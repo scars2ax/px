@@ -141,6 +141,7 @@ function setGitSha() {
     })`;
     process.env.COMMIT_SHA = shaString;
     logger.info({ sha: shaString }, "Got commit SHA via Render config.");
+    return;
   }
 
   try {
