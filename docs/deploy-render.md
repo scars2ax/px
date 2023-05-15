@@ -40,7 +40,11 @@ _If you have trouble with this, you can also try selecting **Clear build cache &
 
 ## Adding a greeting message
 
-You can also create a secret file called `greeting.md` via the Environment tab in Render, the same way you created the `.env` file.  This file will be used to display a message on the Server Info page.  This is a good place to put instructions for how to use the server.
+To show a greeting message on the Server Info page, set the `GREETING_URL` environment variable within Render to the URL of a Markdown file.  This URL should point to a raw text file, not an HTML page.
+
+You can use a public GitHub Gist or GitLab Snippet for this.  For example: `GREETING_URL=https://gitlab.com/-/snippets/2542011/raw/main/greeting.md`.
+
+Don't set `GREETING_URL` in the `.env` secret file you created earlier; it must be set in Render's environment variables section.
 
 ## Customizing the server
 

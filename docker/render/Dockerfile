@@ -12,12 +12,11 @@ RUN apt-get update && \
 # You may need to clear the build cache if you change the greeting, otherwise
 # Render will use the cached layer from the previous build.
 
+WORKDIR /app
 ARG GREETING_URL
 RUN if [ -n "$GREETING_URL" ]; then \
     curl -sL "$GREETING_URL" > greeting.md; \
     fi
-
-WORKDIR /app
 COPY package*.json greeting.md* ./
 RUN npm install
 COPY . .
