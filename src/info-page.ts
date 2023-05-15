@@ -16,7 +16,8 @@ export const handleInfoPage = (req: Request, res: Response) => {
     return;
   }
 
-  // Huggingface puts spaces behind some cloudflare ssl proxy, so `req.protocol` is `http` but the correct URL is actually `https`
+  // Some load balancers/reverse proxies don't give us the right protocol in
+  // the host header. Huggingface works this way, Cloudflare does not.
   const host = req.get("host");
   const isHuggingface = host?.includes("hf.space");
   const protocol = isHuggingface ? "https" : req.protocol;
@@ -83,7 +84,7 @@ function cacheInfoPageHtml(host: string) {
     build: process.env.COMMIT_SHA || "dev",
   };
 
-  const title = getServiceTitle();
+  const title = getServerTitle();
   const headerHtml = buildInfoPageHeader(new showdown.Converter(), title);
 
   const pageBody = `<!DOCTYPE html>
@@ -159,7 +160,12 @@ function getQueueInformation() {
   };
 }
 
-function getServiceTitle() {
+function getServerTitle() {
+  // Use manually set title if available
+  if (process.env.SERVER_TITLE) {
+    return process.env.SERVER_TITLE;
+  }
+
   // Huggingface
   if (process.env.SPACE_ID) {
     return `${process.env.SPACE_AUTHOR_NAME} / ${process.env.SPACE_TITLE}`;
