@@ -36,6 +36,7 @@ app.use(
     },
   })
 );
+app.get("/health", (_req, res) => res.sendStatus(200));
 app.use((req, _res, next) => {
   req.startTime = Date.now();
   req.retryCount = 0;
