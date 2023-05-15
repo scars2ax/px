@@ -6,11 +6,12 @@ RUN apt-get update && \
     
 # Unlike Huggingface, Render can only deploy straight from a git repo and
 # doesn't allow you to create or modify arbitrary files via the web UI.
-# If you want to add a custom `greeting.md` file, push the file somewhere 
-# (like a GitHub Gist or GitLab Snippet) and then set the `GREETING_URL` in
-# your Render environment variables to the URL of the file. It must be a raw
-# text file, not an HTML page.
-RUN curl -o greeting.md $GREETING_URL; exit 0
+
+# If you want to add a custom `greeting.md` file, you can do so by creating a
+# new secret file in Render's Environment UI. Name the secret `greeting.md` and
+# paste the contents of your `greeting.md` file into the value field.
+
+RUN --mount=type=secret,id=greeting,dst=/etc/secrets/greeting.md cat /etc/secrets/greeting.md > /greeting.md    
 
 WORKDIR /app
 COPY package*.json greeting.md* ./

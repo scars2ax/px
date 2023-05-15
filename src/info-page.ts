@@ -80,7 +80,7 @@ function cacheInfoPageHtml(host: string) {
     ...getQueueInformation(),
     keys: keyInfo,
     config: listConfig(),
-    commitSha: process.env.COMMIT_SHA || "dev",
+    build: process.env.COMMIT_SHA || "dev",
   };
 
   const title = getServiceTitle();
