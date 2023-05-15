@@ -5,7 +5,7 @@ services:
     env: docker
     repo: https://gitlab.com/khanon/oai-proxy.git
     region: oregon
+    plan: free
     branch: render
     healthCheckPath: /health
-    dockerfilePath: ./docker/render/Dockerfile
-    
+    dockerfilePath: ./docker/render/Dockerfile   
