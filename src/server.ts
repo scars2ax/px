@@ -53,9 +53,9 @@ app.use(
   express.urlencoded({ extended: true, limit: "10mb" })
 );
 
-// TODO: Detect and/or support manual configuration of whether the app is behind
-// a load balanver/reverse proxy, as we need this to determine the IP addresses
-// correctly.
+// TODO: Detect (or support manual configuration of) whether the app is behind
+// a load balancer/reverse proxy, which is necessary to determine request IP
+// addresses correctly.
 app.set("trust proxy", true);
 
 // routes
