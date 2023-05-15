@@ -133,6 +133,16 @@ function registerUncaughtExceptionHandler() {
 }
 
 function setGitSha() {
+  // On Render, the .git directory isn't available in the docker build context
+  // so we can't get the SHA directly, but they expose it as an env variable.
+  if (process.env.RENDER) {
+    const shaString = `${process.env.RENDER_GIT_COMMIT?.slice(0, 7)} (${
+      process.env.RENDER_GIT_REPO_SLUG
+    })`;
+    process.env.COMMIT_SHA = shaString;
+    logger.info({ sha: shaString }, "Got commit SHA via Render config.");
+  }
+
   try {
     // Huggingface seems to have changed something about how they deploy Spaces
     // and git commands fail because of some ownership issue with the .git

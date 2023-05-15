@@ -83,9 +83,7 @@ function cacheInfoPageHtml(host: string) {
     commitSha: process.env.COMMIT_SHA || "dev",
   };
 
-  const title = process.env.SPACE_ID
-    ? `${process.env.SPACE_AUTHOR_NAME} / ${process.env.SPACE_TITLE}`
-    : "OAI Reverse Proxy";
+  const title = getServiceTitle();
   const headerHtml = buildInfoPageHeader(new showdown.Converter(), title);
 
   const pageBody = `<!DOCTYPE html>
@@ -159,4 +157,18 @@ function getQueueInformation() {
     proomptersInQueue: getQueueLength(),
     estimatedQueueTime: waitMs > 2000 ? waitTime : "no wait",
   };
+}
+
+function getServiceTitle() {
+  // Huggingface
+  if (process.env.SPACE_ID) {
+    return `${process.env.SPACE_AUTHOR_NAME} / ${process.env.SPACE_TITLE}`;
+  }
+
+  // Render
+  if (process.env.RENDER) {
+    return `Render / ${process.env.RENDER_SERVICE_NAME}`;
+  }
+
+  return "OAI Reverse Proxy";
 }
