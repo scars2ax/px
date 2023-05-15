@@ -22,8 +22,12 @@ app.use(
   pinoHttp({
     quietReqLogger: true,
     logger,
-    // SillyTavern spams the hell out of this endpoint so don't log it
-    autoLogging: { ignore: (req) => req.url === "/proxy/kobold/api/v1/model" },
+    autoLogging: {
+      ignore: (req) => {
+        const ignored = ["/proxy/kobold/api/v1/model", "/health"];
+        return ignored.includes(req.url as string);
+      },
+    },
     redact: {
       paths: [
         "req.headers.cookie",
@@ -36,6 +40,7 @@ app.use(
     },
   })
 );
+
 app.get("/health", (_req, res) => res.sendStatus(200));
 app.use((req, _res, next) => {
   req.startTime = Date.now();
@@ -47,9 +52,10 @@ app.use(
   express.json({ limit: "10mb" }),
   express.urlencoded({ extended: true, limit: "10mb" })
 );
-// TODO: this works if we're always being deployed to Huggingface but if users
-// deploy this somewhere without a load balancer then incoming requests can
-// spoof the X-Forwarded-For header and bypass the rate limiting.
+
+// TODO: Detect and/or support manual configuration of whether the app is behind
+// a load balanver/reverse proxy, as we need this to determine the IP addresses
+// correctly.
 app.set("trust proxy", true);
 
 // routes

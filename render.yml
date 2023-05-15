@@ -1,0 +1,11 @@
+services:
+  # A Docker web service
+  - type: web
+    name: oai-proxy
+    env: docker
+    repo: https://gitlab.com/khanon/oai-proxy.git
+    region: oregon
+    branch: release
+    healthCheckPath: /health
+    dockerfilePath: ./docker/render/Dockerfile
+    
