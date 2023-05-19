@@ -35,6 +35,8 @@ app.use(
         "req.headers.authorization",
         'req.headers["x-forwarded-for"]',
         'req.headers["x-real-ip"]',
+        'req.headers["true-client-ip"]',
+        'req.headers["cf-connecting-ip"]',
       ],
       censor: "********",
     },
@@ -139,7 +141,7 @@ function setBuildInfo() {
     const sha = process.env.RENDER_GIT_COMMIT?.slice(0, 7) || "unknown SHA";
     const branch = process.env.RENDER_GIT_BRANCH || "unknown branch";
     const repo = process.env.RENDER_GIT_REPO_SLUG || "unknown repo";
-    const buildInfo = `${sha} (${branch} @ ${repo})`;
+    const buildInfo = `${sha} (${branch}@${repo})`;
     process.env.BUILD_INFO = buildInfo;
     logger.info({ build: buildInfo }, "Got build info from Render config.");
     return;
