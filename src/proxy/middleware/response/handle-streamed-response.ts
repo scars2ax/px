@@ -46,14 +46,25 @@ export const handleStreamedResponse: RawResponseBodyHandler = async (
     // streaming the response without sending headers.
     if (!res.headersSent) {
       res.setHeader("Content-Type", "text/event-stream");
-      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Cache-Control", "no-cache, no-transform");
       res.setHeader("Connection", "keep-alive");
       copyHeaders(proxyRes, res);
       res.flushHeaders();
     }
 
+    // SillyTavern's SSE processor is out-of-spec and doesn't handle cases where
+    // a single HTTP chunk contains multiple SSE data events. This seems to
+    // occur more frequently on Render than on other platforms, and my guess is
+    // that Cloudflare more aggressively buffers HTTP chunks than other reverse
+    // proxies if we send consecutive tokens too quickly, even though we're
+    // sending them separately.
+    // As a workaround we will force Cloudflare to send each token in its own
+    // chunk by introducing a small delay between each token to ensure that
+    // Cloudflare doesn't buffer them together.
+
     const chunks: Buffer[] = [];
     proxyRes.on("data", (chunk) => {
+      req.log.trace({ chunk: chunk.toString() }, `Received HTTP chunk`);
       chunks.push(chunk);
       res.write(chunk);
     });
