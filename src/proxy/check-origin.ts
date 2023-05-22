@@ -8,7 +8,6 @@ export const checkOrigin: RequestHandler = (req, res, next) => {
   const blocks = BLOCKED_REFERERS || [];
   for (const block of blocks) {
     if (
-      true ||
       req.headers.origin?.includes(block) ||
       req.headers.referer?.includes(block)
     ) {
