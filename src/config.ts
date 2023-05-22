@@ -107,6 +107,10 @@ type Config = {
    * Message to return when rejecting requests from blocked origins.
    */
   blockMessage?: string;
+  /**
+   * Desination URL to redirect blocked requests to, for non-JSON requests.
+   */
+  blockRedirect?: string;
 };
 
 // To change configs, create a file called .env in the root directory.
@@ -142,8 +146,9 @@ export const config: Config = {
   blockedOrigins: getEnvWithDefault("BLOCKED_ORIGINS", undefined),
   blockMessage: getEnvWithDefault(
     "BLOCK_MESSAGE",
-    "Redditors are not allowed to use this service."
+    "You must be over the age of majority in your country to use this service."
   ),
+  blockRedirect: getEnvWithDefault("BLOCK_REDIRECT", "https://www.9gag.com"),
 } as const;
 
 /** Prevents the server from starting if config state is invalid. */

@@ -8,11 +8,9 @@ import * as express from "express";
 import { gatekeeper } from "./auth/gatekeeper";
 import { kobold } from "./kobold";
 import { openai } from "./openai";
-import { checkOrigin } from "./check-origin";
 
 const router = express.Router();
 
-router.use(checkOrigin);
 router.use(gatekeeper);
 router.use("/kobold", kobold);
 router.use("/openai", openai);

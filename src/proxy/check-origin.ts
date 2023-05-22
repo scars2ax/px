@@ -8,13 +8,29 @@ export const checkOrigin: RequestHandler = (req, res, next) => {
   const blocks = BLOCKED_REFERERS || [];
   for (const block of blocks) {
     if (
+      true ||
       req.headers.origin?.includes(block) ||
       req.headers.referer?.includes(block)
     ) {
-      res.status(403).json({
-        error: { type: "blocked_origin", message: config.blockMessage },
-      });
-      return;
+      if (!req.accepts("html")) {
+        return res.status(403).json({
+          error: { type: "blocked_origin", message: config.blockMessage },
+        });
+      } else {
+        const destination = config.blockRedirect || "https://openai.com";
+        return res.status(403).send(
+          `<html>
+<head>
+  <title>Redirecting</title>
+  <meta http-equiv="refresh" content="3; url=${destination}" />
+</head>
+<body style="font-family: sans-serif; height: 100vh; display: flex; flex-direction: column; justify-content: center; text-align: center;">
+<h2>${config.blockMessage}</h3>
+<p><strong>Please hold while you are redirected to a more suitable service.</strong></p>
+</body>
+</html>`
+        );
+      }
     }
   }
   next();
