@@ -232,6 +232,7 @@ export const OMITTED_KEYS: (keyof Config)[] = [
   "maxIpsPerUser",
   "blockedOrigins",
   "blockMessage",
+  "blockRedirect",
 ];
 
 const getKeys = Object.keys as <T extends object>(obj: T) => Array<keyof T>;
