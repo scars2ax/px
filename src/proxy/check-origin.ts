@@ -11,6 +11,10 @@ export const checkOrigin: RequestHandler = (req, res, next) => {
       req.headers.origin?.includes(block) ||
       req.headers.referer?.includes(block)
     ) {
+      req.log.warn(
+        { origin: req.headers.origin, referer: req.headers.referer },
+        "Blocked request from origin or referer"
+      );
       if (!req.accepts("html")) {
         return res.status(403).json({
           error: { type: "blocked_origin", message: config.blockMessage },
