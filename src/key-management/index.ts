@@ -9,14 +9,14 @@ import {
   AnthropicModel,
 } from "./anthropic/provider";
 
-type AIService = "openai" | "anthropic";
+export type AIService = "openai" | "anthropic";
 export type Model = OpenAIModel | AnthropicModel;
 
 export interface Key {
-  /** The API key itself. */
+  /** The API key itself. Never log this, use `hash` instead. */
   key: string;
-  /** The provider that this key belongs to. */
-  provider: AIService;
+  /** The service that this key is for. */
+  service: AIService;
   /** Whether this is a free trial key. These are prioritized over paid keys if they can fulfill the request. */
   isTrial: boolean;
   /** Whether this key has been provisioned for GPT-4. */
@@ -29,7 +29,7 @@ export interface Key {
   lastUsed: number;
   /** The time at which this key was last checked. */
   lastChecked: number;
-  /** Key hash for displaying usage in the dashboard. */
+  /** Hash of the key, for logging and to find the key in the pool. */
   hash: string;
 }
 
@@ -45,28 +45,8 @@ the appropriate KeyProvider or returns data aggregated across all KeyProviders
 for service-agnostic functionality.
 */
 
-export interface KeyPool {
-  /** Initialize the key pool. */
-  init(): void;
-  /** Gets a key for the given model. */
-  get(model: Model): Key;
-  /** List status of all keys in the pool. */
-  list(): Omit<Key, "key">[];
-  /** Disable a key. */
-  disable(key: Key): void;
-  /** Number of active keys in the pool. */
-  available(): number;
-  /** Whether any key providers are still checking key status. */
-  anyUnchecked(): boolean;
-  /** Time until the key pool will be able to fulfill a request for a model.*/
-  getLockoutPeriod(model: Model): number;
-  /** Remaining aggregate quota for the key pool as a percentage. */
-  remainingQuota(service: AIService): number;
-  /** Used over available usage in USD. */
-  usageInUsd(service: AIService): string;
-}
-
-export interface KeyProvider<T extends Key = never> {
+export interface KeyProvider<T extends Key = Key> {
+  service: AIService;
   init(): void;
   get(model: Model): T;
   list(): Omit<T, "key">[];
@@ -74,8 +54,9 @@ export interface KeyProvider<T extends Key = never> {
   available(): number;
   anyUnchecked(): boolean;
   getLockoutPeriod(model: Model): number;
-  remainingQuota(): number;
-  usageInUsd(): string;
+  remainingQuota(options?: Record<string, unknown>): number;
+  usageInUsd(options?: Record<string, unknown>): string;
+  markRateLimited(hash: string): void;
 }
 
 export const keyPool = new OpenAIKeyProvider();

@@ -17,6 +17,7 @@ export const OPENAI_SUPPORTED_MODELS: readonly OpenAIModel[] = [
 ] as const;
 
 export interface OpenAIKey extends Key {
+  service: "openai";
   /** The current usage of this key. */
   usage: number;
   /** Threshold at which a warning email will be sent by OpenAI. */
@@ -57,9 +58,11 @@ export type OpenAIKeyUpdate = Omit<
 >;
 
 export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
+  readonly service = "openai" as const;
+
   private keys: OpenAIKey[] = [];
   private checker?: OpenAIKeyChecker;
-  private log = logger.child({ module: "key-pool" });
+  private log = logger.child({ module: "key-provider", service: this.service });
 
   constructor() {
     const keyString = config.openaiKey;
@@ -72,7 +75,7 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
     for (const k of bareKeys) {
       const newKey = {
         key: k,
-        provider: "openai" as const,
+        service: "openai" as const,
         isGpt4: false,
         isTrial: false,
         isDisabled: false,
@@ -83,14 +86,18 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
         lastUsed: 0,
         lastChecked: 0,
         promptCount: 0,
-        hash: crypto.createHash("sha256").update(k).digest("hex").slice(0, 8),
+        hash: `oai-${crypto
+          .createHash("sha256")
+          .update(k)
+          .digest("hex")
+          .slice(0, 8)}`,
         rateLimitedAt: 0,
         rateLimitRequestsReset: 0,
         rateLimitTokensReset: 0,
       };
       this.keys.push(newKey);
     }
-    this.log.info({ keyCount: this.keys.length }, "Loaded keys");
+    this.log.info({ keyCount: this.keys.length }, "Loaded OpenAI keys.");
   }
 
   public init() {
@@ -119,11 +126,9 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
       (key) => !key.isDisabled && (!needGpt4 || key.isGpt4)
     );
     if (availableKeys.length === 0) {
-      let message = "No keys available. Please add more keys.";
-      if (needGpt4) {
-        message =
-          "No GPT-4 keys available. Please add more keys or select a non-GPT-4 model.";
-      }
+      let message = needGpt4
+        ? "No active OpenAI keys available."
+        : "No GPT-4 keys available.  Try selecting a non-GPT-4 model.";
       throw new Error(message);
     }
 
@@ -155,7 +160,7 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
     });
 
     const selectedKey = keysByPriority[0];
-    selectedKey.lastUsed = Date.now();
+    selectedKey.lastUsed = now;
 
     // When a key is selected, we rate-limit it for a brief period of time to
     // prevent the queue processor from immediately flooding it with requests
@@ -163,7 +168,7 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
     // get new rate limit headers).
     // Instead, we will let a request through every second until the key
     // becomes fully saturated and locked out again.
-    selectedKey.rateLimitedAt = Date.now();
+    selectedKey.rateLimitedAt = now;
     selectedKey.rateLimitRequestsReset = 1000;
     return { ...selectedKey };
   }
@@ -175,9 +180,10 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
     // this.writeKeyStatus();
   }
 
+  /** Disables a key, or does nothing if the key isn't in this pool. */
   public disable(key: Key) {
-    const keyFromPool = this.keys.find((k) => k.key === key.key)!;
-    if (keyFromPool.isDisabled) return;
+    const keyFromPool = this.keys.find((k) => k.key === key.key);
+    if (!keyFromPool || keyFromPool.isDisabled) return;
     keyFromPool.isDisabled = true;
     // If it's disabled just set the usage to the hard limit so it doesn't
     // mess with the aggregate usage.
@@ -289,7 +295,7 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
   }
 
   /** Returns the remaining aggregate quota for all keys as a percentage. */
-  public remainingQuota(gpt4 = false) {
+  public remainingQuota({ gpt4 }: { gpt4: boolean } = { gpt4: false }): number {
     const keys = this.keys.filter((k) => k.isGpt4 === gpt4);
     if (keys.length === 0) return 0;
 
@@ -303,7 +309,7 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
   }
 
   /** Returns used and available usage in USD. */
-  public usageInUsd(gpt4 = false) {
+  public usageInUsd({ gpt4 }: { gpt4: boolean } = { gpt4: false }): string {
     const keys = this.keys.filter((k) => k.isGpt4 === gpt4);
     if (keys.length === 0) return "???";
 

@@ -1,4 +1,7 @@
-import { KeyProvider } from "..";
+import crypto from "crypto";
+import { Key, KeyProvider, Model } from "..";
+import { config } from "../../config";
+import { logger } from "../../logger";
 
 export type AnthropicModel = "claude-v1" | "claude-instant-v1";
 export const ANTHROPIC_SUPPORTED_MODELS: readonly AnthropicModel[] = [
@@ -6,37 +9,174 @@ export const ANTHROPIC_SUPPORTED_MODELS: readonly AnthropicModel[] = [
   "claude-v1",
 ] as const;
 
-export class AnthropicKeyProvider implements KeyProvider {
-  // @ts-ignore
-  async get(model: AnthropicModel) {
-    throw new Error("Method not implemented.");
+export interface AnthropicKey extends Key {
+  service: "anthropic";
+  /** The time at which this key was last rate limited. */
+  rateLimitedAt: number;
+  /** The period of time for which this key was rate limited. */
+  rateLimitedFor: number;
+}
+
+export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
+  readonly service = "anthropic";
+
+  private keys: AnthropicKey[] = [];
+  private log = logger.child({ module: "key-provider", service: this.service });
+
+  constructor() {
+    const keyConfig = config.anthropicKey?.trim();
+    if (!keyConfig) {
+      this.log.warn(
+        "No Anthropic key configured, Anthropic API will be unavailable."
+      );
+      return;
+    }
+    let bareKeys: string[];
+    bareKeys = [...new Set(keyConfig.split(",").map((k) => k.trim()))];
+    for (const key of bareKeys) {
+      const newKey: AnthropicKey = {
+        key,
+        service: this.service,
+        isGpt4: false,
+        isTrial: false,
+        isDisabled: false,
+        promptCount: 0,
+        lastUsed: 0,
+        rateLimitedAt: 0,
+        rateLimitedFor: 0,
+        hash: `ant-${crypto
+          .createHash("sha256")
+          .update(key)
+          .digest("hex")
+          .slice(0, 8)}`,
+        lastChecked: 0,
+      };
+      this.keys.push(newKey);
+    }
+    this.log.info({ keyCount: this.keys.length }, "Loaded Anthropic keys.");
   }
-  // @ts-ignore
-  async list() {
-    throw new Error("Method not implemented.");
+
+  public init() {
+    // Nothing to do as Anthropic's API doesn't provide any usage information so
+    // there is no key checker implementation.
   }
-  // @ts-ignore
-  async disable(key: any) {
-    throw new Error("Method not implemented.");
+
+  public list() {
+    return this.keys.map((k) => Object.freeze({ ...k, key: undefined }));
   }
-  // @ts-ignore
-  async available() {
-    throw new Error("Method not implemented.");
+
+  public get(_model: AnthropicModel) {
+    // Currently, all Anthropic keys have access to all models. This will almost
+    // certainly change when they move out of beta later this year.
+    const availableKeys = this.keys.filter((k) => !k.isDisabled);
+    if (availableKeys.length === 0) {
+      throw new Error("No Anthropic keys available.");
+    }
+
+    // (largely copied from the OpenAI provider, without trial key support)
+    // Select a key, from highest priority to lowest priority:
+    // 1. Keys which are not rate limited
+    //    a. We can assume any rate limits over a minute ago are expired
+    //    b. If all keys were rate limited in the last minute, select the
+    //       least recently rate limited key
+    // 2. Keys which have not been used in the longest time
+
+    const now = Date.now();
+    // Lower rateLimitThreshold for Anthropic because rather than limiting on
+    // a one minute window, they limit to concurrent requests. Claude
+    // generations don't typically take more than 30 seconds so any rate limits
+    // over 30 seconds old are almost certainly expired.
+    const rateLimitThreshold = 30 * 1000;
+
+    const keysByPriority = availableKeys.sort((a, b) => {
+      const aRateLimited = now - a.rateLimitedAt < rateLimitThreshold;
+      const bRateLimited = now - b.rateLimitedAt < rateLimitThreshold;
+
+      if (aRateLimited && !bRateLimited) return 1;
+      if (!aRateLimited && bRateLimited) return -1;
+      if (aRateLimited && bRateLimited) {
+        return a.rateLimitedAt - b.rateLimitedAt;
+      }
+      return a.lastUsed - b.lastUsed;
+    });
+
+    const selectedKey = keysByPriority[0];
+    selectedKey.lastUsed = now;
+
+    selectedKey.rateLimitedAt = now;
+    // Intended to throttle the queue processor as otherwise it will just
+    // flood the API with requests and we want to wait a sec to see if we're
+    // going to get a rate limit error on this key.
+    selectedKey.rateLimitedFor = 1000;
+    return { ...selectedKey };
   }
-  // @ts-ignore
-  async anyUnchecked() {
-    throw new Error("Method not implemented.");
+
+  public disable(key: AnthropicKey) {
+    const keyFromPool = this.keys.find((k) => k.key === key.key);
+    if (!keyFromPool || keyFromPool.isDisabled) return;
+    keyFromPool.isDisabled = true;
+    this.log.warn({ key: key.hash }, "Key disabled");
   }
-  // @ts-ignore
-  async getLockoutPeriod(model: AnthropicModel) {
-    throw new Error("Method not implemented.");
+
+  public available() {
+    return this.keys.filter((k) => !k.isDisabled).length;
   }
-  // @ts-ignore
-  async remainingQuota() {
-    throw new Error("Method not implemented.");
+
+  // No key checker for Anthropic
+  public anyUnchecked() {
+    return false;
   }
-  // @ts-ignore
-  async usageInUsd() {
-    throw new Error("Method not implemented.");
+
+  public getLockoutPeriod(_model: AnthropicModel) {
+    const activeKeys = this.keys.filter((k) => !k.isDisabled);
+    // Don't lock out if there are no keys available or the queue will stall.
+    // Just let it through so the add-key middleware can throw an error.
+    if (activeKeys.length === 0) return 0;
+
+    const now = Date.now();
+    const rateLimitedKeys = activeKeys.filter(
+      (k) => now < k.rateLimitedAt + k.rateLimitedFor
+    );
+    const anyNotRateLimited = rateLimitedKeys.length < activeKeys.length;
+
+    if (anyNotRateLimited) return 0;
+
+    // If all keys are rate-limited, return the time until the first key is
+    // ready.
+    const timeUntilFirstReady = Math.min(
+      ...rateLimitedKeys.map((k) => k.rateLimitedAt + k.rateLimitedFor - now)
+    );
+    return timeUntilFirstReady;
+  }
+
+  /**
+   * This is called when we receive a 429, which means there are already five
+   * concurrent requests running on this key. We don't have any information on
+   * when these requests will resolve so all we can do is wait a bit and try
+   * again.
+   * We will lock the key for 10 seconds, which should let a few of the other
+   * generations finish. This is an arbitrary number but the goal is to balance
+   * between not hammering the API with requests and not locking out a key that
+   * is actually available.
+   * TODO; Try to assign requests to slots on each key so we have an idea of how
+   * long each slot has been running and can make a more informed decision on
+   * how long to lock the key.
+   */
+  public markRateLimited(keyHash: string) {
+    this.log.warn({ key: keyHash }, "Key rate limited");
+    const key = this.keys.find((k) => k.hash === keyHash)!;
+    key.rateLimitedAt = Date.now();
+    key.rateLimitedFor = 10000;
+  }
+
+  public remainingQuota() {
+    const activeKeys = this.keys.filter((k) => !k.isDisabled).length;
+    const allKeys = this.keys.length;
+    if (activeKeys === 0) return 0;
+    return Math.round((activeKeys / allKeys) * 100) / 100;
+  }
+
+  public usageInUsd() {
+    return "$0.00 / ∞";
   }
 }
