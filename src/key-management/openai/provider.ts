@@ -17,7 +17,7 @@ export const OPENAI_SUPPORTED_MODELS: readonly OpenAIModel[] = [
 ] as const;
 
 export interface OpenAIKey extends Key {
-  service: "openai";
+  readonly service: "openai";
   /** The current usage of this key. */
   usage: number;
   /** Threshold at which a warning email will be sent by OpenAI. */
@@ -257,8 +257,8 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
   }
 
   public incrementPrompt(keyHash?: string) {
-    if (!keyHash) return;
-    const key = this.keys.find((k) => k.hash === keyHash)!;
+    const key = this.keys.find((k) => k.hash === keyHash);
+    if (!key) return;
     key.promptCount++;
   }
 

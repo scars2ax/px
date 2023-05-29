@@ -10,7 +10,7 @@ export const ANTHROPIC_SUPPORTED_MODELS: readonly AnthropicModel[] = [
 ] as const;
 
 export interface AnthropicKey extends Key {
-  service: "anthropic";
+  readonly service: "anthropic";
   /** The time at which this key was last rate limited. */
   rateLimitedAt: number;
   /** The period of time for which this key was rate limited. */
@@ -64,7 +64,7 @@ export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
 
   public init() {
     // Nothing to do as Anthropic's API doesn't provide any usage information so
-    // there is no key checker implementation.
+    // there is no key checker implementation and no need to start it.
   }
 
   public list() {
@@ -102,7 +102,6 @@ export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
 
     const selectedKey = keysByPriority[0];
     selectedKey.lastUsed = now;
-
     selectedKey.rateLimitedAt = now;
     // Intended to throttle the queue processor as otherwise it will just
     // flood the API with requests and we want to wait a sec to see if we're
@@ -125,6 +124,12 @@ export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
   // No key checker for Anthropic
   public anyUnchecked() {
     return false;
+  }
+
+  public incrementPrompt(hash?: string) {
+    const key = this.keys.find((k) => k.hash === hash);
+    if (!key) return;
+    key.promptCount++;
   }
 
   public getLockoutPeriod(_model: AnthropicModel) {

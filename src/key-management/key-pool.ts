@@ -1,3 +1,4 @@
+import type * as http from "http";
 import { AnthropicKeyProvider } from "./anthropic/provider";
 import { Key, AIService, Model, KeyProvider } from "./index";
 import { OpenAIKeyProvider } from "./openai/provider";
@@ -48,9 +49,26 @@ export class KeyPool {
     return this.keyProviders.some((provider) => provider.anyUnchecked());
   }
 
+  public incrementPrompt(key: Key): void {
+    const provider = this.getKeyProvider(key.service);
+    provider.incrementPrompt(key.hash);
+  }
+
   public getLockoutPeriod(model: Model): number {
     const service = this.getService(model);
     return this.getKeyProvider(service).getLockoutPeriod(model);
+  }
+
+  public markRateLimited(key: Key): void {
+    const provider = this.getKeyProvider(key.service);
+    provider.markRateLimited(key.hash);
+  }
+
+  public updateRateLimits(key: Key, headers: http.IncomingHttpHeaders): void {
+    const provider = this.getKeyProvider(key.service);
+    if (provider instanceof OpenAIKeyProvider) {
+      provider.updateRateLimits(key.hash, headers);
+    }
   }
 
   public remainingQuota(service: AIService): number {
