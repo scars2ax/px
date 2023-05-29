@@ -120,16 +120,21 @@ export function enqueue(req: Request) {
 
 export function dequeue(model: SupportedModel): Request | undefined {
   const modelQueue = queue.filter((req) => {
+    const reqProvider = req.originalUrl.startsWith("/proxy/anthropic")
+      ? "anthropic"
+      : "openai";
+
+    // This sucks, but the `req.body.model` on Anthropic requests via the
+    // OpenAI-compat endpoint isn't actually claude-*, it's a fake gpt value.
+    // TODO: refactor model/service detection
+
     if (model.startsWith("claude")) {
-      // This sucks, but the `req.body.model` on Anthropic requests via the
-      // OpenAI-compat endpoint isn't actually claude-*, it's a fake gpt value.
-      // TODO: refactor model/service detection
-      return req.originalUrl.startsWith("/proxy/anthropic");
+      return reqProvider === "anthropic";
     }
     if (model.startsWith("gpt-4")) {
-      return req.body.model?.startsWith("gpt-4");
+      return reqProvider === "openai" && req.body.model?.startsWith("gpt-4");
     }
-    return !req.body.model?.startsWith("gpt-4");
+    return reqProvider === "openai" && req.body.model?.startsWith("gpt-3");
   });
 
   if (modelQueue.length === 0) {
@@ -326,7 +331,7 @@ export function buildFakeSseMessage(
   req: Request
 ) {
   let fakeEvent;
-  
+
   if (req.api === "anthropic") {
     // data: {"completion": " Here is a paragraph of lorem ipsum text:\n\nLorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor inc", "stop_reason": "max_tokens", "truncated": false, "stop": null, "model": "claude-instant-v1", "log_id": "???", "exception": null}
     fakeEvent = {

@@ -15,8 +15,8 @@ export interface AnthropicKey extends Key {
   readonly service: "anthropic";
   /** The time at which this key was last rate limited. */
   rateLimitedAt: number;
-  /** The period of time for which this key was rate limited. */
-  rateLimitedFor: number;
+  /** The time until which this key is rate limited. */
+  rateLimitedUntil: number;
 }
 
 /**
@@ -51,7 +51,7 @@ export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
         promptCount: 0,
         lastUsed: 0,
         rateLimitedAt: 0,
-        rateLimitedFor: 0,
+        rateLimitedUntil: 0,
         hash: `ant-${crypto
           .createHash("sha256")
           .update(key)
@@ -108,7 +108,7 @@ export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
     // Intended to throttle the queue processor as otherwise it will just
     // flood the API with requests and we want to wait a sec to see if we're
     // going to get a rate limit error on this key.
-    selectedKey.rateLimitedFor = 1000;
+    selectedKey.rateLimitedUntil = now + 1000;
     return { ...selectedKey };
   }
 
@@ -141,9 +141,7 @@ export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
     if (activeKeys.length === 0) return 0;
 
     const now = Date.now();
-    const rateLimitedKeys = activeKeys.filter(
-      (k) => now < k.rateLimitedAt + k.rateLimitedFor
-    );
+    const rateLimitedKeys = activeKeys.filter((k) => now < k.rateLimitedUntil);
     const anyNotRateLimited = rateLimitedKeys.length < activeKeys.length;
 
     if (anyNotRateLimited) return 0;
@@ -151,7 +149,7 @@ export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
     // If all keys are rate-limited, return the time until the first key is
     // ready.
     const timeUntilFirstReady = Math.min(
-      ...rateLimitedKeys.map((k) => k.rateLimitedAt + k.rateLimitedFor - now)
+      ...activeKeys.map((k) => k.rateLimitedUntil - now)
     );
     return timeUntilFirstReady;
   }
@@ -172,8 +170,9 @@ export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
   public markRateLimited(keyHash: string) {
     this.log.warn({ key: keyHash }, "Key rate limited");
     const key = this.keys.find((k) => k.hash === keyHash)!;
-    key.rateLimitedAt = Date.now();
-    key.rateLimitedFor = RATE_LIMIT_LOCKOUT;
+    const now = Date.now();
+    key.rateLimitedAt = now;
+    key.rateLimitedUntil = now + RATE_LIMIT_LOCKOUT;
   }
 
   public remainingQuota() {
