@@ -282,7 +282,7 @@ const handleUpstreamErrors: ProxyResHandlerWithBody = async (
       errorPayload.proxy_note = `Assigned key was deactivated by OpenAI. ${tryAgainMessage}`;
     } else if (type === "requests" || type === "tokens") {
       // Per-minute request or token rate limit is exceeded, which we can retry
-      keyPool.markRateLimited(req.key!.hash);
+      keyPool.markRateLimited(req.key!);
       if (config.queueMode !== "none") {
         reenqueueRequest(req);
         // TODO: I don't like using an error to control flow here
@@ -369,7 +369,7 @@ export const handleInternalError: httpProxy.ErrorCallback = (
 
 const incrementKeyUsage: ProxyResHandlerWithBody = async (_proxyRes, req) => {
   if (QUOTA_ROUTES.includes(req.path)) {
-    keyPool.incrementPrompt(req.key?.hash);
+    keyPool.incrementPrompt(req.key!);
     if (req.user) {
       incrementPromptCount(req.user.token);
     }
@@ -377,7 +377,7 @@ const incrementKeyUsage: ProxyResHandlerWithBody = async (_proxyRes, req) => {
 };
 
 const trackRateLimit: ProxyResHandlerWithBody = async (proxyRes, req) => {
-  keyPool.updateRateLimits(req.key!.hash, proxyRes.headers);
+  keyPool.updateRateLimits(req.key!, proxyRes.headers);
 };
 
 const copyHttpHeaders: ProxyResHandlerWithBody = async (

@@ -1,20 +1,16 @@
-import {
-  OPENAI_SUPPORTED_MODELS,
-  OpenAIKeyProvider,
-  OpenAIModel,
-} from "./openai/provider";
+import { OPENAI_SUPPORTED_MODELS, OpenAIModel } from "./openai/provider";
 import {
   ANTHROPIC_SUPPORTED_MODELS,
-  AnthropicKeyProvider,
   AnthropicModel,
 } from "./anthropic/provider";
+import { KeyPool } from "./key-pool";
 
 export type AIService = "openai" | "anthropic";
 export type Model = OpenAIModel | AnthropicModel;
 
 export interface Key {
   /** The API key itself. Never log this, use `hash` instead. */
-  key: string;
+  readonly key: string;
   /** The service that this key is for. */
   service: AIService;
   /** Whether this is a free trial key. These are prioritized over paid keys if they can fulfill the request. */
@@ -46,18 +42,23 @@ for service-agnostic functionality.
 */
 
 export interface KeyProvider<T extends Key = Key> {
-  service: AIService;
+  readonly service: AIService;
   init(): void;
   get(model: Model): T;
   list(): Omit<T, "key">[];
   disable(key: T): void;
   available(): number;
   anyUnchecked(): boolean;
+  incrementPrompt(hash: string): void;
   getLockoutPeriod(model: Model): number;
   remainingQuota(options?: Record<string, unknown>): number;
   usageInUsd(options?: Record<string, unknown>): string;
   markRateLimited(hash: string): void;
 }
 
-export const keyPool = new OpenAIKeyProvider();
-export const SUPPORTED_MODELS = OPENAI_SUPPORTED_MODELS;
+export const keyPool = new KeyPool();
+export const SUPPORTED_MODELS = [
+  ...OPENAI_SUPPORTED_MODELS,
+  ...ANTHROPIC_SUPPORTED_MODELS,
+];
+export { OPENAI_SUPPORTED_MODELS, ANTHROPIC_SUPPORTED_MODELS };
