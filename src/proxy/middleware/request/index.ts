@@ -8,6 +8,7 @@ export { languageFilter } from "./language-filter";
 export { limitCompletions } from "./limit-completions";
 export { limitOutputTokens } from "./limit-output-tokens";
 export { transformKoboldPayload } from "./transform-kobold-payload";
+export { transformOutboundPayload } from "./transform-outbound-payload";
 
 const OPENAI_CHAT_COMPLETION_ENDPOINT = "/v1/chat/completions";
 const ANTHROPIC_COMPLETION_ENDPOINT = "/v1/complete";

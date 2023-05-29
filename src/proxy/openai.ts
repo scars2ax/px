@@ -11,6 +11,7 @@ import {
   finalizeBody,
   limitOutputTokens,
   limitCompletions,
+  transformOutboundPayload,
 } from "./middleware/request";
 import {
   createOnProxyResHandler,
@@ -29,6 +30,7 @@ const rewriteRequest = (
     languageFilter,
     limitOutputTokens,
     limitCompletions,
+    transformOutboundPayload,
     finalizeBody,
   ];
 
