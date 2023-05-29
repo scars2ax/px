@@ -3,6 +3,28 @@ import * as http from "http";
 import { RawResponseBodyHandler, decodeResponseBody } from ".";
 import { buildFakeSseMessage } from "../../queue";
 
+type OpenAiChatCompletionResponse = {
+  id: string;
+  object: string;
+  created: number;
+  model: string;
+  choices: {
+    message: { role: string; content: string };
+    finish_reason: string | null;
+    index: number;
+  }[];
+};
+
+type AnthropicCompletionResponse = {
+  completion: string;
+  stop_reason: string;
+  truncated: boolean;
+  stop: any;
+  model: string;
+  log_id: string;
+  exception: null;
+};
+
 /**
  * Consume the SSE stream and forward events to the client. Once the stream is
  * stream is closed, resolve with the full response body so that subsequent
@@ -64,14 +86,28 @@ export const handleStreamedResponse: RawResponseBodyHandler = async (
       res.flushHeaders();
     }
 
-    const chunks: Buffer[] = [];
+    const fullChunks: string[] = [];
+    let chunkBuffer: string[] = [];
+    let messageBuffer = "";
+    let lastPosition = 0;
     proxyRes.on("data", (chunk) => {
-      chunks.push(chunk);
-      res.write(chunk);
+      // We may receive multiple (or partial) SSE messages in a single chunk, so
+      // we need to buffer and emit seperate stream events for full messages so
+      // we can parse/transform them properly.
+      const str = chunk.toString();
+      chunkBuffer.push(str);
+
+      const newMessages = (messageBuffer + chunkBuffer.join("")).split("\n\n");
+      chunkBuffer = [];
+      messageBuffer = newMessages.pop() || "";
+
+      for (const message of newMessages) {
+        proxyRes.emit("full-sse-event", message);
+      }
     });
 
     proxyRes.on("end", () => {
-      let finalBody = convertEventsToFinalResponse(chunks, req);
+      let finalBody = convertEventsToFinalResponse(chunkBuffer, req);
       req.log.info(
         { api: req.api, key: req.key?.hash },
         `Finished proxying SSE stream.`
@@ -79,6 +115,19 @@ export const handleStreamedResponse: RawResponseBodyHandler = async (
       res.end();
       resolve(finalBody);
     });
+
+    proxyRes.on("full-sse-event", (data) => {
+      const { event, position } = transformEvent(
+        data,
+        fromApi,
+        toApi,
+        fullChunks.length
+      );
+      fullChunks.push(event);
+      lastPosition = position;
+      res.write(event);
+    });
+
     proxyRes.on("error", (err) => {
       req.log.error(
         { error: err, api: req.api, key: req.key?.hash },
@@ -97,8 +146,43 @@ export const handleStreamedResponse: RawResponseBodyHandler = async (
   });
 };
 
+function transformEvent(
+  data: string,
+  fromApi: string,
+  toApi: string,
+  lastPosition: number
+) {
+  if (fromApi === toApi) {
+    return { position: -1, event: data };
+  }
+
+  if (fromApi === "openai" && toApi === "anthropic") {
+    throw new Error(`OpenAI -> Anthropic streaming not yet supported.`);
+  }
+
+  // Anthropic sends the full completion so far with each event whereas OpenAI
+  // only sends the delta. To make the SSE events compatible, we remove
+  // everything before `lastPosition` from the completion.
+  if (!data.startsWith("data:")) {
+    return { position: lastPosition, event: data };
+  }
+
+  if (data.startsWith("data: [DONE]")) {
+    return { position: lastPosition, event: data };
+  }
+
+  const event = JSON.parse(data.slice("data: ".length));
+  if (event.completion) {
+    event.completion = event.completion.slice(lastPosition);
+  }
+  return {
+    position: event.completion.length,
+    event: `data: ${JSON.stringify(event)}\n\n`,
+  };
+}
+
 /** Copy headers, excluding ones we're already setting for the SSE response. */
-const copyHeaders = (proxyRes: http.IncomingMessage, res: Response) => {
+function copyHeaders(proxyRes: http.IncomingMessage, res: Response) {
   const toOmit = [
     "content-length",
     "content-encoding",
@@ -112,31 +196,9 @@ const copyHeaders = (proxyRes: http.IncomingMessage, res: Response) => {
       res.setHeader(key, value);
     }
   }
-};
+}
 
-type OpenAiChatCompletionResponse = {
-  id: string;
-  object: string;
-  created: number;
-  model: string;
-  choices: {
-    message: { role: string; content: string };
-    finish_reason: string | null;
-    index: number;
-  }[];
-};
-
-type AnthropicCompletionResponse = {
-  completion: string;
-  stop_reason: string;
-  truncated: boolean;
-  stop: any;
-  model: string;
-  log_id: string;
-  exception: null;
-};
-
-const convertEventsToFinalResponse = (chunks: Buffer[], req: Request) => {
+function convertEventsToFinalResponse(chunks: string[], req: Request) {
   if (req.key!.service === "openai") {
     let response: OpenAiChatCompletionResponse = {
       id: "",
@@ -145,8 +207,8 @@ const convertEventsToFinalResponse = (chunks: Buffer[], req: Request) => {
       model: "",
       choices: [],
     };
-    const events = Buffer.concat(chunks)
-      .toString()
+    const events = chunks
+      .join("")
       .trim()
       .split("\n\n")
       .map((line) => line.trim());
@@ -199,4 +261,4 @@ const convertEventsToFinalResponse = (chunks: Buffer[], req: Request) => {
     return response;
   }
   throw new Error("If you get this, something is fucked");
-};
+}
