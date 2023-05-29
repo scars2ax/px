@@ -5,12 +5,13 @@ import crypto from "crypto";
 import fs from "fs";
 import http from "http";
 import path from "path";
-import { KeyPool, Key, Model } from "../index";
+import { KeyProvider, Key, Model } from "../index";
 import { config } from "../../config";
 import { logger } from "../../logger";
-import { KeyChecker } from "./key-checker";
+import { OpenAIKeyChecker } from "./checker";
 
-export const OPENAI_SUPPORTED_MODELS: readonly Model[] = [
+export type OpenAIModel = "gpt-3.5-turbo" | "gpt-4";
+export const OPENAI_SUPPORTED_MODELS: readonly OpenAIModel[] = [
   "gpt-3.5-turbo",
   "gpt-4",
 ] as const;
@@ -55,9 +56,9 @@ export type OpenAIKeyUpdate = Omit<
   "key" | "hash" | "lastUsed" | "lastChecked" | "promptCount"
 >;
 
-export class OpenAIKeyPool implements KeyPool<OpenAIKey> {
+export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
   private keys: OpenAIKey[] = [];
-  private checker?: KeyChecker;
+  private checker?: OpenAIKeyChecker;
   private log = logger.child({ module: "key-pool" });
 
   constructor() {
@@ -71,6 +72,7 @@ export class OpenAIKeyPool implements KeyPool<OpenAIKey> {
     for (const k of bareKeys) {
       const newKey = {
         key: k,
+        provider: "openai" as const,
         isGpt4: false,
         isTrial: false,
         isDisabled: false,
@@ -93,7 +95,7 @@ export class OpenAIKeyPool implements KeyPool<OpenAIKey> {
 
   public init() {
     if (config.checkKeys) {
-      this.checker = new KeyChecker(this.keys, this.update.bind(this));
+      this.checker = new OpenAIKeyChecker(this.keys, this.update.bind(this));
       this.checker.start();
     }
   }

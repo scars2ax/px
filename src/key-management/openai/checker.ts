@@ -1,7 +1,7 @@
 import axios, { AxiosError } from "axios";
 import { Configuration, OpenAIApi } from "openai";
 import { logger } from "../../logger";
-import type { OpenAIKey, OpenAIKeyPool } from "./key-pool";
+import type { OpenAIKey, OpenAIKeyProvider } from "./provider";
 
 const MIN_CHECK_INTERVAL = 3 * 1000; // 3 seconds
 const KEY_CHECK_PERIOD = 5 * 60 * 1000; // 5 minutes
@@ -26,11 +26,11 @@ type OpenAIError = {
   error: { type: string; code: string; param: unknown; message: string };
 };
 
-type UpdateFn = typeof OpenAIKeyPool.prototype.update;
+type UpdateFn = typeof OpenAIKeyProvider.prototype.update;
 
-export class KeyChecker {
+export class OpenAIKeyChecker {
   private readonly keys: OpenAIKey[];
-  private log = logger.child({ module: "key-checker" });
+  private log = logger.child({ module: "key-checker", service: "openai" });
   private timeout?: NodeJS.Timeout;
   private updateKey: UpdateFn;
   private lastCheck = 0;
@@ -198,7 +198,7 @@ export class KeyChecker {
   }
 
   private async getUsage(key: OpenAIKey) {
-    const querystring = KeyChecker.getUsageQuerystring(key.isTrial);
+    const querystring = OpenAIKeyChecker.getUsageQuerystring(key.isTrial);
     const url = `${GET_USAGE_URL}?${querystring}`;
     const { data } = await axios.get<GetUsageResponse>(url, {
       headers: { Authorization: `Bearer ${key.key}` },
@@ -207,7 +207,7 @@ export class KeyChecker {
   }
 
   private handleAxiosError(key: OpenAIKey, error: AxiosError) {
-    if (error.response && KeyChecker.errorIsOpenAiError(error)) {
+    if (error.response && OpenAIKeyChecker.errorIsOpenAiError(error)) {
       const { status, data } = error.response;
       if (status === 401) {
         this.log.warn(

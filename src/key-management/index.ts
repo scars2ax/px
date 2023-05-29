@@ -1,13 +1,22 @@
-import { OpenAIKeyPool } from "./openai/key-pool";
-import { OPENAI_SUPPORTED_MODELS } from "./openai/key-pool";
+import {
+  OPENAI_SUPPORTED_MODELS,
+  OpenAIKeyProvider,
+  OpenAIModel,
+} from "./openai/provider";
+import {
+  ANTHROPIC_SUPPORTED_MODELS,
+  AnthropicKeyProvider,
+  AnthropicModel,
+} from "./anthropic/provider";
 
+type AIService = "openai" | "anthropic";
 export type Model = OpenAIModel | AnthropicModel;
-export type OpenAIModel = "gpt-3.5-turbo" | "gpt-4";
-export type AnthropicModel = "claude-v1" | "claude-instant-v1";
 
 export interface Key {
   /** The API key itself. */
   key: string;
+  /** The provider that this key belongs to. */
+  provider: AIService;
   /** Whether this is a free trial key. These are prioritized over paid keys if they can fulfill the request. */
   isTrial: boolean;
   /** Whether this key has been provisioned for GPT-4. */
@@ -24,26 +33,50 @@ export interface Key {
   hash: string;
 }
 
-export interface KeyPool<T extends Key = never> {
+/*
+KeyPool and KeyProvider's similarities are a relic of the old design where
+there was only a single KeyPool for OpenAI keys. Now that there are multiple
+supported services, the service-specific functionality has been moved to
+KeyProvider and KeyPool is just a wrapper around multiple KeyProviders,
+delegating to the appropriate one based on the model requested.
+
+Existing code will continue to call methods on KeyPool, which routes them to
+the appropriate KeyProvider or returns data aggregated across all KeyProviders
+for service-agnostic functionality.
+*/
+
+export interface KeyPool {
   /** Initialize the key pool. */
   init(): void;
-  /** Get a key from the pool. */
-  get(model: Model): T;
+  /** Gets a key for the given model. */
+  get(model: Model): Key;
   /** List status of all keys in the pool. */
-  list(): Omit<T, "key">[];
+  list(): Omit<Key, "key">[];
   /** Disable a key. */
-  disable(key: T): void;
-  /** Number of keys in the pool. */
+  disable(key: Key): void;
+  /** Number of active keys in the pool. */
   available(): number;
-  /** Whether the key pool is still checking key status. */
+  /** Whether any key providers are still checking key status. */
   anyUnchecked(): boolean;
-  /** The time until the key pool will be able to fulfill another request. */
+  /** Time until the key pool will be able to fulfill a request for a model.*/
   getLockoutPeriod(model: Model): number;
-  /** Get remaining aggregate quota for the key pool as a percentage. */
+  /** Remaining aggregate quota for the key pool as a percentage. */
+  remainingQuota(service: AIService): number;
+  /** Used over available usage in USD. */
+  usageInUsd(service: AIService): string;
+}
+
+export interface KeyProvider<T extends Key = never> {
+  init(): void;
+  get(model: Model): T;
+  list(): Omit<T, "key">[];
+  disable(key: T): void;
+  available(): number;
+  anyUnchecked(): boolean;
+  getLockoutPeriod(model: Model): number;
   remainingQuota(): number;
-  /** Get used over available usage in USD. */
   usageInUsd(): string;
 }
 
-export const keyPool = new OpenAIKeyPool();
+export const keyPool = new OpenAIKeyProvider();
 export const SUPPORTED_MODELS = OPENAI_SUPPORTED_MODELS;
