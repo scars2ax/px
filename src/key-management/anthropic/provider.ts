@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { Key, KeyProvider, Model } from "..";
+import { Key, KeyProvider } from "..";
 import { config } from "../../config";
 import { logger } from "../../logger";
 
@@ -16,6 +16,12 @@ export interface AnthropicKey extends Key {
   /** The period of time for which this key was rate limited. */
   rateLimitedFor: number;
 }
+
+/**
+ * We don't get rate limit headers from Anthropic so if we get a 429, we just
+ * lock out the key for 10 seconds.
+ */
+const RATE_LIMIT_LOCKOUT = 10000;
 
 export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
   readonly service = "anthropic";
@@ -76,21 +82,15 @@ export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
     // (largely copied from the OpenAI provider, without trial key support)
     // Select a key, from highest priority to lowest priority:
     // 1. Keys which are not rate limited
-    //    a. We can assume any rate limits over a minute ago are expired
-    //    b. If all keys were rate limited in the last minute, select the
-    //       least recently rate limited key
+    //    a. If all keys were rate limited recently, select the least-recently
+    //       rate limited key.
     // 2. Keys which have not been used in the longest time
 
     const now = Date.now();
-    // Lower rateLimitThreshold for Anthropic because rather than limiting on
-    // a one minute window, they limit to concurrent requests. Claude
-    // generations don't typically take more than 30 seconds so any rate limits
-    // over 30 seconds old are almost certainly expired.
-    const rateLimitThreshold = 30 * 1000;
 
     const keysByPriority = availableKeys.sort((a, b) => {
-      const aRateLimited = now - a.rateLimitedAt < rateLimitThreshold;
-      const bRateLimited = now - b.rateLimitedAt < rateLimitThreshold;
+      const aRateLimited = now - a.rateLimitedAt < RATE_LIMIT_LOCKOUT;
+      const bRateLimited = now - b.rateLimitedAt < RATE_LIMIT_LOCKOUT;
 
       if (aRateLimited && !bRateLimited) return 1;
       if (!aRateLimited && bRateLimited) return -1;
@@ -166,7 +166,7 @@ export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
     this.log.warn({ key: keyHash }, "Key rate limited");
     const key = this.keys.find((k) => k.hash === keyHash)!;
     key.rateLimitedAt = Date.now();
-    key.rateLimitedFor = 10000;
+    key.rateLimitedFor = RATE_LIMIT_LOCKOUT;
   }
 
   public remainingQuota() {
