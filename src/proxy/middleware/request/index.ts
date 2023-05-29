@@ -3,7 +3,6 @@ import type { ClientRequest } from "http";
 import type { ProxyReqCallback } from "http-proxy";
 
 export { addKey } from "./add-key";
-export { checkStreaming } from "./check-streaming";
 export { finalizeBody } from "./finalize-body";
 export { languageFilter } from "./language-filter";
 export { limitCompletions } from "./limit-completions";
