@@ -71,12 +71,18 @@ export class KeyPool {
     }
   }
 
-  public remainingQuota(service: AIService): number {
-    return this.getKeyProvider(service).remainingQuota();
+  public remainingQuota(
+    service: AIService,
+    options?: Record<string, unknown>
+  ): number {
+    return this.getKeyProvider(service).remainingQuota(options);
   }
 
-  public usageInUsd(service: AIService): string {
-    return this.getKeyProvider(service).usageInUsd();
+  public usageInUsd(
+    service: AIService,
+    options?: Record<string, unknown>
+  ): string {
+    return this.getKeyProvider(service).usageInUsd(options);
   }
 
   private getService(model: Model): AIService {
