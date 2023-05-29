@@ -90,47 +90,70 @@ export const handleStreamedResponse: RawResponseBodyHandler = async (
     let chunkBuffer: string[] = [];
     let messageBuffer = "";
     let lastPosition = 0;
-    proxyRes.on("data", (chunk) => {
-      // We may receive multiple (or partial) SSE messages in a single chunk, so
-      // we need to buffer and emit seperate stream events for full messages so
-      // we can parse/transform them properly.
-      const str = chunk.toString();
-      chunkBuffer.push(str);
 
-      const newMessages = (messageBuffer + chunkBuffer.join("")).split("\n\n");
-      chunkBuffer = [];
-      messageBuffer = newMessages.pop() || "";
+    type ProxyResHandler<T extends unknown> = (...args: T[]) => void;
+    function withErrorHandling<T extends unknown>(fn: ProxyResHandler<T>) {
+      return (...args: T[]) => {
+        try {
+          fn(...args);
+        } catch (error) {
+          proxyRes.emit("error", error);
+        }
+      };
+    }
 
-      for (const message of newMessages) {
-        proxyRes.emit("full-sse-event", message);
-      }
-    });
+    proxyRes.on(
+      "data",
+      withErrorHandling((chunk) => {
+        // We may receive multiple (or partial) SSE messages in a single chunk, so
+        // we need to buffer and emit seperate stream events for full messages so
+        // we can parse/transform them properly.
+        const str = chunk.toString();
+        chunkBuffer.push(str);
 
-    proxyRes.on("full-sse-event", (data) => {
-      req.log.debug(
-        { data, fullChunks: fullChunks.length },
-        "Received full SSE event, transforming and forwarding to client."
-      );
-      const { event, position } = transformEvent(
-        data,
-        fromApi,
-        toApi,
-        fullChunks.length
-      );
-      fullChunks.push(event);
-      lastPosition = position;
-      res.write(event + "\n\n");
-    });
+        const newMessages = (messageBuffer + chunkBuffer.join("")).split(
+          "\n\n"
+        );
+        chunkBuffer = [];
+        messageBuffer = newMessages.pop() || "";
 
-    proxyRes.on("end", () => {
-      let finalBody = convertEventsToFinalResponse(chunkBuffer, req);
-      req.log.info(
-        { api: req.api, key: req.key?.hash },
-        `Finished proxying SSE stream.`
-      );
-      res.end();
-      resolve(finalBody);
-    });
+        for (const message of newMessages) {
+          proxyRes.emit("full-sse-event", message);
+        }
+      })
+    );
+
+    proxyRes.on(
+      "full-sse-event",
+      withErrorHandling((data) => {
+        req.log.debug(
+          { data, fullChunks: fullChunks.length },
+          "Received full SSE event, transforming and forwarding to client."
+        );
+        const { event, position } = transformEvent(
+          data,
+          fromApi,
+          toApi,
+          fullChunks.length
+        );
+        fullChunks.push(event);
+        lastPosition = position;
+        res.write(event + "\n\n");
+      })
+    );
+
+    proxyRes.on(
+      "end",
+      withErrorHandling(() => {
+        let finalBody = convertEventsToFinalResponse(fullChunks, req);
+        req.log.info(
+          { api: req.api, key: req.key?.hash },
+          `Finished proxying SSE stream.`
+        );
+        res.end();
+        resolve(finalBody);
+      })
+    );
 
     proxyRes.on("error", (err) => {
       req.log.error(
