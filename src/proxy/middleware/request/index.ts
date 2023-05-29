@@ -11,12 +11,15 @@ export { limitOutputTokens } from "./limit-output-tokens";
 export { transformKoboldPayload } from "./transform-kobold-payload";
 
 const OPENAI_CHAT_COMPLETION_ENDPOINT = "/v1/chat/completions";
+const ANTHROPIC_COMPLETION_ENDPOINT = "/v1/complete";
 
-/** Returns true if we're making a chat completion request. */
+/** Returns true if we're making a request to a completion endpoint. */
 export function isCompletionRequest(req: Request) {
   return (
     req.method === "POST" &&
-    req.path.startsWith(OPENAI_CHAT_COMPLETION_ENDPOINT)
+    [OPENAI_CHAT_COMPLETION_ENDPOINT, ANTHROPIC_COMPLETION_ENDPOINT].some(
+      (endpoint) => req.path.startsWith(endpoint)
+    )
   );
 }
 
