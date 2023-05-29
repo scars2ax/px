@@ -91,7 +91,7 @@ export function enqueue(req: Request) {
         const avgWait = Math.round(getEstimatedWaitTime() / 1000);
         const currentDuration = Math.round((Date.now() - req.startTime) / 1000);
         const debugMsg = `queue length: ${queue.length}; elapsed time: ${currentDuration}s; avg wait: ${avgWait}s`;
-        req.res!.write(buildFakeSseMessage("heartbeat", debugMsg));
+        req.res!.write(buildFakeSseMessage("heartbeat", debugMsg, req));
       }
     }, 10000);
   }
@@ -281,7 +281,11 @@ function killQueuedRequest(req: Request) {
   try {
     const message = `Your request has been terminated by the proxy because it has been in the queue for more than 5 minutes. The queue is currently ${queue.length} requests long.`;
     if (res.headersSent) {
-      const fakeErrorEvent = buildFakeSseMessage("proxy queue error", message);
+      const fakeErrorEvent = buildFakeSseMessage(
+        "proxy queue error",
+        message,
+        req
+      );
       res.write(fakeErrorEvent);
       res.end();
     } else {
@@ -305,20 +309,37 @@ function initStreaming(req: Request) {
   res.write(": joining queue\n\n");
 }
 
-export function buildFakeSseMessage(type: string, string: string) {
-  const fakeEvent = {
-    id: "chatcmpl-" + type,
-    object: "chat.completion.chunk",
-    created: Date.now(),
-    model: "",
-    choices: [
-      {
-        delta: { content: `\`\`\`\n[${type}: ${string}]\n\`\`\`\n` },
-        index: 0,
-        finish_reason: type,
-      },
-    ],
-  };
+export function buildFakeSseMessage(
+  type: string,
+  string: string,
+  req: Request
+) {
+  let fakeEvent;
+  if (req.key!.service === "anthropic") {
+    // data: {"completion": " Here is a paragraph of lorem ipsum text:\n\nLorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor inc", "stop_reason": "max_tokens", "truncated": false, "stop": null, "model": "claude-instant-v1", "log_id": "efaf005439d1cac588bed1d43e7632a", "exception": null}
+    fakeEvent = {
+      completion: `\`\`\`\n[${type}: ${string}]\n\`\`\`\n`,
+      stop_reason: type,
+      truncated: false, // I've never seen this be true
+      stop: null,
+      model: req.body?.model,
+      log_id: "proxy-req-" + req.id,
+    };
+  } else {
+    fakeEvent = {
+      id: "chatcmpl-" + type,
+      object: "chat.completion.chunk",
+      created: Date.now(),
+      model: req.body?.model,
+      choices: [
+        {
+          delta: { content: `\`\`\`\n[${type}: ${string}]\n\`\`\`\n` },
+          index: 0,
+          finish_reason: type,
+        },
+      ],
+    };
+  }
   return `data: ${JSON.stringify(fakeEvent)}\n\n`;
 }
 
