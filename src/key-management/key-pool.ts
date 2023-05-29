@@ -2,48 +2,27 @@ import { AnthropicKeyProvider } from "./anthropic/provider";
 import { Key, AIService, Model, KeyProvider } from "./index";
 import { OpenAIKeyProvider } from "./openai/provider";
 
-export interface KeyPool {
-  /** Initialize the key pool. */
-  init(): void;
-  /** Gets a key for the given model. */
-  get(model: Model): Key;
-  /** List status of all keys in the pool. */
-  list(): Omit<Key, "key">[];
-  /** Disable a key. */
-  disable(key: Key): void;
-  /** Number of active keys in the pool. */
-  available(): number;
-  /** Whether any key providers are still checking key status. */
-  anyUnchecked(): boolean;
-  /** Time until the key pool will be able to fulfill a request for a model.*/
-  getLockoutPeriod(model: Model): number;
-  /** Remaining aggregate quota for the key pool as a percentage. */
-  remainingQuota(service: AIService): number;
-  /** Used over available usage in USD. */
-  usageInUsd(service: AIService): string;
-}
-
-// TODO: this will never have subclasses or other implementations so the TS
-// interface is unnecessary.
-
-export class KeyPool implements KeyPool {
+export class KeyPool {
   private keyProviders: KeyProvider[] = [];
 
-  constructor() {}
+  constructor() {
+    this.keyProviders.push(new OpenAIKeyProvider());
+    this.keyProviders.push(new AnthropicKeyProvider());
+  }
 
   public init() {
     this.keyProviders.forEach((provider) => provider.init());
-
-    // TODO: Ensure at least a single key is available across any provider,
-    // otherwise the server should not start.
-    // Remove thrown exceptions from init methods as not all providers will be
-    // used in a given deployment.
+    const availableKeys = this.available();
+    if (availableKeys === 0) {
+      throw new Error(
+        "No keys loaded. Ensure either OPENAI_KEY or ANTHROPIC_KEY is set."
+      );
+    }
   }
 
   public get(model: Model): Key {
-    // TODO: Delegate to the appropriate provider. Need some way to map model
-    // prefixes to provider classes.
-    return this.keyProviders[0].get(model);
+    const service = this.getService(model);
+    return this.getKeyProvider(service).get(model);
   }
 
   public list(): Omit<Key, "key">[] {
@@ -52,6 +31,7 @@ export class KeyPool implements KeyPool {
 
   public disable(key: Key): void {
     const service = this.getKeyProvider(key.service);
+    service.disable(key);
   }
 
   // TODO: this probably needs to be scoped to a specific provider. I think the
@@ -81,12 +61,12 @@ export class KeyPool implements KeyPool {
     return this.getKeyProvider(service).usageInUsd();
   }
 
-  // TODO: define regex for model prefixes and use that to determine which
-  // provider to service
   private getService(model: Model): AIService {
     if (model.startsWith("gpt")) {
+      // https://platform.openai.com/docs/models/model-endpoint-compatibility
       return "openai";
-    } else if (model.startsWith("claude")) {
+    } else if (model.startsWith("claude-")) {
+      // https://console.anthropic.com/docs/api/reference#parameters
       return "anthropic";
     }
     throw new Error(`Unknown service for model ${model}`);

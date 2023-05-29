@@ -65,9 +65,10 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
   private log = logger.child({ module: "key-provider", service: this.service });
 
   constructor() {
-    const keyString = config.openaiKey;
-    if (!keyString?.trim()) {
-      throw new Error("OPENAI_KEY environment variable is not set");
+    const keyString = config.openaiKey?.trim();
+    if (!keyString) {
+      this.log.warn("OPENAI_KEY is not set. OpenAI API will not be available.");
+      return;
     }
     let bareKeys: string[];
     bareKeys = keyString.split(",").map((k) => k.trim());
@@ -134,7 +135,7 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
 
     // Select a key, from highest priority to lowest priority:
     // 1. Keys which are not rate limited
-    //    a. We can assume any rate limits over a minute ago are expired
+    //    a. We ignore rate limits from over a minute ago
     //    b. If all keys were rate limited in the last minute, select the
     //       least recently rate limited key
     // 2. Keys which are trials

@@ -33,7 +33,7 @@ export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
     const keyConfig = config.anthropicKey?.trim();
     if (!keyConfig) {
       this.log.warn(
-        "No Anthropic key configured, Anthropic API will be unavailable."
+        "ANTHROPIC_KEY is not set. Anthropic API will not be available."
       );
       return;
     }
