@@ -266,7 +266,7 @@ export function createQueueMiddleware(proxyMiddleware: Handler): Handler {
         type: "proxy_error",
         message: err.message,
         stack: err.stack,
-        proxy_note: `Only one request per IP can be queued at a time. If you don't have another request queued, your IP may be in use by another user.`,
+        proxy_note: `Only one request can be queued at a time. If you don't have another request queued, your IP or user token might be in use by another request.`,
       });
     }
   };

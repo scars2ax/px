@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { logger } from "../../../logger";
 import type { ExpressHttpProxyReqCallback } from ".";
 
 // https://console.anthropic.com/docs/api/reference#-v1-complete
