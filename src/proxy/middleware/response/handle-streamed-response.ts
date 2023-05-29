@@ -106,17 +106,11 @@ export const handleStreamedResponse: RawResponseBodyHandler = async (
       }
     });
 
-    proxyRes.on("end", () => {
-      let finalBody = convertEventsToFinalResponse(chunkBuffer, req);
-      req.log.info(
-        { api: req.api, key: req.key?.hash },
-        `Finished proxying SSE stream.`
-      );
-      res.end();
-      resolve(finalBody);
-    });
-
     proxyRes.on("full-sse-event", (data) => {
+      req.log.debug(
+        { data, fullChunks: fullChunks.length },
+        "Received full SSE event, transforming and forwarding to client."
+      );
       const { event, position } = transformEvent(
         data,
         fromApi,
@@ -125,7 +119,17 @@ export const handleStreamedResponse: RawResponseBodyHandler = async (
       );
       fullChunks.push(event);
       lastPosition = position;
-      res.write(event);
+      res.write(event + "\n\n");
+    });
+
+    proxyRes.on("end", () => {
+      let finalBody = convertEventsToFinalResponse(chunkBuffer, req);
+      req.log.info(
+        { api: req.api, key: req.key?.hash },
+        `Finished proxying SSE stream.`
+      );
+      res.end();
+      resolve(finalBody);
     });
 
     proxyRes.on("error", (err) => {
@@ -209,7 +213,6 @@ function convertEventsToFinalResponse(chunks: string[], req: Request) {
     };
     const events = chunks
       .join("")
-      .trim()
       .split("\n\n")
       .map((line) => line.trim());
 

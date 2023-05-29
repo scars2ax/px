@@ -9,6 +9,9 @@ export const addKey: ExpressHttpProxyReqCallback = (proxyReq, req) => {
     throw new Error("You must specify a model with your request.");
   }
 
+  // This should happen somewhere else but addKey is guaranteed to run first.
+  req.isStreaming = Boolean(req.body?.stream);
+
   // Anthropic support has a special endpoint that accepts OpenAI-formatted
   // requests and translates them into Anthropic requests.  On this endpoint,
   // the requested model is an OpenAI one even though we're actually sending
