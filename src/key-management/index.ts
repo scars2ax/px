@@ -60,5 +60,6 @@ export const keyPool = new KeyPool();
 export const SUPPORTED_MODELS = [
   ...OPENAI_SUPPORTED_MODELS,
   ...ANTHROPIC_SUPPORTED_MODELS,
-];
+] as const;
+export type SupportedModel = (typeof SUPPORTED_MODELS)[number];
 export { OPENAI_SUPPORTED_MODELS, ANTHROPIC_SUPPORTED_MODELS };

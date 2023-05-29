@@ -42,6 +42,11 @@ export const transformOutboundPayload: ExpressHttpProxyReqCallback = (
   _proxyReq,
   req
 ) => {
+  if (req.retryCount > 0) {
+    // We've already transformed the payload once, so don't do it again.
+    return;
+  }
+  
   const inboundService = req.api;
   const outboundService = req.key!.service;
 

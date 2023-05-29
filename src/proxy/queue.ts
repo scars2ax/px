@@ -17,7 +17,7 @@
 
 import type { Handler, Request } from "express";
 import { config, DequeueMode } from "../config";
-import { keyPool } from "../key-management";
+import { keyPool, SupportedModel } from "../key-management";
 import { logger } from "../logger";
 import { AGNAI_DOT_CHAT_IP } from "./rate-limit";
 
@@ -118,12 +118,19 @@ export function enqueue(req: Request) {
   }
 }
 
-export function dequeue(model: string): Request | undefined {
-  // TODO: This should be set by some middleware that checks the request body.
-  const modelQueue =
-    model === "gpt-4"
-      ? queue.filter((req) => req.body.model?.startsWith("gpt-4"))
-      : queue.filter((req) => !req.body.model?.startsWith("gpt-4"));
+export function dequeue(model: SupportedModel): Request | undefined {
+  const modelQueue = queue.filter((req) => {
+    if (model.startsWith("claude")) {
+      // This sucks, but the `req.body.model` on Anthropic requests via the
+      // OpenAI-compat endpoint isn't actually claude-*, it's a fake gpt value.
+      // TODO: refactor model/service detection
+      return req.originalUrl.startsWith("/proxy/anthropic");
+    }
+    if (model.startsWith("gpt-4")) {
+      return req.body.model?.startsWith("gpt-4");
+    }
+    return !req.body.model?.startsWith("gpt-4");
+  });
 
   if (modelQueue.length === 0) {
     return undefined;
@@ -172,6 +179,7 @@ function processQueue() {
   // the others, because we only track one rate limit per key.
   const gpt4Lockout = keyPool.getLockoutPeriod("gpt-4");
   const turboLockout = keyPool.getLockoutPeriod("gpt-3.5-turbo");
+  const claudeLockout = keyPool.getLockoutPeriod("claude-v1");
 
   const reqs: (Request | undefined)[] = [];
   if (gpt4Lockout === 0) {
@@ -179,6 +187,9 @@ function processQueue() {
   }
   if (turboLockout === 0) {
     reqs.push(dequeue("gpt-3.5-turbo"));
+  }
+  if (claudeLockout === 0) {
+    reqs.push(dequeue("claude-v1"));
   }
 
   reqs.filter(Boolean).forEach((req) => {
