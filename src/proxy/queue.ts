@@ -315,7 +315,8 @@ export function buildFakeSseMessage(
   req: Request
 ) {
   let fakeEvent;
-  if (req.key!.service === "anthropic") {
+  
+  if (req.api === "anthropic") {
     // data: {"completion": " Here is a paragraph of lorem ipsum text:\n\nLorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor inc", "stop_reason": "max_tokens", "truncated": false, "stop": null, "model": "claude-instant-v1", "log_id": "???", "exception": null}
     fakeEvent = {
       completion: `\`\`\`\n[${type}: ${string}]\n\`\`\`\n`,
