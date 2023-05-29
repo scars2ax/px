@@ -3,11 +3,13 @@ import { Key, KeyProvider } from "..";
 import { config } from "../../config";
 import { logger } from "../../logger";
 
-export type AnthropicModel = "claude-v1" | "claude-instant-v1";
-export const ANTHROPIC_SUPPORTED_MODELS: readonly AnthropicModel[] = [
+export const ANTHROPIC_SUPPORTED_MODELS = [
   "claude-instant-v1",
+  "claude-instant-v1-100k",
   "claude-v1",
+  "claude-v1-100k",
 ] as const;
+export type AnthropicModel = (typeof ANTHROPIC_SUPPORTED_MODELS)[number];
 
 export interface AnthropicKey extends Key {
   readonly service: "anthropic";
