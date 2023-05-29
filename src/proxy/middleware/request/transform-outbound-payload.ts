@@ -1,3 +1,4 @@
+import { Request } from "express";
 import { z } from "zod";
 import type { ExpressHttpProxyReqCallback } from ".";
 
@@ -56,7 +57,7 @@ export const transformOutboundPayload: ExpressHttpProxyReqCallback = (
   }
 
   if (inboundService === "openai" && outboundService === "anthropic") {
-    req.body = openaiToAnthropic(req.body);
+    req.body = openaiToAnthropic(req.body, req);
     return;
   }
 
@@ -65,27 +66,50 @@ export const transformOutboundPayload: ExpressHttpProxyReqCallback = (
   );
 };
 
-function openaiToAnthropic(body: any) {
-  const { messages, ...rest } = OpenAIV1ChatCompletionSchema.parse(body);
-  const prompt = messages
-    .map((m) => {
-      let role: string = m.role;
-      if (role === "assistant") {
-        role = "Assistant";
-      } else if (role === "system") {
-        role = "System";
-      } else if (role === "user") {
-        role = "Human";
-      }
-      // https://console.anthropic.com/docs/prompt-design
-      // `name` isn't supported by Anthropic but we can still try to use it.
-      return `\n\n${role}: ${m.name?.trim() ? `(as ${m.name}) ` : ""}${
-        m.content
-      }`;
-    })
-    .join("");
+function openaiToAnthropic(body: any, req: Request) {
+  const result = OpenAIV1ChatCompletionSchema.safeParse(body);
+  if (!result.success) {
+    // don't log the prompt
+    const { messages, ...params } = body;
+    req.log.error(
+      { issues: result.error.issues, params },
+      "Invalid OpenAI-to-Anthropic request"
+    );
+    throw result.error;
+  }
+
+  const { messages, ...rest } = result.data;
+  const prompt =
+    result.data.messages
+      .map((m) => {
+        let role: string = m.role;
+        if (role === "assistant") {
+          role = "Assistant";
+        } else if (role === "system") {
+          role = "System";
+        } else if (role === "user") {
+          role = "Human";
+        }
+        // https://console.anthropic.com/docs/prompt-design
+        // `name` isn't supported by Anthropic but we can still try to use it.
+        return `\n\n${role}: ${m.name?.trim() ? `(as ${m.name}) ` : ""}${
+          m.content
+        }`;
+      })
+      .join("") + "\n\nAssistant: ";
+
+  // When translating from OpenAI to Anthropic, we obviously can't use the
+  // provided OpenAI model name as-is. We will instead select a Claude model,
+  // choosing either the 100k token model or the 9k token model depending on
+  // the length of the prompt. I'm not bringing in the full OpenAI tokenizer for
+  // this so we'll use Anthropic's guideline of ~28000 characters to about 8k
+  // tokens (https://console.anthropic.com/docs/prompt-design#prompt-length)
+  // as the cutoff, minus a little bit for safety.
+  const model = prompt.length > 25000 ? "claude-v1-100k" : "claude-v1";
+
   return {
     ...rest,
+    model,
     prompt,
     max_tokens_to_sample: rest.max_tokens,
     stop_sequences: rest.stop,

@@ -70,6 +70,11 @@ const anthropicProxy = createProxyMiddleware({
   },
   selfHandleResponse: true,
   logger,
+  pathRewrite: {
+    // If the user sends a request to /v1/chat/completions (the OpenAI endpoint)
+    // we will transform the payload and rewrite the path to /v1/complete.
+    "^/v1/chat/completions": "/v1/complete",
+  },
 });
 const queuedAnthropicProxy = createQueueMiddleware(anthropicProxy);
 

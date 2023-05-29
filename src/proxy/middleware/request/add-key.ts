@@ -20,13 +20,14 @@ export const addKey: ExpressHttpProxyReqCallback = (proxyReq, req) => {
   // Real Anthropic requests come in via /proxy/anthropic/v1/complete
   // The OpenAI-compatible endpoint is /proxy/anthropic/v1/chat/completions
 
-  const openaiCompatible = req.path === "/proxy/anthropic/v1/chat/completions";
+  const openaiCompatible =
+    req.originalUrl === "/proxy/anthropic/v1/chat/completions";
   if (openaiCompatible) {
     req.log.debug("Using an Anthropic key for an OpenAI-compatible request");
-    // TODO: inspect the size of the prompt and only use the 100k token variant
-    // if the prompt is above ~20k characters. Not going to bother bringing in
-    // the real OpenAI tokenizer for this, just need a rough estimate.
-    assignedKey = keyPool.get("claude-v1-100k");
+    req.api = "openai";
+    // We don't assign the model here, that will happen when transforming the
+    // request body.
+    assignedKey = keyPool.get("claude-v1");
   } else {
     assignedKey = keyPool.get(req.body.model);
   }
@@ -36,7 +37,8 @@ export const addKey: ExpressHttpProxyReqCallback = (proxyReq, req) => {
     {
       key: assignedKey.hash,
       model: req.body?.model,
-      openaiCompatible,
+      fromApi: req.api,
+      toApi: assignedKey.service,
     },
     "Assigned key to request"
   );
