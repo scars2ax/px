@@ -126,10 +126,6 @@ export const handleStreamedResponse: RawResponseBodyHandler = async (
     proxyRes.on(
       "full-sse-event",
       withErrorHandling((data) => {
-        req.log.debug(
-          { data, fullChunks: fullChunks.length },
-          "Received full SSE event, transforming and forwarding to client."
-        );
         const { event, position } = transformEvent(
           data,
           fromApi,
@@ -257,7 +253,6 @@ function convertEventsToFinalResponse(events: string[], req: Request) {
         return acc;
       }
 
-      console.log(event);
       const data = JSON.parse(event.slice("data: ".length));
       if (i === 0) {
         return {
@@ -284,10 +279,6 @@ function convertEventsToFinalResponse(events: string[], req: Request) {
     return response;
   }
   if (req.key!.service === "anthropic") {
-    req.log.debug(
-      { chunks: events.length, lastChunk: events[events.length - 2] },
-      "Converting Anthropic SSE events to final response."
-    );
     /*
      * Full complete responses from Anthropic are conveniently just the same as
      * the final SSE event before the "DONE" event, so we can reuse that

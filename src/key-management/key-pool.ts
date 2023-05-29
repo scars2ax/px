@@ -93,7 +93,7 @@ export class KeyPool {
       // https://console.anthropic.com/docs/api/reference#parameters
       return "anthropic";
     }
-    throw new Error(`Unknown service for model ${model}`);
+    throw new Error(`Unknown service for model '${model}'`);
   }
 
   private getKeyProvider(service: AIService): KeyProvider {

@@ -57,8 +57,44 @@ const anthropicResponseHandler: ProxyResHandlerWithBody = async (
     body.proxy_note = `Prompts are logged on this proxy instance. See ${host} for more information.`;
   }
 
+  if (!req.originalUrl.includes("/v1/complete")) {
+    req.log.info("Transforming Anthropic response to OpenAI format");
+    body = transformAnthropicResponse(body);
+  }
   res.status(200).json(body);
 };
+
+/**
+ * Transforms a model response from the Anthropic API to match those from the
+ * OpenAI API, for users using Claude via the OpenAI-compatible endpoint. This
+ * is only used for non-streaming requests as streaming requests are handled
+ * on-the-fly.
+ */
+function transformAnthropicResponse(
+  anthropicBody: Record<string, any>
+): Record<string, any> {
+  return {
+    id: "ant-" + anthropicBody.log_id,
+    object: "chat.completion",
+    created: Date.now(),
+    model: anthropicBody.model,
+    usage: {
+      prompt_tokens: 0,
+      completion_tokens: 0,
+      total_tokens: 0,
+    },
+    choices: [
+      {
+        message: {
+          role: "assistant",
+          content: anthropicBody.completion?.trim(),
+        },
+        finish_reason: anthropicBody.stop_reason,
+        index: 0,
+      },
+    ],
+  };
+}
 
 const anthropicProxy = createProxyMiddleware({
   target: "https://api.anthropic.com",
