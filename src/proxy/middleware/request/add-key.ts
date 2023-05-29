@@ -10,7 +10,8 @@ export const addKey: ExpressHttpProxyReqCallback = (proxyReq, req) => {
   }
 
   // This should happen somewhere else but addKey is guaranteed to run first.
-  req.isStreaming = Boolean(req.body?.stream);
+  req.isStreaming = req.body.stream === true || req.body.stream === "true";
+  req.body.stream = req.isStreaming;
 
   // Anthropic support has a special endpoint that accepts OpenAI-formatted
   // requests and translates them into Anthropic requests.  On this endpoint,

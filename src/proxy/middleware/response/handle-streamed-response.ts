@@ -112,7 +112,7 @@ export const handleStreamedResponse: RawResponseBodyHandler = async (
         chunkBuffer.push(str);
 
         const newMessages = (messageBuffer + chunkBuffer.join("")).split(
-          "\n\n"
+          /\r?\n\r?\n/ // Anthropic uses CRLF line endings (out-of-spec btw)
         );
         chunkBuffer = [];
         messageBuffer = newMessages.pop() || "";
@@ -134,7 +134,7 @@ export const handleStreamedResponse: RawResponseBodyHandler = async (
           data,
           fromApi,
           toApi,
-          fullChunks.length
+          lastPosition
         );
         fullChunks.push(event);
         lastPosition = position;
@@ -173,18 +173,22 @@ export const handleStreamedResponse: RawResponseBodyHandler = async (
   });
 };
 
+/**
+ * Transforms SSE events from the given response API into events compatible with
+ * the API requested by the client.
+ */
 function transformEvent(
   data: string,
-  fromApi: string,
-  toApi: string,
+  requestApi: string,
+  responseApi: string,
   lastPosition: number
 ) {
-  if (fromApi === toApi) {
+  if (requestApi === responseApi) {
     return { position: -1, event: data };
   }
 
-  if (fromApi === "openai" && toApi === "anthropic") {
-    throw new Error(`OpenAI -> Anthropic streaming not yet supported.`);
+  if (requestApi === "anthropic" && responseApi === "openai") {
+    throw new Error(`Anthropic -> OpenAI streaming not implemented.`);
   }
 
   // Anthropic sends the full completion so far with each event whereas OpenAI
@@ -199,12 +203,22 @@ function transformEvent(
   }
 
   const event = JSON.parse(data.slice("data: ".length));
-  if (event.completion) {
-    event.completion = event.completion.slice(lastPosition);
-  }
+  const newEvent = {
+    id: "ant-" + event.log_id,
+    object: "chat.completion.chunk",
+    created: Date.now(),
+    model: event.model,
+    choices: [
+      {
+        index: 0,
+        delta: { content: event.completion?.slice(lastPosition) },
+        finish_reason: event.stop_reason,
+      },
+    ],
+  };
   return {
     position: event.completion.length,
-    event: `data: ${JSON.stringify(event)}\n\n`,
+    event: `data: ${JSON.stringify(newEvent)}`,
   };
 }
 
@@ -225,7 +239,7 @@ function copyHeaders(proxyRes: http.IncomingMessage, res: Response) {
   }
 }
 
-function convertEventsToFinalResponse(chunks: string[], req: Request) {
+function convertEventsToFinalResponse(events: string[], req: Request) {
   if (req.key!.service === "openai") {
     let response: OpenAiChatCompletionResponse = {
       id: "",
@@ -234,21 +248,17 @@ function convertEventsToFinalResponse(chunks: string[], req: Request) {
       model: "",
       choices: [],
     };
-    const events = chunks
-      .join("")
-      .split("\n\n")
-      .map((line) => line.trim());
-
-    response = events.reduce((acc, chunk, i) => {
-      if (!chunk.startsWith("data: ")) {
+    response = events.reduce((acc, event, i) => {
+      if (!event.startsWith("data: ")) {
         return acc;
       }
 
-      if (chunk === "data: [DONE]") {
+      if (event === "data: [DONE]") {
         return acc;
       }
 
-      const data = JSON.parse(chunk.slice("data: ".length));
+      console.log(event);
+      const data = JSON.parse(event.slice("data: ".length));
       if (i === 0) {
         return {
           id: data.id,
@@ -274,11 +284,15 @@ function convertEventsToFinalResponse(chunks: string[], req: Request) {
     return response;
   }
   if (req.key!.service === "anthropic") {
+    req.log.debug(
+      { chunks: events.length, lastChunk: events[events.length - 2] },
+      "Converting Anthropic SSE events to final response."
+    );
     /*
      * Full complete responses from Anthropic are conveniently just the same as
      * the final SSE event before the "DONE" event, so we can reuse that
      */
-    const lastEvent = chunks[chunks.length - 2].toString();
+    const lastEvent = events[events.length - 2].toString();
     const data = JSON.parse(lastEvent.slice("data: ".length));
     const response: AnthropicCompletionResponse = {
       ...data,
