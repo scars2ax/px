@@ -316,7 +316,7 @@ export function buildFakeSseMessage(
 ) {
   let fakeEvent;
   if (req.key!.service === "anthropic") {
-    // data: {"completion": " Here is a paragraph of lorem ipsum text:\n\nLorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor inc", "stop_reason": "max_tokens", "truncated": false, "stop": null, "model": "claude-instant-v1", "log_id": "efaf005439d1cac588bed1d43e7632a", "exception": null}
+    // data: {"completion": " Here is a paragraph of lorem ipsum text:\n\nLorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor inc", "stop_reason": "max_tokens", "truncated": false, "stop": null, "model": "claude-instant-v1", "log_id": "???", "exception": null}
     fakeEvent = {
       completion: `\`\`\`\n[${type}: ${string}]\n\`\`\`\n`,
       stop_reason: type,
@@ -327,7 +327,7 @@ export function buildFakeSseMessage(
     };
   } else {
     fakeEvent = {
-      id: "chatcmpl-" + type,
+      id: "chatcmpl-" + req.id,
       object: "chat.completion.chunk",
       created: Date.now(),
       model: req.body?.model,
