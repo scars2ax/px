@@ -5,49 +5,25 @@ import crypto from "crypto";
 import fs from "fs";
 import http from "http";
 import path from "path";
-import { config } from "../config";
-import { logger } from "../logger";
+import { KeyPool, Key, Model } from "../index";
+import { config } from "../../config";
+import { logger } from "../../logger";
 import { KeyChecker } from "./key-checker";
 
-// TODO: Made too many assumptions about OpenAI being the only provider and now
-// this doesn't really work for Anthropic. Create a Provider interface and
-// implement Pool, Checker, and Models for each provider.
-
-export type Model = OpenAIModel | AnthropicModel;
-export type OpenAIModel = "gpt-3.5-turbo" | "gpt-4";
-export type AnthropicModel = "claude-v1" | "claude-instant-v1";
-export const SUPPORTED_MODELS: readonly Model[] = [
+export const OPENAI_SUPPORTED_MODELS: readonly Model[] = [
   "gpt-3.5-turbo",
   "gpt-4",
-  "claude-v1",
-  "claude-instant-v1",
 ] as const;
 
-export type Key = {
-  /** The OpenAI API key itself. */
-  key: string;
-  /** Whether this is a free trial key. These are prioritized over paid keys if they can fulfill the request. */
-  isTrial: boolean;
-  /** Whether this key has been provisioned for GPT-4. */
-  isGpt4: boolean;
-  /** Whether this key is currently disabled. We set this if we get a 429 or 401 response from OpenAI. */
-  isDisabled: boolean;
+export interface OpenAIKey extends Key {
+  /** The current usage of this key. */
+  usage: number;
   /** Threshold at which a warning email will be sent by OpenAI. */
   softLimit: number;
   /** Threshold at which the key will be disabled because it has reached the user-defined limit. */
   hardLimit: number;
   /** The maximum quota allocated to this key by OpenAI. */
   systemHardLimit: number;
-  /** The current usage of this key. */
-  usage: number;
-  /** The number of prompts that have been sent with this key. */
-  promptCount: number;
-  /** The time at which this key was last used. */
-  lastUsed: number;
-  /** The time at which this key was last checked. */
-  lastChecked: number;
-  /** Key hash for displaying usage in the dashboard. */
-  hash: string;
   /** The time at which this key was last rate limited. */
   rateLimitedAt: number;
   /**
@@ -72,15 +48,15 @@ export type Key = {
    * tokens.
    */
   rateLimitTokensReset: number;
-};
+}
 
-export type KeyUpdate = Omit<
-  Partial<Key>,
+export type OpenAIKeyUpdate = Omit<
+  Partial<OpenAIKey>,
   "key" | "hash" | "lastUsed" | "lastChecked" | "promptCount"
 >;
 
-export class KeyPool {
-  private keys: Key[] = [];
+export class OpenAIKeyPool implements KeyPool<OpenAIKey> {
+  private keys: OpenAIKey[] = [];
   private checker?: KeyChecker;
   private log = logger.child({ module: "key-pool" });
 
@@ -111,7 +87,6 @@ export class KeyPool {
         rateLimitTokensReset: 0,
       };
       this.keys.push(newKey);
-
     }
     this.log.info({ keyCount: this.keys.length }, "Loaded keys");
   }
@@ -192,7 +167,7 @@ export class KeyPool {
   }
 
   /** Called by the key checker to update key information. */
-  public update(keyHash: string, update: KeyUpdate) {
+  public update(keyHash: string, update: OpenAIKeyUpdate) {
     const keyFromPool = this.keys.find((k) => k.hash === keyHash)!;
     Object.assign(keyFromPool, { ...update, lastChecked: Date.now() });
     // this.writeKeyStatus();
@@ -213,7 +188,7 @@ export class KeyPool {
   }
 
   public anyUnchecked() {
-    return config.checkKeys && this.keys.some((key) => !key.lastChecked);
+    return !!config.checkKeys && this.keys.some((key) => !key.lastChecked);
   }
 
   /**
@@ -357,8 +332,6 @@ export class KeyPool {
   //   );
   // }
 }
-
-
 
 /**
  * Converts reset string ("21.0032s" or "21ms") to a number of milliseconds.
