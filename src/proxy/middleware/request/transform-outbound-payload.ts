@@ -56,7 +56,7 @@ export const transformOutboundPayload: ExpressHttpProxyReqCallback = (
   }
 
   throw new Error(
-    `'${req.inboundApi}' -> '${req.outboundApi}' request proxying is supported. Make sure your client is configured to use the correct API.`
+    `'${req.inboundApi}' -> '${req.outboundApi}' request proxying is not supported. Make sure your client is configured to use the correct API.`
   );
 };
 
