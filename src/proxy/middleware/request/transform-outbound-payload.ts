@@ -42,39 +42,30 @@ export const transformOutboundPayload: ExpressHttpProxyReqCallback = (
   _proxyReq,
   req
 ) => {
-  if (req.retryCount > 0 || !isCompletionRequest(req)) {
+  const sameService = req.inboundApi === req.outboundApi;
+  const alreadyTransformed = req.retryCount > 0;
+  const notTransformable = !isCompletionRequest(req);
+
+  if (sameService || alreadyTransformed || notTransformable) {
     return;
   }
 
-  const inboundService = req.api;
-  const outboundService = req.key!.service;
-
-  if (inboundService === outboundService) {
-    return;
-  }
-
-  // Not supported yet and unnecessary as everything supports OpenAI.
-  if (inboundService === "anthropic" && outboundService === "openai") {
-    throw new Error(
-      "Anthropic -> OpenAI request transformation not supported. Provide an OpenAI-compatible payload, or use the /claude endpoint."
-    );
-  }
-
-  if (inboundService === "openai" && outboundService === "anthropic") {
+  if (req.inboundApi === "openai" && req.outboundApi === "anthropic") {
     req.body = openaiToAnthropic(req.body, req);
     return;
   }
 
   throw new Error(
-    `Unsupported transformation: ${inboundService} -> ${outboundService}`
+    `'${req.inboundApi}' -> '${req.outboundApi}' request proxying is supported. Make sure your client is configured to use the correct API.`
   );
 };
 
 function openaiToAnthropic(body: any, req: Request) {
   const result = OpenAIV1ChatCompletionSchema.safeParse(body);
   if (!result.success) {
-    // don't log the prompt
-    const { messages, ...params } = body;
+    // don't log the prompt (usually `messages` but maybe `prompt` if the user
+    // misconfigured their client)
+    const { messages, prompt, ...params } = body;
     req.log.error(
       { issues: result.error.issues, params },
       "Invalid OpenAI-to-Anthropic request"

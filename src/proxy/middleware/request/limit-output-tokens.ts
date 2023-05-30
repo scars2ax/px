@@ -24,9 +24,9 @@ export const limitOutputTokens: ExpressHttpProxyReqCallback = (
     // TODO: this is not going to scale well, need to implement a better way
     // of translating request parameters from one API to another.
     maxTokens = Math.min(maxTokens, MAX_TOKENS);
-    if (req.key!.service === "openai") {
+    if (req.outboundApi === "openai") {
       req.body.max_tokens = maxTokens;
-    } else if (req.key!.service === "anthropic") {
+    } else if (req.outboundApi === "anthropic") {
       req.body.max_tokens_to_sample = maxTokens;
     }
 
