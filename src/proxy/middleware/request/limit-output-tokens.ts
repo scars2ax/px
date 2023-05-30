@@ -10,7 +10,7 @@ export const limitOutputTokens: ExpressHttpProxyReqCallback = (
   req
 ) => {
   if (isCompletionRequest(req) && req.body?.max_tokens) {
-    const requestedMaxTokens = getMaxTokensFromRequest(req);
+    const requestedMaxTokens = Number.parseInt(getMaxTokensFromRequest(req));
     let maxTokens = requestedMaxTokens;
 
     if (typeof requestedMaxTokens !== "number") {
