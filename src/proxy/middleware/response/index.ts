@@ -8,8 +8,7 @@ import { logger } from "../../../logger";
 import { keyPool } from "../../../key-management";
 import { enqueue, trackWaitTime } from "../../queue";
 import { incrementPromptCount } from "../../auth/user-store";
-import { writeErrorResponse } from "../common";
-import { isCompletionRequest } from "../request";
+import { isCompletionRequest, writeErrorResponse } from "../common";
 import { handleStreamedResponse } from "./handle-streamed-response";
 import { logPrompt } from "./log-prompt";
 

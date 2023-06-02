@@ -1,5 +1,6 @@
 import { Key, keyPool } from "../../../key-management";
-import { ProxyRequestMiddleware, isCompletionRequest } from ".";
+import { isCompletionRequest } from "../common";
+import { ProxyRequestMiddleware } from ".";
 
 /** Add a key that can service this request to the request object. */
 export const addKey: ProxyRequestMiddleware = (proxyReq, req) => {

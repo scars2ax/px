@@ -1,6 +1,7 @@
 import { Request } from "express";
 import { config } from "../../../config";
-import { ProxyRequestMiddleware, isCompletionRequest } from ".";
+import { isCompletionRequest } from "../common";
+import { ProxyRequestMiddleware } from ".";
 
 const MAX_TOKENS = config.maxOutputTokens;
 

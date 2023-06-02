@@ -1,6 +1,7 @@
 import { Request } from "express";
 import { z } from "zod";
-import { RequestPreprocessor, isCompletionRequest } from ".";
+import { isCompletionRequest } from "../common";
+import { RequestPreprocessor } from ".";
 // import { countTokens } from "../../../tokenization";
 
 // https://console.anthropic.com/docs/api/reference#-v1-complete

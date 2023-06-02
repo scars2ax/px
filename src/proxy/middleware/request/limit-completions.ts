@@ -1,4 +1,5 @@
-import { ProxyRequestMiddleware, isCompletionRequest } from ".";
+import { isCompletionRequest } from "../common";
+import { ProxyRequestMiddleware } from ".";
 
 /**
  * Don't allow multiple completions to be requested to prevent abuse.

@@ -119,7 +119,7 @@ anthropicRouter.use((req, _res, next) => {
   }
   next();
 });
-anthropicRouter.get("/v1/models", (req, res) => {
+anthropicRouter.get("/v1/models", (_req, res) => {
   res.json(buildFakeModelsResponse());
 });
 anthropicRouter.post(
