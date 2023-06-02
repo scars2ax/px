@@ -36,7 +36,13 @@ const OpenAIV1ChatCompletionSchema = z.object({
   ),
   temperature: z.number().optional().default(1),
   top_p: z.number().optional().default(1),
-  n: z.literal(1).optional(),
+  n: z
+    .literal(1, {
+      errorMap: () => ({
+        message: "You may only request a single completion at a time.",
+      }),
+    })
+    .optional(),
   stream: z.boolean().optional().default(false),
   stop: z.union([z.string(), z.array(z.string())]).optional(),
   max_tokens: z.coerce.number().optional(),
@@ -65,7 +71,7 @@ export const transformOutboundPayload: RequestPreprocessor = async (req) => {
     const result = validator.safeParse(req.body);
     if (!result.success) {
       req.log.error(
-        { issues: result.error.issues, params: req.body },
+        { issues: result.error.issues, body: req.body },
         "Request validation failed"
       );
       throw result.error;
@@ -86,11 +92,8 @@ export const transformOutboundPayload: RequestPreprocessor = async (req) => {
 function openaiToAnthropic(body: any, req: Request) {
   const result = OpenAIV1ChatCompletionSchema.safeParse(body);
   if (!result.success) {
-    // don't log the prompt (usually `messages` but maybe `prompt` if the user
-    // misconfigured their client)
-    const { messages, prompt, ...params } = body;
     req.log.error(
-      { issues: result.error.issues, params },
+      { issues: result.error.issues, body: req.body },
       "Invalid OpenAI-to-Anthropic request"
     );
     throw result.error;
