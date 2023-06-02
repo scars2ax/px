@@ -1,6 +1,7 @@
 import { Request } from "express";
 import { z } from "zod";
-import { ProxyRequestMiddleware, isCompletionRequest } from ".";
+import { RequestPreprocessor, isCompletionRequest } from ".";
+import { countTokens } from "../../../tokenization";
 
 // https://console.anthropic.com/docs/api/reference#-v1-complete
 const AnthropicV1CompleteSchema = z.object({
@@ -45,10 +46,7 @@ const OpenAIV1ChatCompletionSchema = z.object({
 });
 
 /** Transforms an incoming request body to one that matches the target API. */
-export const transformOutboundPayload: ProxyRequestMiddleware = (
-  _proxyReq,
-  req
-) => {
+export const transformOutboundPayload: RequestPreprocessor = async (req) => {
   const sameService = req.inboundApi === req.outboundApi;
   const alreadyTransformed = req.retryCount > 0;
   const notTransformable = !isCompletionRequest(req);
@@ -128,6 +126,14 @@ function openaiToAnthropic(body: any, req: Request) {
   // For smaller prompts we use 1.2 because it's not as annoying as 1.3
   // For big prompts (v1, auto-selects the latest model) is all we can use.
   const model = prompt.length > 25000 ? "claude-v1-100k" : "claude-v1.2";
+
+  // wip
+  const tokens = countTokens({
+    prompt,
+    req,
+    service: "anthropic",
+  });
+  req.log.info({ tokens }, "Token count");
 
   let stops = rest.stop
     ? Array.isArray(rest.stop)

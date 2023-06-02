@@ -3,18 +3,17 @@ import * as http from "http";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import { config } from "../config";
 import { logger } from "../logger";
+import { handleProxyError } from "./middleware/common";
 import {
   addKey,
+  createPreprocessorMiddleware,
   finalizeBody,
   languageFilter,
   limitOutputTokens,
-  setApiFormat,
-  transformOutboundPayload,
 } from "./middleware/request";
 import {
   ProxyResHandlerWithBody,
   createOnProxyResHandler,
-  handleInternalError,
 } from "./middleware/response";
 import { createQueueMiddleware } from "./queue";
 
@@ -27,7 +26,6 @@ const rewriteAnthropicRequest = (
     addKey,
     languageFilter,
     limitOutputTokens,
-    transformOutboundPayload,
     finalizeBody,
   ];
 
@@ -102,7 +100,7 @@ const anthropicProxy = createProxyMiddleware({
   on: {
     proxyReq: rewriteAnthropicRequest,
     proxyRes: createOnProxyResHandler([anthropicResponseHandler]),
-    error: handleInternalError,
+    error: handleProxyError,
   },
   selfHandleResponse: true,
   logger,
@@ -126,13 +124,13 @@ anthropicRouter.get("/v1/models", (req, res) => {
 });
 anthropicRouter.post(
   "/v1/complete",
-  setApiFormat({ in: "anthropic", out: "anthropic" }),
+  createPreprocessorMiddleware({ inApi: "anthropic", outApi: "anthropic" }),
   queuedAnthropicProxy
 );
 // OpenAI-to-Anthropic compatibility endpoint.
 anthropicRouter.post(
   "/v1/chat/completions",
-  setApiFormat({ in: "openai", out: "anthropic" }),
+  createPreprocessorMiddleware({ inApi: "openai", outApi: "anthropic" }),
   queuedAnthropicProxy
 );
 // Redirect browser requests to the homepage.

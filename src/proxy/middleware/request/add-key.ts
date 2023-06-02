@@ -16,7 +16,7 @@ export const addKey: ProxyRequestMiddleware = (proxyReq, req) => {
 
   if (!req.inboundApi || !req.outboundApi) {
     const err = new Error(
-      "Request API format missing. Did you forget to add the `setApiFormat` middleware to your route?"
+      "Request API format missing. Did you forget to add the request preprocessor to your router?"
     );
     req.log.error(
       { in: req.inboundApi, out: req.outboundApi, path: req.path },

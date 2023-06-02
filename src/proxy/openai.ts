@@ -6,18 +6,17 @@ import { keyPool } from "../key-management";
 import { logger } from "../logger";
 import { createQueueMiddleware } from "./queue";
 import { ipLimiter } from "./rate-limit";
+import { handleProxyError } from "./middleware/common";
 import {
   addKey,
   languageFilter,
   finalizeBody,
   limitOutputTokens,
   limitCompletions,
-  setApiFormat,
-  transformOutboundPayload,
+  createPreprocessorMiddleware,
 } from "./middleware/request";
 import {
   createOnProxyResHandler,
-  handleInternalError,
   ProxyResHandlerWithBody,
 } from "./middleware/response";
 
@@ -31,7 +30,6 @@ const rewriteRequest = (
     languageFilter,
     limitOutputTokens,
     limitCompletions,
-    transformOutboundPayload,
     finalizeBody,
   ];
 
@@ -69,7 +67,7 @@ const openaiProxy = createProxyMiddleware({
   on: {
     proxyReq: rewriteRequest,
     proxyRes: createOnProxyResHandler([openaiResponseHandler]),
-    error: handleInternalError,
+    error: handleProxyError,
   },
   selfHandleResponse: true,
   logger,
@@ -84,17 +82,13 @@ openaiRouter.use((req, _res, next) => {
   }
   next();
 });
-openaiRouter.get(
-  "/v1/models",
-  setApiFormat({ in: "openai", out: "openai" }),
-  (_req, res) => {
-    res.json(buildFakeModelsResponse());
-  }
-);
+openaiRouter.get("/v1/models", (_req, res) => {
+  res.json(buildFakeModelsResponse());
+});
 openaiRouter.post(
   "/v1/chat/completions",
-  setApiFormat({ in: "openai", out: "openai" }),
   ipLimiter,
+  createPreprocessorMiddleware({ inApi: "openai", outApi: "openai" }),
   queuedOpenaiProxy
 );
 // Redirect browser requests to the homepage.
