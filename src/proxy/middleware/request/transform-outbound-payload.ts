@@ -1,6 +1,6 @@
 import { Request } from "express";
 import { z } from "zod";
-import { ExpressHttpProxyReqCallback, isCompletionRequest } from ".";
+import { ProxyRequestMiddleware, isCompletionRequest } from ".";
 
 // https://console.anthropic.com/docs/api/reference#-v1-complete
 const AnthropicV1CompleteSchema = z.object({
@@ -45,7 +45,7 @@ const OpenAIV1ChatCompletionSchema = z.object({
 });
 
 /** Transforms an incoming request body to one that matches the target API. */
-export const transformOutboundPayload: ExpressHttpProxyReqCallback = (
+export const transformOutboundPayload: ProxyRequestMiddleware = (
   _proxyReq,
   req
 ) => {

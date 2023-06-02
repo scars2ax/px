@@ -1,8 +1,8 @@
 import { Key, keyPool } from "../../../key-management";
-import { ExpressHttpProxyReqCallback, isCompletionRequest } from ".";
+import { ProxyRequestMiddleware, isCompletionRequest } from ".";
 
 /** Add a key that can service this request to the request object. */
-export const addKey: ExpressHttpProxyReqCallback = (proxyReq, req) => {
+export const addKey: ProxyRequestMiddleware = (proxyReq, req) => {
   let assignedKey: Key;
 
   if (!isCompletionRequest(req)) {
