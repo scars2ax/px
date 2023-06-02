@@ -1,7 +1,7 @@
 import { Request } from "express";
 import { z } from "zod";
 import { RequestPreprocessor, isCompletionRequest } from ".";
-import { countTokens } from "../../../tokenization";
+// import { countTokens } from "../../../tokenization";
 
 // https://console.anthropic.com/docs/api/reference#-v1-complete
 const AnthropicV1CompleteSchema = z.object({
@@ -128,12 +128,12 @@ function openaiToAnthropic(body: any, req: Request) {
   const model = prompt.length > 25000 ? "claude-v1-100k" : "claude-v1.2";
 
   // wip
-  const tokens = countTokens({
-    prompt,
-    req,
-    service: "anthropic",
-  });
-  req.log.info({ tokens }, "Token count");
+  // const tokens = countTokens({
+  //   prompt,
+  //   req,
+  //   service: "anthropic",
+  // });
+  // req.log.info({ tokens }, "Token count");
 
   let stops = rest.stop
     ? Array.isArray(rest.stop)
