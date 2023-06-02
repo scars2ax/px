@@ -7,7 +7,7 @@ const MAX_TOKENS = config.maxOutputTokens;
 
 /** Enforce a maximum number of tokens requested from the model. */
 export const limitOutputTokens: ProxyRequestMiddleware = (_proxyReq, req) => {
-  if (isCompletionRequest(req) && req.body?.max_tokens) {
+  if (isCompletionRequest(req)) {
     const requestedMaxTokens = Number.parseInt(getMaxTokensFromRequest(req));
     let maxTokens = requestedMaxTokens;
 
