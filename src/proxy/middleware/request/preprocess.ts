@@ -1,6 +1,11 @@
 import { RequestHandler } from "express";
 import { handleInternalError } from "../common";
-import { RequestPreprocessor, setApiFormat, transformOutboundPayload } from ".";
+import {
+  RequestPreprocessor,
+  checkPromptSize,
+  setApiFormat,
+  transformOutboundPayload,
+} from ".";
 
 /**
  * Returns a middleware function that processes the request body into the given
@@ -12,6 +17,7 @@ export const createPreprocessorMiddleware = (
 ): RequestHandler => {
   const preprocessors: RequestPreprocessor[] = [
     setApiFormat(apiFormat),
+    checkPromptSize,
     transformOutboundPayload,
     ...(additionalPreprocessors ?? []),
   ];
@@ -24,7 +30,7 @@ export const createPreprocessorMiddleware = (
       next();
     } catch (error) {
       req.log.error(error, "Error while executing request preprocessor");
-      handleInternalError(error as Error, req, res);
+      handleInternalError(error as Error, req, res, "proxy_preprocessor_error");
     }
   };
 };

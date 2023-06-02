@@ -4,6 +4,7 @@ import type { ProxyReqCallback } from "http-proxy";
 
 // Express middleware (runs before http-proxy-middleware, can be async)
 export { createPreprocessorMiddleware } from "./preprocess";
+export { checkPromptSize } from "./check-prompt-size";
 export { setApiFormat } from "./set-api-format";
 export { transformOutboundPayload } from "./transform-outbound-payload";
 

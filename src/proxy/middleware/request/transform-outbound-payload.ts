@@ -2,7 +2,13 @@ import { Request } from "express";
 import { z } from "zod";
 import { isCompletionRequest } from "../common";
 import { RequestPreprocessor } from ".";
-// import { countTokens } from "../../../tokenization";
+import { OpenAIPromptMessage } from "../../../tokenization/openai";
+
+/**
+ * The maximum number of tokens an Anthropic prompt can have before we switch to
+ * the larger claude-100k context model.
+ */
+const CLAUDE_100K_THRESHOLD = 8200;
 
 // https://console.anthropic.com/docs/api/reference#-v1-complete
 const AnthropicV1CompleteSchema = z.object({
@@ -55,10 +61,9 @@ const OpenAIV1ChatCompletionSchema = z.object({
 /** Transforms an incoming request body to one that matches the target API. */
 export const transformOutboundPayload: RequestPreprocessor = async (req) => {
   const sameService = req.inboundApi === req.outboundApi;
-  const alreadyTransformed = req.retryCount > 0;
   const notTransformable = !isCompletionRequest(req);
 
-  if (alreadyTransformed || notTransformable) {
+  if (notTransformable) {
     return;
   }
 
@@ -69,6 +74,7 @@ export const transformOutboundPayload: RequestPreprocessor = async (req) => {
         ? OpenAIV1ChatCompletionSchema
         : AnthropicV1CompleteSchema;
     const result = validator.safeParse(req.body);
+
     if (!result.success) {
       req.log.error(
         { issues: result.error.issues, body: req.body },
@@ -76,11 +82,14 @@ export const transformOutboundPayload: RequestPreprocessor = async (req) => {
       );
       throw result.error;
     }
+
+    validatePromptSize(req);
     return;
   }
 
   if (req.inboundApi === "openai" && req.outboundApi === "anthropic") {
     req.body = openaiToAnthropic(req.body, req);
+    validatePromptSize(req);
     return;
   }
 
@@ -107,24 +116,7 @@ function openaiToAnthropic(body: any, req: Request) {
   req.headers["anthropic-version"] = "2023-01-01";
 
   const { messages, ...rest } = result.data;
-  const prompt =
-    result.data.messages
-      .map((m) => {
-        let role: string = m.role;
-        if (role === "assistant") {
-          role = "Assistant";
-        } else if (role === "system") {
-          role = "System";
-        } else if (role === "user") {
-          role = "Human";
-        }
-        // https://console.anthropic.com/docs/prompt-design
-        // `name` isn't supported by Anthropic but we can still try to use it.
-        return `\n\n${role}: ${m.name?.trim() ? `(as ${m.name}) ` : ""}${
-          m.content
-        }`;
-      })
-      .join("") + "\n\nAssistant: ";
+  const prompt = openAIMessagesToClaudePrompt(messages);
 
   // No longer defaulting to `claude-v1.2` because it seems to be in the process
   // of being deprecated. `claude-v1` is the new default.
@@ -135,9 +127,8 @@ function openaiToAnthropic(body: any, req: Request) {
   const CLAUDE_BIG = process.env.CLAUDE_BIG_MODEL || "claude-v1-100k";
   const CLAUDE_SMALL = process.env.CLAUDE_SMALL_MODEL || "claude-v1";
 
-  // TODO: Finish implementing tokenizer for more accurate model selection.
-  // This currently uses _character count_, not token count.
-  const model = prompt.length > 25000 ? CLAUDE_BIG : CLAUDE_SMALL;
+  const model =
+    req.promptTokens ?? 0 > CLAUDE_100K_THRESHOLD ? CLAUDE_BIG : CLAUDE_SMALL;
 
   let stops = rest.stop
     ? Array.isArray(rest.stop)
@@ -159,4 +150,64 @@ function openaiToAnthropic(body: any, req: Request) {
     max_tokens_to_sample: rest.max_tokens,
     stop_sequences: stops,
   };
+}
+
+export function openAIMessagesToClaudePrompt(messages: OpenAIPromptMessage[]) {
+  return (
+    messages
+      .map((m) => {
+        let role: string = m.role;
+        if (role === "assistant") {
+          role = "Assistant";
+        } else if (role === "system") {
+          role = "System";
+        } else if (role === "user") {
+          role = "Human";
+        }
+        // https://console.anthropic.com/docs/prompt-design
+        // `name` isn't supported by Anthropic but we can still try to use it.
+        return `\n\n${role}: ${m.name?.trim() ? `(as ${m.name}) ` : ""}${
+          m.content
+        }`;
+      })
+      .join("") + "\n\nAssistant:"
+  );
+}
+
+function validatePromptSize(req: Request) {
+  const promptTokens = req.promptTokens || 0;
+  const model = req.body.model;
+  let maxTokensForModel = 0;
+
+  if (model.match(/gpt-3.5/)) {
+    maxTokensForModel = 4096;
+  } else if (model.match(/gpt-4/)) {
+    maxTokensForModel = 8192;
+  } else if (model.match(/gpt-4-32k/)) {
+    maxTokensForModel = 32768;
+  } else if (model.match(/claude-(?:instant-)?v1(?:\.\d)?(?:-100k)/)) {
+    // Claude models don't throw an error if you exceed the token limit and
+    // instead just become extremely slow and give schizo results, so we will be
+    // more conservative with the token limit for them.
+    maxTokensForModel = 100000 * 0.98;
+  } else if (model.match(/claude-(?:instant-)?v1(?:\.\d)?$/)) {
+    maxTokensForModel = 9000 * 0.98;
+  } else {
+    // I don't trust my regular expressions enough to throw an error here so
+    // we just log a warning and allow 100k tokens.
+    req.log.warn({ model }, "Unknown model, using 100k token limit.");
+    maxTokensForModel = 100000;
+  }
+
+  if (req.debug) {
+    req.debug.calculated_max_tokens = maxTokensForModel;
+  }
+
+  z.number()
+    .max(
+      maxTokensForModel,
+      `Prompt is too long for model ${model} (${promptTokens} tokens, max ${maxTokensForModel})`
+    )
+    .parse(promptTokens);
+  req.log.debug({ promptTokens, maxTokensForModel }, "Prompt size validated");
 }
