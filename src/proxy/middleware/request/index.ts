@@ -1,11 +1,11 @@
-import type { Request, RequestHandler, Response } from "express";
+import type { Request } from "express";
 import type { ClientRequest } from "http";
 import type { ProxyReqCallback } from "http-proxy";
-import { handleInternalError } from "../common";
 
 // Express middleware (runs before http-proxy-middleware, can be async)
-import { setApiFormat } from "./set-api-format";
-import { transformOutboundPayload } from "./transform-outbound-payload";
+export { createPreprocessorMiddleware } from "./preprocess";
+export { setApiFormat } from "./set-api-format";
+export { transformOutboundPayload } from "./transform-outbound-payload";
 
 // HPM middleware (runs on onProxyReq, cannot be async)
 export { addKey } from "./add-key";
@@ -14,19 +14,6 @@ export { languageFilter } from "./language-filter";
 export { limitCompletions } from "./limit-completions";
 export { limitOutputTokens } from "./limit-output-tokens";
 export { transformKoboldPayload } from "./transform-kobold-payload";
-
-const OPENAI_CHAT_COMPLETION_ENDPOINT = "/v1/chat/completions";
-const ANTHROPIC_COMPLETION_ENDPOINT = "/v1/complete";
-
-/** Returns true if we're making a request to a completion endpoint. */
-export function isCompletionRequest(req: Request) {
-  return (
-    req.method === "POST" &&
-    [OPENAI_CHAT_COMPLETION_ENDPOINT, ANTHROPIC_COMPLETION_ENDPOINT].some(
-      (endpoint) => req.path.startsWith(endpoint)
-    )
-  );
-}
 
 /**
  * Middleware that runs prior to the request being handled by http-proxy-
@@ -56,30 +43,3 @@ export type RequestPreprocessor = (req: Request) => void | Promise<void>;
  * request queue middleware.
  */
 export type ProxyRequestMiddleware = ProxyReqCallback<ClientRequest, Request>;
-
-/**
- * Returns a middleware function that processes the request body into the given
- * API format, and then sequentially runs the given additional preprocessors.
- */
-export const createPreprocessorMiddleware = (
-  apiFormat: Parameters<typeof setApiFormat>[0],
-  additionalPreprocessors?: RequestPreprocessor[]
-): RequestHandler => {
-  const preprocessors: RequestPreprocessor[] = [
-    setApiFormat(apiFormat),
-    transformOutboundPayload,
-    ...(additionalPreprocessors ?? []),
-  ];
-
-  return async (req, res, next) => {
-    try {
-      for (const preprocessor of preprocessors) {
-        await preprocessor(req);
-      }
-      next();
-    } catch (error) {
-      req.log.error(error, "Error while executing request preprocessor");
-      handleInternalError(error as Error, req, res);
-    }
-  };
-};
