@@ -59,7 +59,7 @@ export async function requestTokenCount({
     throw new Error("Claude tokenizer is not initialized");
   }
 
-  log.debug({ requestId, prompt: prompt.length }, "Requesting token count");
+  log.debug({ requestId, chars: prompt.length }, "Requesting token count");
   await socket.send(["tokenize", requestId, prompt]);
 
   log.debug({ requestId }, "Waiting for socket response");
@@ -75,11 +75,11 @@ export async function requestTokenCount({
     setTimeout(() => {
       if (pendingRequests.has(requestId)) {
         pendingRequests.delete(requestId);
-        const err = "Tokenizer took too long to respond";
+        const err = "Tokenizer deadline exceeded";
         log.warn({ requestId }, err);
         reject(new Error(err));
       }
-    }, 500);
+    }, 250); // TODO: make this configurable, some really crappy VMs might need more time
   });
 }
 

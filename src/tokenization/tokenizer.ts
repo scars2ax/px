@@ -1,6 +1,5 @@
 import { Request } from "express";
 import { config } from "../config";
-import { AIService } from "../key-management";
 import { logger } from "../logger";
 import {
   init as initIpc,
@@ -9,6 +8,7 @@ import {
 import {
   init as initEncoder,
   getTokenCount as getOpenAITokenCount,
+  OpenAIPromptMessage,
 } from "./openai";
 
 let canTokenizeClaude = false;
@@ -28,38 +28,86 @@ export async function init() {
   }
 }
 
+type TokenCountResult = {
+  token_count: number;
+  tokenizer: string;
+  tokenization_duration_ms: number;
+};
+type TokenCountRequest = {
+  req: Request;
+} & (
+  | { prompt: string; service: "anthropic" }
+  | { prompt: OpenAIPromptMessage[]; service: "openai" }
+);
 export async function countTokens({
   req,
-  prompt,
   service,
-}: {
-  req: Request;
-  prompt: string;
-  service: AIService;
-}) {
-  if (service === "anthropic") {
-    if (!canTokenizeClaude) return guesstimateClaudeTokenCount(prompt);
-    try {
-      return await requestClaudeTokenCount({
-        requestId: String(req.id),
-        prompt: prompt,
-      });
-    } catch (e) {
-      req.log.error("Failed to tokenize with claude_tokenizer", e);
-      return guesstimateClaudeTokenCount(prompt);
-    }
-  }
-  if (service === "openai") {
-    // All OpenAI models we support use the same tokenizer currently
-    return getOpenAITokenCount(prompt);
+  prompt,
+}: TokenCountRequest): Promise<TokenCountResult> {
+  const time = process.hrtime();
+
+  switch (service) {
+    case "anthropic":
+      if (!canTokenizeClaude) {
+        const result = guesstimateTokens(prompt);
+        return {
+          token_count: result,
+          tokenizer: "guesstimate (claude-ipc disabled)",
+          tokenization_duration_ms: getElapsedMs(time),
+        };
+      }
+
+      // If the prompt is absolutely massive (possibly malicious) don't even try
+      if (prompt.length > 500000) {
+        return {
+          token_count: guesstimateTokens(JSON.stringify(prompt)),
+          tokenizer: "guesstimate (prompt too long)",
+          tokenization_duration_ms: getElapsedMs(time),
+        };
+      }
+
+      try {
+        const result = await requestClaudeTokenCount({
+          requestId: String(req.id),
+          prompt,
+        });
+        return {
+          token_count: result,
+          tokenizer: "claude-ipc",
+          tokenization_duration_ms: getElapsedMs(time),
+        };
+      } catch (e: any) {
+        req.log.error("Failed to tokenize with claude_tokenizer", e);
+        const result = guesstimateTokens(prompt);
+        return {
+          token_count: result,
+          tokenizer: `guesstimate (claude-ipc failed: ${e.message})`,
+          tokenization_duration_ms: getElapsedMs(time),
+        };
+      }
+
+    case "openai":
+      const result = getOpenAITokenCount(prompt, req.body.model);
+      return {
+        ...result,
+        tokenization_duration_ms: getElapsedMs(time),
+      };
+    default:
+      throw new Error(`Unknown service: ${service}`);
   }
 }
 
-function guesstimateClaudeTokenCount(prompt: string) {
+function getElapsedMs(time: [number, number]) {
+  const diff = process.hrtime(time);
+  return diff[0] * 1000 + diff[1] / 1e6;
+}
+
+function guesstimateTokens(prompt: string) {
   // From Anthropic's docs:
   // The maximum length of prompt that Claude can see is its context window.
   // Claude's context window is currently ~6500 words / ~8000 tokens /
   // ~28000 Unicode characters.
-  // We'll round up to ~0.3 tokens per character
-  return Math.ceil(prompt.length * 0.3);
+  // This suggests 0.28 tokens per character but in practice this seems to be
+  // a substantial underestimate in some cases.
+  return Math.ceil(prompt.length * 0.325);
 }
