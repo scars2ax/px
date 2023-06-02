@@ -45,6 +45,9 @@ export function writeErrorResponse(
     res.write(`data: [DONE]\n\n`);
     res.end();
   } else {
+    if (req.debug) {
+      errorPayload.error.proxy_tokenizer_debug_info = req.debug;
+    }
     res.status(statusCode).json(errorPayload);
   }
 }
@@ -57,7 +60,8 @@ export const handleProxyError: httpProxy.ErrorCallback = (err, req, res) => {
 export const handleInternalError = (
   err: Error,
   req: Request,
-  res: Response
+  res: Response,
+  errorType: string = "proxy_internal_error"
 ) => {
   try {
     const isZod = err instanceof ZodError;
@@ -86,7 +90,7 @@ export const handleInternalError = (
     } else {
       writeErrorResponse(req, res, 500, {
         error: {
-          type: "proxy_rewriter_error",
+          type: errorType,
           proxy_note: `Reverse proxy encountered an error before it could reach the upstream API.`,
           message: err.message,
           stack: err.stack,
