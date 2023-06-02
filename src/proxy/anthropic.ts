@@ -3,6 +3,8 @@ import * as http from "http";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import { config } from "../config";
 import { logger } from "../logger";
+import { createQueueMiddleware } from "./queue";
+import { ipLimiter } from "./rate-limit";
 import { handleProxyError } from "./middleware/common";
 import {
   addKey,
@@ -15,7 +17,6 @@ import {
   ProxyResHandlerWithBody,
   createOnProxyResHandler,
 } from "./middleware/response";
-import { createQueueMiddleware } from "./queue";
 
 let modelsCache: any = null;
 let modelsCacheTime = 0;
@@ -167,12 +168,14 @@ anthropicRouter.use((req, _res, next) => {
 anthropicRouter.get("/v1/models", handleModelRequest);
 anthropicRouter.post(
   "/v1/complete",
+  ipLimiter,
   createPreprocessorMiddleware({ inApi: "anthropic", outApi: "anthropic" }),
   anthropicProxy
 );
 // OpenAI-to-Anthropic compatibility endpoint.
 anthropicRouter.post(
   "/v1/chat/completions",
+  ipLimiter,
   createPreprocessorMiddleware({ inApi: "openai", outApi: "anthropic" }),
   anthropicProxy
 );
