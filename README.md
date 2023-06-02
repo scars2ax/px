@@ -40,3 +40,23 @@ To run the proxy locally for development or testing, install Node.js >= 18.0.0 a
 4. Start the server in development mode with `npm run start:dev`.
 
 You can also use `npm run start:dev:tsc` to enable project-wide type checking at the cost of slower startup times. `npm run type-check` can be used to run type checking without starting the server.
+
+## Claude tokenizer
+As Anthropic does not ship a NodeJS tokenizer, the server includes a small Python script that runs alongside the proxy to tokenize Claude requests. It is automatically started when the server is launched, but requires additional dependencies to be installed. If these dependencies are not installed, the server will not be able to accurately count the number of tokens in Claude requests but will still function normally otherwise.
+
+Note: On Windows, a Windows Firewall prompt may appear when the Claude tokenizer is started. This is normal and is caused by the Python process attempting to open a socket to communicate with the NodeJS server. You can safely allow the connection.
+
+#### Automatic installation
+This will create a venv and install the required dependencies. You still need to activate the venv when running the server, and you must have Python >= 3.8.0 installed.
+1. Install Python >= 3.8.0
+2. Run `npm run install:claude:unix` (Linux/Mac) or `npm run install:claude:win` (Windows)
+
+#### Manual installation
+1. Install Python >= 3.8.0
+2. Create a virtual environment in the `claude` directory with `python -m venv venv`
+3. Activate the virtual environment with `source venv/bin/activate` (Linux/Mac) or `.\venv\Scripts\activate` (PowerShell/Windows)
+4. Install dependencies with `pip install -r requirements.txt`
+5. Provided you have the virtual environment activated, the server will automatically start the tokenizer when it is launched.
+
+#### Deploying
+Refer to the reference Dockerfiles for examples on how to install the tokenizer. The Huggingface and Render Dockerfiles both include the tokenizer.

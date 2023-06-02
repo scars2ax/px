@@ -5,8 +5,10 @@
   "scripts": {
     "build": "node esbuild.js",
     "build:dev": "node esbuild.js --dev",
+    "install:claude:win": "python -m venv .venv && .venv\\Scripts\\activate.bat && pip install -r requirements.txt",
+    "install:claude:unix": "python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt",
     "start:dev": "concurrently \"npm run build:dev\" \"npm run start:watch\"",
-    "start:dev:tsc": "nodemon --watch src --exec ts-node --transpile-only src/server.ts",
+    "start:dev:tsc": "nodemon --watch src --exec ts-node src/server.ts",
     "start:watch": "nodemon --require source-map-support/register build/server.js",
     "start:replit": "tsc && node build/server.js",
     "start": "node build/server.js",
