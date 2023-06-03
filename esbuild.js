@@ -22,9 +22,6 @@ const config = {
       },
     }),
   ],
-
-  // "src/tokenization/claude_tokenizer.py":
-  //   "build/tokenization/claude_tokenizer.py",
 };
 
 function createBundler() {

@@ -46,17 +46,17 @@ As Anthropic does not ship a NodeJS tokenizer, the server includes a small Pytho
 
 Note: On Windows, a Windows Firewall prompt may appear when the Claude tokenizer is started. This is normal and is caused by the Python process attempting to open a socket to communicate with the NodeJS server. You can safely allow the connection.
 
-#### Automatic installation
+### Automatic installation (local development)
 This will create a venv and install the required dependencies. You still need to activate the venv when running the server, and you must have Python >= 3.8.0 installed.
 1. Install Python >= 3.8.0
 2. Run `npm run install:claude:unix` (Linux/Mac) or `npm run install:claude:win` (Windows)
 
-#### Manual installation
+### Manual installation (local development)
 1. Install Python >= 3.8.0
 2. Create a virtual environment in the `claude` directory with `python -m venv venv`
 3. Activate the virtual environment with `source venv/bin/activate` (Linux/Mac) or `.\venv\Scripts\activate` (PowerShell/Windows)
 4. Install dependencies with `pip install -r requirements.txt`
 5. Provided you have the virtual environment activated, the server will automatically start the tokenizer when it is launched.
 
-#### Deploying
+### Docker (production deployment)
 Refer to the reference Dockerfiles for examples on how to install the tokenizer. The Huggingface and Render Dockerfiles both include the tokenizer.
