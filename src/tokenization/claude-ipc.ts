@@ -112,7 +112,8 @@ function onMessage(requestId: Buffer, tokens: Buffer) {
 async function launchTokenizer() {
   return new Promise<ChildProcess>((resolve, reject) => {
     let resolved = false;
-    const proc = spawn("python", [
+    const python = process.platform === "win32" ? "python" : "python3";
+    const proc = spawn(python, [
       "-u",
       join(__dirname, "tokenization", "claude-tokenizer.py"),
     ]);
@@ -125,6 +126,13 @@ async function launchTokenizer() {
     proc.stderr!.on("data", (data) => {
       pythonLog.error(data.toString());
     });
+    proc.on("error", (err) => {
+      pythonLog.error({ err }, "Claude tokenizer error");
+      if (!resolved) {
+        resolved = true;
+        reject(err);
+      }
+    }); 
     proc.on("close", (code) => {
       pythonLog.info(`Claude tokenizer exited with code ${code}`);
       socket?.close();

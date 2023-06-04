@@ -19,8 +19,6 @@ def init(socket):
         while True:
             message = socket.recv_multipart()
             routing_id, command = message
-            print(f"claude-tokenizer.py: received message {message}")
-            print(f"claude-tokenizer.py: received command {command}")
             if command == b"init":
                 print("claude-tokenizer.py: initialized")
                 socket.send_multipart([routing_id, b"ok"])
