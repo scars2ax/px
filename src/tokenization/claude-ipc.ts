@@ -7,15 +7,14 @@ const log = logger.child({ module: "claude-ipc" });
 const pythonLog = logger.child({ module: "claude-python" });
 
 let tokenizer: ChildProcess;
-let isReady = false;
-// zeromq is an optional dependency, so we need to defer loading it.
-let socket: typeof import("zeromq").Dealer.constructor.prototype;
+let initialized = false;
+let socket: any; // zeromq.Dealer, not sure how to import it safely as it is optional
 
 export async function init() {
   log.info("Initializing Claude tokenizer IPC");
   try {
-    const zmq = await import("zeromq");
     tokenizer = await launchTokenizer();
+    const zmq = await import("zeromq");
     socket = new zmq.Dealer({ sendTimeout: 500 });
     socket.connect(TOKENIZER_SOCKET);
 
@@ -38,7 +37,7 @@ export async function init() {
       throw new Error("Unexpected test token count");
     }
 
-    isReady = true;
+    initialized = true;
   } catch (err) {
     log.error({ err: err.message }, "Failed to initialize Claude tokenizer");
     if (process.env.NODE_ENV !== "production") {
@@ -81,7 +80,7 @@ export async function requestTokenCount({
 
     pendingRequests.set(requestId, { resolve: resolveFn });
 
-    const timeout = isReady ? 500 : 10000;
+    const timeout = initialized ? 500 : 10000;
     setTimeout(() => {
       if (pendingRequests.has(requestId)) {
         pendingRequests.delete(requestId);
@@ -111,6 +110,7 @@ async function processMessages() {
 async function launchTokenizer() {
   return new Promise<ChildProcess>((resolve, reject) => {
     let resolved = false;
+
     const python = process.platform === "win32" ? "python" : "python3";
     const proc = spawn(python, [
       "-u",
@@ -119,35 +119,42 @@ async function launchTokenizer() {
     if (!proc) {
       reject(new Error("Failed to spawn Claude tokenizer"));
     }
+
+    function cleanup() {
+      socket?.close();
+      socket = undefined!;
+      tokenizer = undefined!;
+    }
+
     proc.stdout!.on("data", (data) => {
-      pythonLog.info(data.toString());
+      pythonLog.info(data.toString().trim());
     });
     proc.stderr!.on("data", (data) => {
-      pythonLog.error(data.toString());
+      pythonLog.error(data.toString().trim());
     });
     proc.on("error", (err) => {
       pythonLog.error({ err }, "Claude tokenizer error");
+      cleanup();
       if (!resolved) {
         resolved = true;
         reject(err);
       }
-    }); 
+    });
     proc.on("close", (code) => {
       pythonLog.info(`Claude tokenizer exited with code ${code}`);
-      socket?.close();
-      socket = undefined!;
-      tokenizer = undefined!;
+      cleanup();
       if (code !== 0 && !resolved) {
         resolved = true;
         reject(new Error("Claude tokenizer exited immediately"));
       }
     });
+
     // Wait a moment to catch any immediate errors (missing imports, etc)
     setTimeout(() => {
       if (!resolved) {
         resolved = true;
         resolve(proc);
       }
-    }, 100);
+    }, 200);
   });
 }

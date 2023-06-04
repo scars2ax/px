@@ -8,7 +8,7 @@ FROM node:18-alpine as builder
 RUN apk add --no-cache autoconf automake g++ libtool zeromq-dev python3 \
     py3-pip git curl cmake gcc musl-dev pkgconfig openssl-dev
   
-# Install Rust (required to build tokenizers)
+# Install Rust (required to build huggingface/tokenizers)
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
 
