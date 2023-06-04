@@ -56,6 +56,6 @@
     "semver": "^7.5.3"
   },
   "optionalDependencies": {
-    "zeromq": "^5.3.1"
+    "zeromq": "^6.0.0-beta.16"
   }
 }

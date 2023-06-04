@@ -24,7 +24,7 @@ def init(socket):
                 socket.send_multipart([routing_id, b"ok"])
                 break
     except Exception as e:
-        print("claude-tokenizer.py: failed to initialize ({e})")
+        print("claude-tokenizer.py: failed to initialize")
         return
 
     message_processor(socket)

@@ -1,43 +1,32 @@
 import { spawn, ChildProcess } from "child_process";
 import { join } from "path";
 import { logger } from "../logger";
-type Zmq = typeof import("zeromq");
 
 const TOKENIZER_SOCKET = "tcp://localhost:5555";
 const log = logger.child({ module: "claude-ipc" });
 const pythonLog = logger.child({ module: "claude-python" });
 
 let tokenizer: ChildProcess;
-let socket: ReturnType<Zmq["socket"]>;
 let isReady = false;
+// zeromq is an optional dependency, so we need to defer loading it.
+let socket: typeof import("zeromq").Dealer.constructor.prototype;
 
 export async function init() {
   log.info("Initializing Claude tokenizer IPC");
   try {
     const zmq = await import("zeromq");
     tokenizer = await launchTokenizer();
-    socket = zmq.socket("dealer");
+    socket = new zmq.Dealer({ sendTimeout: 500 });
     socket.connect(TOKENIZER_SOCKET);
 
-    socket.send(["init"]);
-    const response = await new Promise<string>((resolve) => {
-      const timeout = setTimeout(() => resolve("timeout"), 1000);
-      socket.once("message", (msg) => {
-        clearTimeout(timeout);
-        resolve(msg);
-      });
-    });
-    if (response === "timeout") {
-      throw new Error("Timeout waiting for init response");
-    }
+    await socket.send(["init"]);
+    const response = await socket.receive();
     if (response.toString() !== "ok") {
       throw new Error("Unexpected init response");
     }
 
-    socket.on("message", onMessage);
-    socket.on("error", (err) => {
-      log.error({ err }, "Claude tokenizer socket error");
-    });
+    // Start message pump
+    processMessages();
 
     // Test tokenizer
     const result = await requestTokenCount({
@@ -80,7 +69,7 @@ export async function requestTokenCount({
   }
 
   log.debug({ requestId, chars: prompt.length }, "Requesting token count");
-  socket.send(["tokenize", requestId, prompt]);
+  await socket.send(["tokenize", requestId, prompt]);
 
   log.debug({ requestId }, "Waiting for socket response");
   return new Promise<number>(async (resolve, reject) => {
@@ -104,13 +93,19 @@ export async function requestTokenCount({
   });
 }
 
-function onMessage(requestId: Buffer, tokens: Buffer) {
-  const request = pendingRequests.get(requestId.toString());
-  if (!request) {
-    log.error({ requestId }, "No pending request found for incoming message");
-    return;
+async function processMessages() {
+  if (!socket) {
+    throw new Error("Claude tokenizer is not initialized");
   }
-  request.resolve(Number(tokens.toString()));
+  log.debug("Starting message loop");
+  for await (const [requestId, tokens] of socket) {
+    const request = pendingRequests.get(requestId.toString());
+    if (!request) {
+      log.error({ requestId }, "No pending request found for incoming message");
+      continue;
+    }
+    request.resolve(Number(tokens.toString()));
+  }
 }
 
 async function launchTokenizer() {
