@@ -52,7 +52,17 @@ function cacheInfoPageHtml(baseUrl: string) {
   };
 
   const title = getServerTitle();
-  const headerHtml = buildInfoPageHeader(new showdown.Converter(), title);
+  let headerHtml = buildInfoPageHeader(new showdown.Converter(), title);
+
+  if (process.env.MISSING_PYTHON_WARNING) {
+    headerHtml +=
+      `<p style="color: red;">Python is not installed; the Claude tokenizer ` +
+      `cannot start. Your Dockerfile may be out of date; see <a ` +
+      `href="https://gitgud.io/khanon/oai-reverse-proxy">the docs</a> for an ` +
+      `updated Huggingface Dockerfile.</p><p>You can disable this warning by ` +
+      `setting <code>DISABLE_MISSING_PYTHON_WARNING=true</code> in your ` +
+      `environment.</p>`;
+  }
 
   const pageBody = `<!DOCTYPE html>
 <html lang="en">

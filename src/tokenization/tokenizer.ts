@@ -1,4 +1,5 @@
 import { Request } from "express";
+import childProcess from "child_process";
 import { config } from "../config";
 import { logger } from "../logger";
 import {
@@ -12,19 +13,23 @@ import {
 } from "./openai";
 
 let canTokenizeClaude = false;
-let canTokenizeOpenAI = false;
 
 export async function init() {
   if (config.anthropicKey) {
-    canTokenizeClaude = await initIpc();
-    if (!canTokenizeClaude) {
-      logger.warn(
-        "Anthropic key is set, but tokenizer is not available. Claude prompts will use a naive estimate for token count."
-      );
+    if (!isPythonInstalled()) {
+      const skipWarning = !!process.env.DISABLE_MISSING_PYTHON_WARNING;
+      process.env.MISSING_PYTHON_WARNING = skipWarning ? "" : "true";
+    } else {
+      canTokenizeClaude = await initIpc();
+      if (!canTokenizeClaude) {
+        logger.warn(
+          "Anthropic key is set, but tokenizer is not available. Claude prompts will use a naive estimate for token count."
+        );
+      }
     }
   }
   if (config.openaiKey) {
-    canTokenizeOpenAI = initEncoder();
+    initEncoder();
   }
 }
 
@@ -110,4 +115,15 @@ function guesstimateTokens(prompt: string) {
   // This suggests 0.28 tokens per character but in practice this seems to be
   // a substantial underestimate in some cases.
   return Math.ceil(prompt.length * 0.325);
+}
+
+function isPythonInstalled() {
+  try {
+    const python = process.platform === "win32" ? "python" : "python3";
+    childProcess.execSync(`${python} --version`, { stdio: "ignore" });
+    return true;
+  } catch (err) {
+    logger.debug({ err: err.message }, "Python not installed.");
+    return false;
+  }
 }
