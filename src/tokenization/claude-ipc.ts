@@ -9,6 +9,7 @@ const pythonLog = logger.child({ module: "claude-python" });
 
 let tokenizer: ChildProcess;
 let socket: ReturnType<Zmq["socket"]>;
+let isReady = false;
 
 export async function init() {
   log.info("Initializing Claude tokenizer IPC");
@@ -47,6 +48,8 @@ export async function init() {
       log.error({ result }, "Unexpected test token count");
       throw new Error("Unexpected test token count");
     }
+
+    isReady = true;
   } catch (err) {
     log.error({ err: err.message }, "Failed to initialize Claude tokenizer");
     if (process.env.NODE_ENV !== "production") {
@@ -89,6 +92,7 @@ export async function requestTokenCount({
 
     pendingRequests.set(requestId, { resolve: resolveFn });
 
+    const timeout = isReady ? 500 : 10000;
     setTimeout(() => {
       if (pendingRequests.has(requestId)) {
         pendingRequests.delete(requestId);
@@ -96,7 +100,7 @@ export async function requestTokenCount({
         log.warn({ requestId }, err);
         reject(new Error(err));
       }
-    }, 500);
+    }, timeout);
   });
 }
 
