@@ -10,7 +10,8 @@
     "skipDefaultLibCheck": true,
     "outDir": "build",
     "sourceMap": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "useUnknownInCatchVariables": false
   },
   "include": ["src"],
   "exclude": ["node_modules"],
