@@ -8,7 +8,7 @@ import { OpenAIPromptMessage } from "../../../tokenization/openai";
  * The maximum number of tokens an Anthropic prompt can have before we switch to
  * the larger claude-100k context model.
  */
-const CLAUDE_100K_THRESHOLD = 8200;
+const CLAUDE_100K_TOKEN_THRESHOLD = 8200;
 
 // https://console.anthropic.com/docs/api/reference#-v1-complete
 const AnthropicV1CompleteSchema = z.object({
@@ -127,8 +127,16 @@ function openaiToAnthropic(body: any, req: Request) {
   const CLAUDE_BIG = process.env.CLAUDE_BIG_MODEL || "claude-v1-100k";
   const CLAUDE_SMALL = process.env.CLAUDE_SMALL_MODEL || "claude-v1";
 
+  const contextTokens = Number(req.promptTokens ?? 0) + Number(rest.max_tokens);
   const model =
-    req.promptTokens ?? 0 > CLAUDE_100K_THRESHOLD ? CLAUDE_BIG : CLAUDE_SMALL;
+    contextTokens ?? 0 > CLAUDE_100K_TOKEN_THRESHOLD
+      ? CLAUDE_BIG
+      : CLAUDE_SMALL;
+
+  req.log.debug(
+    { contextTokens, model, CLAUDE_100K_TOKEN_THRESHOLD },
+    "Selected Claude model"
+  );
 
   let stops = rest.stop
     ? Array.isArray(rest.stop)
