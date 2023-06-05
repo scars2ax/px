@@ -164,7 +164,7 @@ function openaiToAnthropic(body: any, req: Request) {
   return {
     ...rest,
     model,
-    prompt,
+    prompt: "\n\nHuman: Hello" + prompt,
     max_tokens_to_sample: rest.max_tokens,
     stop_sequences: stops,
   };
