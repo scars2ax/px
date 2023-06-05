@@ -132,6 +132,7 @@ paths:
                     type: string
     delete:
       summary: Disables the user with the given token
+      operationId: disableUser
       description: Optionally accepts a `disabledReason` query parameter. Returns the disabled user.
       parameters:
         - in: path
@@ -202,3 +203,10 @@ components:
           format: int64
         disabledReason:
           type: string
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - bearerAuth: []
