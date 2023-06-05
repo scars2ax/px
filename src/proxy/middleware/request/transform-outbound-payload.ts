@@ -158,7 +158,7 @@ function openaiToAnthropic(body: any, req: Request) {
   // "prompt must start with a '\n\nHuman: ' turn", enable this setting.
   // I will try to fix this when I can identify why it only happens sometimes.
   let preamble = "";
-  if (process.env.CLAUDE_ADD_HUMAN_PREABMLE) {
+  if (process.env.CLAUDE_ADD_HUMAN_PREAMBLE) {
     preamble = "\n\nHuman: Hello Claude.";
   }
 
