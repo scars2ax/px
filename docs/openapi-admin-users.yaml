@@ -1,8 +1,10 @@
-# Shat out by GPT-4, I did not check for correctness beyond a cursory glance
 openapi: 3.0.0
 info:
   version: 1.0.0
   title: User Management API
+servers:
+  - url: https://you-yourspace.hf.space
+    description: Your hosted Huggingface Space instance
 paths:
   /admin/users:
     get:
