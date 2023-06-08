@@ -129,7 +129,7 @@ function openaiToAnthropic(body: any, req: Request) {
 
   const contextTokens = Number(req.promptTokens ?? 0) + Number(rest.max_tokens);
   const model =
-    contextTokens ?? 0 > CLAUDE_100K_TOKEN_THRESHOLD
+    (contextTokens ?? 0) > CLAUDE_100K_TOKEN_THRESHOLD
       ? CLAUDE_BIG
       : CLAUDE_SMALL;
 
