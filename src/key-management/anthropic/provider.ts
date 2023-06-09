@@ -17,6 +17,16 @@ export interface AnthropicKey extends Key {
   rateLimitedAt: number;
   /** The time until which this key is rate limited. */
   rateLimitedUntil: number;
+  props: {
+    /**
+     * Whether this key requires a special preamble.  For unclear reasons, some
+     * Anthropic keys will throw an error if the prompt does not begin with a
+     * message from the user, whereas others can be used without a preamble. This
+     * is despite using the same API endpoint, version, and model.
+     * When a key returns this particular error, we set this flag to true.
+     */
+    requiresPreamble: boolean;
+  };
 }
 
 /**
@@ -52,6 +62,7 @@ export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
         lastUsed: 0,
         rateLimitedAt: 0,
         rateLimitedUntil: 0,
+        props: { requiresPreamble: false },
         hash: `ant-${crypto
           .createHash("sha256")
           .update(key)
@@ -173,6 +184,16 @@ export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
     const now = Date.now();
     key.rateLimitedAt = now;
     key.rateLimitedUntil = now + RATE_LIMIT_LOCKOUT;
+  }
+
+  public updateProp<T extends keyof AnthropicKey["props"]>(
+    hash: string,
+    propName: T,
+    propValue: AnthropicKey["props"][T]
+  ) {
+    const key = this.keys.find((k) => k.hash === hash);
+    if (!key) return;
+    key.props[propName] = propValue;
   }
 
   public remainingQuota() {

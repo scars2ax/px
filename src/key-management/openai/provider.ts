@@ -262,6 +262,10 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
     key.promptCount++;
   }
 
+  public updateProp() {
+    throw new Error("OpenAIKeyProvider does not support updating properties");
+  }
+
   public updateRateLimits(keyHash: string, headers: http.IncomingHttpHeaders) {
     const key = this.keys.find((k) => k.hash === keyHash)!;
     const requestsReset = headers["x-ratelimit-reset-requests"];

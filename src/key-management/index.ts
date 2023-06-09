@@ -27,6 +27,8 @@ export interface Key {
   lastChecked: number;
   /** Hash of the key, for logging and to find the key in the pool. */
   hash: string;
+  /** Service-specific data. */
+  props?: Record<string, unknown>;
 }
 
 /*
@@ -54,6 +56,11 @@ export interface KeyProvider<T extends Key = Key> {
   remainingQuota(options?: Record<string, unknown>): number;
   usageInUsd(options?: Record<string, unknown>): string;
   markRateLimited(hash: string): void;
+  updateProp(
+    hash: string,
+    prop: keyof T["props"],
+    value: T["props"][keyof T["props"]]
+  ): void;
 }
 
 export const keyPool = new KeyPool();
