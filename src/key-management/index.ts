@@ -27,8 +27,6 @@ export interface Key {
   lastChecked: number;
   /** Hash of the key, for logging and to find the key in the pool. */
   hash: string;
-  /** Service-specific data. */
-  props?: Record<string, unknown>;
 }
 
 /*
@@ -49,6 +47,7 @@ export interface KeyProvider<T extends Key = Key> {
   get(model: Model): T;
   list(): Omit<T, "key">[];
   disable(key: T): void;
+  update(hash: string, update: Partial<T>): void;
   available(): number;
   anyUnchecked(): boolean;
   incrementPrompt(hash: string): void;
@@ -56,11 +55,6 @@ export interface KeyProvider<T extends Key = Key> {
   remainingQuota(options?: Record<string, unknown>): number;
   usageInUsd(options?: Record<string, unknown>): string;
   markRateLimited(hash: string): void;
-  updateProp(
-    hash: string,
-    prop: keyof T["props"],
-    value: T["props"][keyof T["props"]]
-  ): void;
 }
 
 export const keyPool = new KeyPool();
@@ -70,3 +64,5 @@ export const SUPPORTED_MODELS = [
 ] as const;
 export type SupportedModel = (typeof SUPPORTED_MODELS)[number];
 export { OPENAI_SUPPORTED_MODELS, ANTHROPIC_SUPPORTED_MODELS };
+export { AnthropicKey } from "./anthropic/provider";
+export { OpenAIKey } from "./openai/provider";
