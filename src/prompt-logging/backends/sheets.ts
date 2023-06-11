@@ -388,4 +388,4 @@ function assertData<T = sheets_v4.Schema$ValueRange>(res: GaxiosResponse<T>) {
   return res.data!;
 }
 
-export const sheets: PromptLogBackend = { init, appendBatch };
+export const sheets = { init, appendBatch };

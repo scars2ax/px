@@ -3,17 +3,10 @@
 import { config } from "../config";
 import { logger } from "../logger";
 import { PromptLogBackend, PromptLogEntry } from ".";
-import { sheets, airtable } from "./backends";
+import { createPromptLogBackend } from "./backends";
 
 const FLUSH_INTERVAL = 1000 * 10;
 const MAX_BATCH_SIZE = 25;
-const BACKENDS: Record<
-  NonNullable<typeof config.promptLoggingBackend>,
-  PromptLogBackend
-> = {
-  google_sheets: sheets,
-  airtable: airtable,
-};
 
 const queue: PromptLogEntry[] = [];
 const log = logger.child({ module: "log-queue" });
@@ -85,7 +78,7 @@ export const start = async () => {
       throw new Error("No logging backend configured.");
     }
 
-    activeBackend = BACKENDS[selectedBackend];
+    activeBackend = createPromptLogBackend(selectedBackend);
     await getBackend().init(() => stop());
     log.info("Logging backend initialized.");
     started = true;
