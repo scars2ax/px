@@ -6,7 +6,7 @@ database for now.
 Due to the limitations of Google Sheets, we'll queue up log entries and flush
 them to the API periodically. */
 
-export interface PromptLogEntry {
+export type PromptLogEntry = {
   model: string;
   endpoint: string;
   /** JSON prompt passed to the model */
@@ -15,7 +15,7 @@ export interface PromptLogEntry {
   promptFlattened: string;
   response: string;
   // TODO: temperature, top_p, top_k, etc.
-}
+};
 
 export interface PromptLogBackend {
   init(onStop: () => void): Promise<void>;
