@@ -86,10 +86,10 @@ type Config = {
   googleSheetsKey?: string;
   /** Google Sheets spreadsheet ID. */
   googleSheetsSpreadsheetId?: string;
-  /** Airtable API key. */
+  /** Airtable personal access token. */
   airtableKey?: string;
-  /** Airtable base ID. */
-  airtableBaseId?: string;
+  /** Airtable workspace ID, under which bases will be automatically created. */
+  airtableWorkspaceId?: string;
   /** Whether to periodically check keys for usage and validity. */
   checkKeys?: boolean;
   /**
@@ -159,6 +159,8 @@ export const config: Config = {
   quotaDisplayMode: getEnvWithDefault("QUOTA_DISPLAY_MODE", "partial"),
   promptLogging: getEnvWithDefault("PROMPT_LOGGING", false),
   promptLoggingBackend: getEnvWithDefault("PROMPT_LOGGING_BACKEND", undefined),
+  airtableKey: getEnvWithDefault("AIRTABLE_KEY", undefined),
+  airtableWorkspaceId: getEnvWithDefault("AIRTABLE_WORKSPACE_ID", undefined),
   googleSheetsKey: getEnvWithDefault("GOOGLE_SHEETS_KEY", undefined),
   googleSheetsSpreadsheetId: getEnvWithDefault(
     "GOOGLE_SHEETS_SPREADSHEET_ID",
@@ -262,7 +264,7 @@ export async function assertConfigIsValid() {
  */
 export const SENSITIVE_KEYS: (keyof Config)[] = [
   "googleSheetsSpreadsheetId",
-  "airtableBaseId",
+  "airtableWorkspaceId",
 ];
 
 /**
