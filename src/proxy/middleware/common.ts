@@ -2,7 +2,6 @@ import { Request, Response } from "express";
 import httpProxy from "http-proxy";
 import { ZodError } from "zod";
 
-
 const OPENAI_CHAT_COMPLETION_ENDPOINT = "/v1/chat/completions";
 const ANTHROPIC_COMPLETION_ENDPOINT = "/v1/complete";
 
@@ -57,6 +56,7 @@ export const handleInternalError = (
 ) => {
   try {
     const isZod = err instanceof ZodError;
+    const isForbidden = err.name === "ForbiddenError";
     if (isZod) {
       writeErrorResponse(req, res, 400, {
         error: {
@@ -64,6 +64,17 @@ export const handleInternalError = (
           proxy_note: `Reverse proxy couldn't validate your request when trying to transform it. Your client may be sending invalid data.`,
           issues: err.issues,
           stack: err.stack,
+          message: err.message,
+        },
+      });
+    } else if (isForbidden) {
+      // Spoofs a vaguely threatening OpenAI error message. Only invoked by the
+      // block-zoomers rewriter to scare off tiktokers.
+      writeErrorResponse(req, res, 403, {
+        error: {
+          type: "access_denied",
+          code: "organization_disabled_policy_violation",
+          param: null,
           message: err.message,
         },
       });

@@ -1,0 +1,24 @@
+import { isCompletionRequest } from "../common";
+import { ProxyRequestMiddleware } from ".";
+
+const DISALLOWED_ORIGIN_SUBSTRINGS = "janitorai.com,janitor.ai".split(",");
+
+class ForbiddenError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ForbiddenError";
+  }
+}
+
+export const blockZoomers: ProxyRequestMiddleware = (_proxyReq, req) => {
+  if (!isCompletionRequest(req)) {
+    return;
+  }
+
+  const origin = req.headers.origin || req.headers.referer;
+  if (origin && DISALLOWED_ORIGIN_SUBSTRINGS.some((s) => origin.includes(s))) {
+    throw new ForbiddenError(
+      `This OpenAI account has been disabled due to fraud and potential CSAM violations. Your IP address, user agent, and request details have been logged and will be shared with the National Center for Missing and Exploited Children and local law enforcement's cybercrime division to assist in their investigation.`
+    );
+  }
+};

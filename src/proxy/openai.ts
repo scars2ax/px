@@ -9,6 +9,7 @@ import { ipLimiter } from "./rate-limit";
 import { handleProxyError } from "./middleware/common";
 import {
   addKey,
+  blockZoomers,
   createPreprocessorMiddleware,
   finalizeBody,
   languageFilter,
@@ -90,6 +91,7 @@ const rewriteRequest = (
 ) => {
   const rewriterPipeline = [
     addKey,
+    blockZoomers,
     languageFilter,
     limitOutputTokens,
     limitCompletions,
