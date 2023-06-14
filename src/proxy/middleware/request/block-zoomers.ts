@@ -10,6 +10,10 @@ class ForbiddenError extends Error {
   }
 }
 
+/**
+ * Blocks requests from Janitor AI users with a fake, scary error message so I
+ * stop getting emails asking for tech support.
+ */
 export const blockZoomers: ProxyRequestMiddleware = (_proxyReq, req) => {
   if (!isCompletionRequest(req)) {
     return;

@@ -31,6 +31,7 @@ export function writeErrorResponse(
     res.headersSent ||
     res.getHeader("content-type") === "text/event-stream"
   ) {
+    const spacer = statusCode === 403 ? " " : 2;
     const msg = buildFakeSseMessage(
       `${errorSource} error (${statusCode})`,
       JSON.stringify(errorPayload, null, 2),
@@ -72,8 +73,8 @@ export const handleInternalError = (
       // block-zoomers rewriter to scare off tiktokers.
       writeErrorResponse(req, res, 403, {
         error: {
-          type: "access_denied",
-          code: "organization_disabled_policy_violation",
+          type: "organization_account_disabled",
+          code: "policy_violation",
           param: null,
           message: err.message,
         },
@@ -102,10 +103,14 @@ export function buildFakeSseMessage(
   req: Request
 ) {
   let fakeEvent;
+  const useBackticks = !type.includes("403");
+  const msgContent = useBackticks
+    ? `\`\`\`\n[${type}: ${string}]\n\`\`\`\n`
+    : `[${type}: ${string}]`;
 
   if (req.inboundApi === "anthropic") {
     fakeEvent = {
-      completion: `\`\`\`\n[${type}: ${string}]\n\`\`\`\n`,
+      completion: msgContent,
       stop_reason: type,
       truncated: false, // I've never seen this be true
       stop: null,
@@ -120,7 +125,7 @@ export function buildFakeSseMessage(
       model: req.body?.model,
       choices: [
         {
-          delta: { content: `\`\`\`\n[${type}: ${string}]\n\`\`\`\n` },
+          delta: { content: msgContent },
           index: 0,
           finish_reason: type,
         },
