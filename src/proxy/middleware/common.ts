@@ -31,10 +31,14 @@ export function writeErrorResponse(
     res.headersSent ||
     res.getHeader("content-type") === "text/event-stream"
   ) {
-    const spacer = statusCode === 403 ? " " : 2;
+    const errorContent =
+      statusCode === 403
+        ? JSON.stringify(errorPayload)
+        : JSON.stringify(errorPayload, null, 2);
+
     const msg = buildFakeSseMessage(
       `${errorSource} error (${statusCode})`,
-      JSON.stringify(errorPayload, null, 2),
+      errorContent,
       req
     );
     res.write(msg);
