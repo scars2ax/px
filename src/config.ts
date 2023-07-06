@@ -18,6 +18,8 @@ type Config = {
   openaiKey?: string;
   /** Comma-delimited list of Anthropic API keys. */
   anthropicKey?: string;
+  scaleKey?: string;
+  scaleMinDeployments: number;
   /**
    * The proxy key to require for requests. Only applicable if the user
    * management mode is set to 'proxy_key', and required if so.
@@ -26,7 +28,7 @@ type Config = {
   /**
    * The admin key used to access the /admin API. Required if the user
    * management mode is set to 'user_token'.
-   **/
+   */
   adminKey?: string;
   /**
    * Which user management mode to use.
@@ -49,7 +51,7 @@ type Config = {
    *
    * `firebase_rtdb`: Users are stored in a Firebase Realtime Database; requires
    *  `firebaseKey` and `firebaseRtdbUrl` to be set.
-   **/
+   */
   gatekeeperStore: "memory" | "firebase_rtdb";
   /** URL of the Firebase Realtime Database if using the Firebase RTDB store. */
   firebaseRtdbUrl?: string;
@@ -127,6 +129,8 @@ export const config: Config = {
   port: getEnvWithDefault("PORT", 7860),
   openaiKey: getEnvWithDefault("OPENAI_KEY", ""),
   anthropicKey: getEnvWithDefault("ANTHROPIC_KEY", ""),
+  scaleKey: getEnvWithDefault("SCALE_KEY", ""),
+  scaleMinDeployments: getEnvWithDefault("SCALE_MIN_DEPLOYMENTS", 0),
   proxyKey: getEnvWithDefault("PROXY_KEY", ""),
   adminKey: getEnvWithDefault("ADMIN_KEY", ""),
   gatekeeper: getEnvWithDefault("GATEKEEPER", "none"),
@@ -262,6 +266,7 @@ export const OMITTED_KEYS: (keyof Config)[] = [
   "logLevel",
   "openaiKey",
   "anthropicKey",
+  "scaleKey",
   "proxyKey",
   "adminKey",
   "checkKeys",
