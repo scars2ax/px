@@ -13,7 +13,6 @@ import {
   createPreprocessorMiddleware,
   finalizeBody,
   languageFilter,
-  limitOutputTokens,
   removeOriginHeaders,
 } from "./middleware/request";
 import {
@@ -76,7 +75,6 @@ const rewriteAnthropicRequest = (
     addKey,
     addAnthropicPreamble,
     languageFilter,
-    limitOutputTokens,
     blockZoomerOrigins,
     removeOriginHeaders,
     finalizeBody,

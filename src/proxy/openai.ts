@@ -14,7 +14,6 @@ import {
   finalizeBody,
   languageFilter,
   limitCompletions,
-  limitOutputTokens,
   removeOriginHeaders,
 } from "./middleware/request";
 import {
@@ -93,7 +92,6 @@ const rewriteRequest = (
   const rewriterPipeline = [
     addKey,
     languageFilter,
-    limitOutputTokens,
     limitCompletions,
     blockZoomerOrigins,
     removeOriginHeaders,
