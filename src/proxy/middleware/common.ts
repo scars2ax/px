@@ -4,14 +4,17 @@ import { ZodError } from "zod";
 
 const OPENAI_CHAT_COMPLETION_ENDPOINT = "/v1/chat/completions";
 const ANTHROPIC_COMPLETION_ENDPOINT = "/v1/complete";
+const GEPETTO_COMPLETION_ENDPOINT = "/";
 
 /** Returns true if we're making a request to a completion endpoint. */
 export function isCompletionRequest(req: Request) {
   return (
     req.method === "POST" &&
-    [OPENAI_CHAT_COMPLETION_ENDPOINT, ANTHROPIC_COMPLETION_ENDPOINT].some(
-      (endpoint) => req.path.startsWith(endpoint)
-    )
+    [
+      OPENAI_CHAT_COMPLETION_ENDPOINT,
+      ANTHROPIC_COMPLETION_ENDPOINT,
+      GEPETTO_COMPLETION_ENDPOINT,
+    ].some((endpoint) => req.path.startsWith(endpoint))
   );
 }
 
