@@ -12,6 +12,7 @@ import { handleInfoPage } from "./info-page";
 import { logQueue } from "./prompt-logging";
 import { start as startRequestQueue } from "./proxy/queue";
 import { init as initUserStore } from "./proxy/auth/user-store";
+import { init as initTokenizers } from "./tokenization";
 import { checkOrigin } from "./proxy/check-origin";
 
 const PORT = config.port;
@@ -98,6 +99,8 @@ async function start() {
   await assertConfigIsValid();
 
   keyPool.init();
+
+  await initTokenizers();
 
   if (config.gatekeeper === "user_token") {
     await initUserStore();
