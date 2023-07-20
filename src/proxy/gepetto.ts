@@ -6,22 +6,25 @@ import { createQueueMiddleware } from "./queue";
 import { ipLimiter } from "./rate-limit";
 import { handleProxyError } from "./middleware/common";
 import {
-  blockZoomers,
   createPreprocessorMiddleware,
   finalizeBody,
 } from "./middleware/request";
-import { createOnProxyResHandler } from "./middleware/response";
+import {
+  ProxyResHandlerWithBody,
+  createOnProxyResHandler,
+} from "./middleware/response";
 import { keyPool } from "../key-management";
+import { config } from "../config";
 
 const getModelsResponse = () => {
-  const variants = ["shikiho-v1"];
+  const variants = ["gepetto4-v1"];
   const models = variants.map((id) => ({
     id,
     object: "model",
     created: new Date().getTime(),
-    owned_by: "shikiho",
+    owned_by: "some swedes",
     permission: [],
-    root: "claude",
+    root: "openai (maybe?)",
     parent: null,
   }));
   return { object: "list", data: models };
@@ -31,20 +34,20 @@ const handleModelRequest: RequestHandler = (_req, res) => {
   res.status(200).json(getModelsResponse());
 };
 
-const rewriteShikihoRequest = (
+const rewriteGepettoRequest = (
   proxyReq: http.ClientRequest,
   req: Request,
   res: http.ServerResponse
 ) => {
-  const rewriterPipeline = [blockZoomers, finalizeBody];
-
-  // shikiho doesn't use api keys but most of the code expects one to be present
-  req.key = keyPool.get("claude-v1");
-
-  // shikiho always uses SSE
-  req.isStreaming = true;
+  const rewriterPipeline = [finalizeBody];
 
   try {
+    if (req.body.stream) {
+      throw new Error("Streaming is not supported on this endpoint.");
+    }
+
+    // gepetto doesn't use api keys but most of the code expects one to be present
+    req.key = keyPool.get("gpt-4");
     for (const rewriter of rewriterPipeline) {
       rewriter(proxyReq, req, res, {});
     }
@@ -54,43 +57,59 @@ const rewriteShikihoRequest = (
   }
 };
 
-const shikihoProxy = createQueueMiddleware(
+const gepettoResponseHandler: ProxyResHandlerWithBody = async (
+  _proxyRes,
+  req,
+  res,
+  body
+) => {
+  if (typeof body !== "object") {
+    throw new Error("Expected body to be an object");
+  }
+
+  if (config.promptLogging) {
+    const host = req.get("host");
+    body.proxy_note = `Prompts are logged on this proxy instance. See ${host} for more information.`;
+  }
+
+  res.status(200).json(body);
+};
+
+const gepettoProxy = createQueueMiddleware(
   createProxyMiddleware({
-    target:
-      "https://api-server.langchain.rozetta-deveopment-beta.rozetta-dxtravel.com",
+    target: process.env.GEPETTO_URL,
     changeOrigin: true,
     on: {
-      proxyReq: rewriteShikihoRequest,
-      proxyRes: createOnProxyResHandler([]),
+      proxyReq: rewriteGepettoRequest,
+      proxyRes: createOnProxyResHandler([gepettoResponseHandler]),
       error: handleProxyError,
     },
     selfHandleResponse: true,
     logger,
     pathRewrite: {
-      // Send OpenAI-compat requests to the Shikiho API.
-      "^/v1/chat/completions": "api/anth",
+      // The POST request needs to be to the root path.
+      "^/v1/chat/completions": "/",
     },
   })
 );
 
-const shikihoRouter = Router();
+const gepettoRouter = Router();
 // Fix paths because clients don't consistently use the /v1 prefix.
-shikihoRouter.use((req, _res, next) => {
+gepettoRouter.use((req, _res, next) => {
   if (!req.path.startsWith("/v1/")) {
     req.url = `/v1${req.url}`;
   }
   next();
 });
-shikihoRouter.get("/v1/models", handleModelRequest);
-// OpenAI-to-Shikiho compatibility endpoint.
-shikihoRouter.post(
+gepettoRouter.get("/v1/models", handleModelRequest);
+gepettoRouter.post(
   "/v1/chat/completions",
   ipLimiter,
-  createPreprocessorMiddleware({ inApi: "openai", outApi: "shikiho" }),
-  shikihoProxy
+  createPreprocessorMiddleware({ inApi: "openai", outApi: "gepetto" }),
+  gepettoProxy
 );
 // Redirect browser requests to the homepage.
-shikihoRouter.get("*", (req, res, next) => {
+gepettoRouter.get("*", (req, res, next) => {
   const isBrowser = req.headers["user-agent"]?.includes("Mozilla");
   if (isBrowser) {
     res.redirect("/");
@@ -99,4 +118,4 @@ shikihoRouter.get("*", (req, res, next) => {
   }
 });
 
-export const shikiho = shikihoRouter;
+export const gepetto = gepettoRouter;

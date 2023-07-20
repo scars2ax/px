@@ -56,6 +56,10 @@ export const handleStreamedResponse: RawResponseBodyHandler = async (
     throw err;
   }
 
+  if (req.inboundApi === "gepetto") {
+    throw new Error("Gepetto streaming not supported at this time.");
+  }
+
   const key = req.key!;
   if (proxyRes.statusCode !== 200) {
     // Ensure we use the non-streaming middleware stack since we won't be
@@ -190,10 +194,6 @@ function transformEvent({
     return { position: lastPosition, event: data };
   }
 
-  if (requestApi === "openai" && responseApi === "shikiho") {
-    return { position: -1, event: transformShikihoEventToOpenAI(data) };
-  }
-
   const event = JSON.parse(data.slice("data: ".length));
   const newEvent = {
     id: "ant-" + event.log_id,
@@ -212,24 +212,6 @@ function transformEvent({
     position: event.completion.length,
     event: `data: ${JSON.stringify(newEvent)}`,
   };
-}
-
-function transformShikihoEventToOpenAI(data: string) {
-  const event = JSON.parse(data.slice("data: ".length));
-  const newEvent = {
-    id: "shikiho-" + Math.random().toString(36).slice(2),
-    object: "chat.completion.chunk",
-    created: Date.now(),
-    model: "shikiho",
-    choices: [
-      {
-        index: 0,
-        delta: { content: event.data },
-        finish_reason: null,
-      },
-    ],
-  };
-  return `data: ${JSON.stringify(newEvent)}`;
 }
 
 /** Copy headers, excluding ones we're already setting for the SSE response. */
@@ -304,14 +286,16 @@ function convertEventsToFinalResponse(events: string[], req: Request) {
      * the final SSE event before the "DONE" event, so we can reuse that
      */
     const lastEvent = events[events.length - 2].toString();
-    const data = JSON.parse(lastEvent.slice(lastEvent.indexOf("data: ") + "data: ".length));
+    const data = JSON.parse(
+      lastEvent.slice(lastEvent.indexOf("data: ") + "data: ".length)
+    );
     const response: AnthropicCompletionResponse = {
       ...data,
       log_id: req.id,
     };
     return response;
   }
-  if (req.outboundApi === "shikiho") {
+  if (req.outboundApi === "gepetto") {
     // not implemented
     return {};
   }

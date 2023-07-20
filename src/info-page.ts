@@ -40,7 +40,8 @@ function cacheInfoPageHtml(baseUrl: string) {
     endpoints: {
       // ...(openaiKeys ? { openai: baseUrl + "/proxy/openai" } : {}),
       // ...(anthropicKeys ? { anthropic: baseUrl + "/proxy/anthropic" } : {}),
-      shikiho: baseUrl + "/proxy/shikiho",
+      // shikiho: baseUrl + "/proxy/shikiho", // shikiho is kill
+      gepetto: baseUrl + "/proxy/gepetto",
     },
     proompts: keys.reduce((acc, k) => acc + k.promptCount, 0),
     ...(config.modelRateLimit ? { proomptersNow: getUniqueIps() } : {}),
