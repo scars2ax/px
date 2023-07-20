@@ -18,6 +18,9 @@ declare global {
       onAborted?: () => void;
       proceed: () => void;
       heartbeatInterval?: NodeJS.Timeout;
+      promptTokens?: number;
+      // TODO: remove later
+      debug: Record<string, any>;
     }
   }
 }
