@@ -1,9 +1,9 @@
 import { Request } from "express";
 import { z } from "zod";
 import { config } from "../../../config";
+import { OpenAIPromptMessage } from "../../../tokenization";
 import { isCompletionRequest } from "../common";
 import { RequestPreprocessor } from ".";
-import { OpenAIPromptMessage } from "../../../tokenization";
 
 const CLAUDE_OUTPUT_MAX = config.maxOutputTokensAnthropic;
 const OPENAI_OUTPUT_MAX = config.maxOutputTokensOpenAI;
