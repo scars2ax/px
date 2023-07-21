@@ -230,7 +230,7 @@ export class OpenAIKeyChecker {
    * Trial key usage reporting is inaccurate, so we need to run an actual
    * completion to test them for liveness.
    */
-  private async assertCanGenerate(key: OpenAIKey): Promise<void> {
+  private async testLiveness(key: OpenAIKey): Promise<void> {
     const openai = new OpenAIApi(new Configuration({ apiKey: key.key }));
     // This will throw an AxiosError if the key is invalid or out of quota.
     await openai.createChatCompletion({
