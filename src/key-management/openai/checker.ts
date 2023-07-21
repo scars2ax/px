@@ -8,7 +8,6 @@ const KEY_CHECK_PERIOD = 5 * 60 * 1000; // 5 minutes
 const GET_MODELS_URL = "https://api.openai.com/v1/models";
 const GET_SUBSCRIPTION_URL =
   "https://api.openai.com/dashboard/billing/subscription";
-const GET_USAGE_URL = "https://api.openai.com/dashboard/billing/usage";
 
 type GetModelsResponse = {
   data: [{ id: string }];
@@ -20,10 +19,6 @@ type GetSubscriptionResponse = {
   soft_limit_usd: number;
   hard_limit_usd: number;
   system_hard_limit_usd: number;
-};
-
-type GetUsageResponse = {
-  total_usage: number;
 };
 
 type OpenAIError = {
@@ -138,35 +133,29 @@ export class OpenAIKeyChecker {
           );
           await this.assertCanGenerate(key);
         }
-        const [provisionedModels, usage] = await Promise.all([
+        const [provisionedModels] = await Promise.all([
           this.getProvisionedModels(key),
-          this.getUsage(key),
         ]);
         const updates = {
           isGpt4: provisionedModels.gpt4,
           softLimit: subscription.soft_limit_usd,
           hardLimit: subscription.hard_limit_usd,
           systemHardLimit: subscription.system_hard_limit_usd,
-          usage,
         };
         this.updateKey(key.hash, updates);
       } else {
         // Don't check provisioned models after the initial check because it's
         // not likely to change.
-        const [subscription, usage] = await Promise.all([
-          this.getSubscription(key),
-          this.getUsage(key),
-        ]);
+        const [subscription] = await Promise.all([this.getSubscription(key)]);
         const updates = {
           softLimit: subscription.soft_limit_usd,
           hardLimit: subscription.hard_limit_usd,
           systemHardLimit: subscription.system_hard_limit_usd,
-          usage,
         };
         this.updateKey(key.hash, updates);
       }
       this.log.info(
-        { key: key.hash, usage: key.usage, hardLimit: key.hardLimit },
+        { key: key.hash, hardLimit: key.hardLimit },
         "Key check complete."
       );
     } catch (error) {
@@ -200,15 +189,6 @@ export class OpenAIKeyChecker {
       { headers: { Authorization: `Bearer ${key.key}` } }
     );
     return data;
-  }
-
-  private async getUsage(key: OpenAIKey) {
-    const querystring = OpenAIKeyChecker.getUsageQuerystring(key.isTrial);
-    const url = `${GET_USAGE_URL}?${querystring}`;
-    const { data } = await axios.get<GetUsageResponse>(url, {
-      headers: { Authorization: `Bearer ${key.key}` },
-    });
-    return parseFloat((data.total_usage / 100).toFixed(2));
   }
 
   private handleAxiosError(key: OpenAIKey, error: AxiosError) {
@@ -258,26 +238,6 @@ export class OpenAIKeyChecker {
       messages: [{ role: "user", content: "Hello" }],
       max_tokens: 1,
     });
-  }
-
-  static getUsageQuerystring(isTrial: boolean) {
-    // For paid keys, the limit resets every month, so we can use the first day
-    // of the current month.
-    // For trial keys, the limit does not reset and we don't know when the key
-    // was created, so we use 99 days ago because that's as far back as the API
-    // will let us go.
-
-    // End date needs to be set to the beginning of the next day so that we get
-    // usage for the current day.
-
-    const today = new Date();
-    const startDate = isTrial
-      ? new Date(today.getTime() - 99 * 24 * 60 * 60 * 1000)
-      : new Date(today.getFullYear(), today.getMonth(), 1);
-    const endDate = new Date(today.getTime() + 24 * 60 * 60 * 1000);
-    return `start_date=${startDate.toISOString().split("T")[0]}&end_date=${
-      endDate.toISOString().split("T")[0]
-    }`;
   }
 
   static errorIsOpenAiError(
