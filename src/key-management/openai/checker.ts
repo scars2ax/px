@@ -2,8 +2,14 @@ import axios, { AxiosError } from "axios";
 import { logger } from "../../logger";
 import type { OpenAIKey, OpenAIKeyProvider } from "./provider";
 
+/** Minimum time in between any two key checks. */
 const MIN_CHECK_INTERVAL = 3 * 1000; // 3 seconds
-const KEY_CHECK_PERIOD = 5 * 60 * 1000; // 5 minutes
+/**
+ * Minimum time in between checks for a given key. Because we can no longer
+ * read quota usage, there is little reason to check a single key more often
+ * than this.
+ **/
+const KEY_CHECK_PERIOD = 30 * 60 * 1000; // 30 minutes
 
 const GET_MODELS_URL = "https://api.openai.com/v1/models";
 const GET_SUBSCRIPTION_URL =
@@ -121,32 +127,28 @@ export class OpenAIKeyChecker {
     this.log.debug({ key: key.hash }, "Checking key...");
     let isInitialCheck = !key.lastChecked;
     try {
-      // During the initial check we need to get the subscription first because
-      // trials have different behavior.
+      // We only need to check for provisioned models on the initial check.
       if (isInitialCheck) {
-        const subscription = await this.getSubscription(key);
-        this.updateKey(key.hash, { isTrial: !subscription.has_payment_method });
-        if (key.isTrial) {
-          this.log.debug(
-            { key: key.hash },
-            "Attempting generation on trial key."
-          );
-          await this.assertCanGenerate(key);
-        }
-        const [provisionedModels] = await Promise.all([
-          this.getProvisionedModels(key),
-        ]);
+        const [subscription, provisionedModels, _livenessTest] =
+          await Promise.all([
+            this.getSubscription(key),
+            this.getProvisionedModels(key),
+            this.testLiveness(key),
+          ]);
         const updates = {
           isGpt4: provisionedModels.gpt4,
+          isTrial: !subscription.has_payment_method,
           softLimit: subscription.soft_limit_usd,
           hardLimit: subscription.hard_limit_usd,
           systemHardLimit: subscription.system_hard_limit_usd,
         };
         this.updateKey(key.hash, updates);
       } else {
-        // Don't check provisioned models after the initial check because it's
-        // not likely to change.
-        const [subscription] = await Promise.all([this.getSubscription(key)]);
+        // Provisioned models don't change, so we don't need to check them again
+        const [subscription, _livenessTest] = await Promise.all([
+          this.getSubscription(key),
+          this.testLiveness(key),
+        ]);
         const updates = {
           softLimit: subscription.soft_limit_usd,
           hardLimit: subscription.hard_limit_usd,
