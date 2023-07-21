@@ -195,7 +195,7 @@ export class OpenAIKeyChecker {
   }
 
   private handleAxiosError(key: OpenAIKey, error: AxiosError) {
-    if (error.response && OpenAIKeyChecker.errorIsOpenAiError(error)) {
+    if (error.response && OpenAIKeyChecker.errorIsOpenAIError(error)) {
       const { status, data } = error.response;
       if (status === 401) {
         this.log.warn(
@@ -299,7 +299,7 @@ export class OpenAIKeyChecker {
     }
   }
 
-  static errorIsOpenAiError(
+  static errorIsOpenAIError(
     error: AxiosError
   ): error is AxiosError<OpenAIError> {
     const data = error.response?.data as any;
