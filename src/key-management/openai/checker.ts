@@ -11,6 +11,7 @@ const MIN_CHECK_INTERVAL = 3 * 1000; // 3 seconds
  **/
 const KEY_CHECK_PERIOD = 30 * 60 * 1000; // 30 minutes
 
+const POST_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
 const GET_MODELS_URL = "https://api.openai.com/v1/models";
 const GET_SUBSCRIPTION_URL =
   "https://api.openai.com/dashboard/billing/subscription";
@@ -227,8 +228,8 @@ export class OpenAIKeyChecker {
         const rateLimitType = data.error.type;
         if (rateLimitType === "requests") {
           // Trial keys have extremely low requests-per-minute limits and we can
-          // often hit them just while checking the key, so we need to retry these
-          // errors.
+          // often hit them just while checking the key, so we need to retry the
+          // check later to know if the key has quota remaining.
           this.log.warn(
             { key: key.hash, error: data },
             "Key is currently rate limited, so its liveness cannot be checked. Retrying in fifteen seconds."
@@ -266,17 +267,34 @@ export class OpenAIKeyChecker {
   }
 
   /**
-   * Trial key usage reporting is inaccurate, so we need to run an actual
-   * completion to test them for liveness.
+   * Tests whether the key is valid and has quota remaining. The request we send
+   * is actually not valid, but keys which are revoked or out of quota will fail
+   * with a 401 or 429 error instead of the expected 400 Bad Request error.
+   * This lets us avoid test keys without spending any quota.
    */
   private async testLiveness(key: OpenAIKey): Promise<void> {
-    const openai = new OpenAIApi(new Configuration({ apiKey: key.key }));
-    // This will throw an AxiosError if the key is invalid or out of quota.
-    await openai.createChatCompletion({
+    const payload = {
       model: "gpt-3.5-turbo",
-      messages: [{ role: "user", content: "Hello" }],
-      max_tokens: 1,
-    });
+      max_tokens: -1,
+      messages: [{ role: "user", content: "" }],
+    };
+    const { data } = await axios.post<OpenAIError>(
+      POST_CHAT_COMPLETIONS_URL,
+      payload,
+      {
+        headers: { Authorization: `Bearer ${key.key}` },
+        validateStatus: (status) => status === 400,
+      }
+    );
+    if (data.error.type === "invalid_request_error") {
+      // This is the expected error type for our bad prompt, so key is valid.
+      return;
+    } else {
+      this.log.warn(
+        { key: key.hash, error: data },
+        "Unexpected 400 error class while checking key; assuming key is valid, but this may indicate a change in the API."
+      );
+    }
   }
 
   static errorIsOpenAiError(
