@@ -204,16 +204,53 @@ export class OpenAIKeyChecker {
         this.updateKey(key.hash, { isDisabled: true });
       } else if (status === 429 && data.error.type === "insufficient_quota") {
         this.log.warn(
-          { key: key.hash, isTrial: key.isTrial, error: data },
+          { key: key.hash, error: data },
           "Key is out of quota. Disabling key."
         );
         this.updateKey(key.hash, { isDisabled: true });
       } else if (status === 429 && data.error.type === "access_terminated") {
         this.log.warn(
-          { key: key.hash, isTrial: key.isTrial, error: data },
+          { key: key.hash, error: data },
           "Key has been terminated due to policy violations. Disabling key."
         );
         this.updateKey(key.hash, { isDisabled: true });
+      } else if (status === 429 && data.error.type === "billing_not_active") {
+        this.log.warn(
+          { key: key.hash, error: data },
+          "Key deactivated due to delinquent billing. Disabling key."
+        );
+        this.updateKey(key.hash, { isDisabled: true });
+      } else if (
+        status === 429 &&
+        ["requests", "tokens"].includes(data.error.type)
+      ) {
+        const rateLimitType = data.error.type;
+        if (rateLimitType === "requests") {
+          // Trial keys have extremely low requests-per-minute limits and we can
+          // often hit them just while checking the key, so we need to retry these
+          // errors.
+          this.log.warn(
+            { key: key.hash, error: data },
+            "Key is currently rate limited, so its liveness cannot be checked. Retrying in fifteen seconds."
+          );
+          // To trigger a shorter than usual delay before the next check, we will
+          // set its `lastChecked` to (NOW - (KEY_CHECK_PERIOD - 15s)).
+          // This will cause the usual key check scheduling logic to schedule the
+          // next check in 15 seconds. This also prevents the key from holding up
+          // startup checks for other keys.
+          const fifteenSeconds = 15 * 1000;
+          const nextCheck = Date.now() - (KEY_CHECK_PERIOD - fifteenSeconds);
+          this.updateKey(key.hash, { lastChecked: nextCheck });
+        } else if (rateLimitType === "tokens") {
+          // Hitting a token rate limit, even on a trial key, actually implies
+          // that the key is valid and can generate completions, so we will
+          // treat this as effectively a successful `testLiveness` call.
+          this.log.info(
+            { key: key.hash },
+            "Key is currently `tokens` rate limited; assuming it is operational."
+          );
+          this.updateKey(key.hash, { lastChecked: Date.now() });
+        }
       } else {
         this.log.error(
           { key: key.hash, status, error: data },
