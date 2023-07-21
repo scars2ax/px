@@ -282,7 +282,7 @@ export class OpenAIKeyChecker {
       return;
     }
     this.log.error(
-      { key: key.hash, error },
+      { key: key.hash, error: error.message },
       "Network error while checking key; trying this key again in a minute."
     );
     const oneMinute = 60 * 1000;
