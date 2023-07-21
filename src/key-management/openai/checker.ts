@@ -1,14 +1,18 @@
 import axios, { AxiosError } from "axios";
-import { Configuration, OpenAIApi } from "openai";
 import { logger } from "../../logger";
 import type { OpenAIKey, OpenAIKeyProvider } from "./provider";
 
 const MIN_CHECK_INTERVAL = 3 * 1000; // 3 seconds
 const KEY_CHECK_PERIOD = 5 * 60 * 1000; // 5 minutes
 
+const GET_MODELS_URL = "https://api.openai.com/v1/models";
 const GET_SUBSCRIPTION_URL =
   "https://api.openai.com/dashboard/billing/subscription";
 const GET_USAGE_URL = "https://api.openai.com/dashboard/billing/usage";
+
+type GetModelsResponse = {
+  data: [{ id: string }];
+};
 
 type GetSubscriptionResponse = {
   plan: { title: string };
@@ -182,8 +186,9 @@ export class OpenAIKeyChecker {
   private async getProvisionedModels(
     key: OpenAIKey
   ): Promise<{ turbo: boolean; gpt4: boolean }> {
-    const openai = new OpenAIApi(new Configuration({ apiKey: key.key }));
-    const models = (await openai.listModels()!).data.data;
+    const opts = { headers: { Authorization: `Bearer ${key.key}` } };
+    const { data } = await axios.get<GetModelsResponse>(GET_MODELS_URL, opts);
+    const models = data.data;
     const turbo = models.some(({ id }) => id.startsWith("gpt-3.5"));
     const gpt4 = models.some(({ id }) => id.startsWith("gpt-4"));
     return { turbo, gpt4 };
@@ -221,8 +226,7 @@ export class OpenAIKeyChecker {
           "Key is out of quota. Disabling key."
         );
         this.updateKey(key.hash, { isDisabled: true });
-      }
-      else if (status === 429 && data.error.type === "access_terminated") {
+      } else if (status === 429 && data.error.type === "access_terminated") {
         this.log.warn(
           { key: key.hash, isTrial: key.isTrial, error: data },
           "Key has been terminated due to policy violations. Disabling key."
