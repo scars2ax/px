@@ -18,6 +18,10 @@ export const OPENAI_SUPPORTED_MODELS: readonly OpenAIModel[] = [
 
 export interface OpenAIKey extends Key {
   readonly service: "openai";
+  /** Set when key check returns a 401. */
+  isRevoked: boolean;
+  /** Set when key check returns a non-transient 429. */
+  isOverQuota: boolean;
   /** Threshold at which a warning email will be sent by OpenAI. */
   softLimit: number;
   /** Threshold at which the key will be disabled because it has reached the user-defined limit. */
@@ -78,6 +82,8 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
         isGpt4: true,
         isTrial: false,
         isDisabled: false,
+        isRevoked: false,
+        isOverQuota: false,
         softLimit: 0,
         hardLimit: 0,
         systemHardLimit: 0,
@@ -296,12 +302,14 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
     }
   }
 
-  /** Returns the total quota limit of all keys in USD. */
-  public totalLimitInUsd(
+  /**
+   * Returns the total quota limit of all keys in USD. Keys which are disabled
+   * are not included in the total.
+   */
+  public activeLimitInUsd(
     { gpt4 }: { gpt4: boolean } = { gpt4: false }
   ): string {
-    const keys = this.keys.filter((k) => k.isGpt4 === gpt4);
-    if (keys.length === 0) return "???";
+    const keys = this.keys.filter((k) => !k.isDisabled && k.isGpt4 === gpt4);
     const totalLimit = keys.reduce((acc, { hardLimit }) => acc + hardLimit, 0);
     return `$${totalLimit.toFixed(2)}`;
   }

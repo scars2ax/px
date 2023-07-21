@@ -183,6 +183,16 @@ export class OpenAIKeyChecker {
     const models = data.data;
     const turbo = models.some(({ id }) => id.startsWith("gpt-3.5"));
     const gpt4 = models.some(({ id }) => id.startsWith("gpt-4"));
+    // We want to update the key's `isGpt4` flag here, but we don't want to
+    // update its `lastChecked` timestamp because we need to let the liveness
+    // check run before we can consider the key checked.
+
+    // Need to use `find` here because keys are cloned from the pool.
+    const keyFromPool = this.keys.find((k) => k.hash === key.hash)!;
+    this.updateKey(key.hash, {
+      isGpt4: gpt4,
+      lastChecked: keyFromPool.lastChecked,
+    });
     return { turbo, gpt4 };
   }
 
@@ -202,17 +212,29 @@ export class OpenAIKeyChecker {
           { key: key.hash, error: data },
           "Key is invalid or revoked. Disabling key."
         );
-        this.updateKey(key.hash, { isDisabled: true });
+        this.updateKey(key.hash, {
+          isDisabled: true,
+          isRevoked: true,
+          isGpt4: false,
+        });
       } else if (status === 429) {
         switch (data.error.type) {
           case "insufficient_quota":
           case "access_terminated":
           case "billing_not_active":
+            const isOverQuota = data.error.type === "insufficient_quota";
+            const isRevoked = !isOverQuota;
+            const isGpt4 = isRevoked ? false : key.isGpt4;
             this.log.warn(
               { key: key.hash, rateLimitType: data.error.type, error: data },
               "Key returned a non-transient 429 error. Disabling key."
             );
-            this.updateKey(key.hash, { isDisabled: true });
+            this.updateKey(key.hash, {
+              isDisabled: true,
+              isRevoked,
+              isOverQuota,
+              isGpt4,
+            });
             break;
           case "requests":
             // Trial keys have extremely low requests-per-minute limits and we

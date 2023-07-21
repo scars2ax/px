@@ -2,7 +2,7 @@ import fs from "fs";
 import { Request, Response } from "express";
 import showdown from "showdown";
 import { config, listConfig } from "./config";
-import { keyPool } from "./key-management";
+import { OpenAIKey, keyPool } from "./key-management";
 import { getUniqueIps } from "./proxy/rate-limit";
 import {
   QueuePartition,
@@ -78,7 +78,9 @@ function cacheInfoPageHtml(baseUrl: string) {
 type ServiceInfo = {
   activeKeys: number;
   trialKeys?: number;
-  totalLimit: string;
+  activeLimit: string;
+  revokedKeys?: number;
+  overQuotaKeys?: number;
   proomptersInQueue: number;
   estimatedQueueTime: string;
 };
@@ -88,23 +90,26 @@ type ServiceInfo = {
 
 function getOpenAIInfo() {
   const info: { [model: string]: Partial<ServiceInfo> } = {};
-  const keys = keyPool.list().filter((k) => k.service === "openai");
+  const keys = keyPool
+    .list()
+    .filter((k) => k.service === "openai") as OpenAIKey[];
   const hasGpt4 = keys.some((k) => k.isGpt4) && !config.turboOnly;
 
   if (keyPool.anyUnchecked()) {
     const uncheckedKeys = keys.filter((k) => !k.lastChecked);
-    info.status = `Still checking ${uncheckedKeys.length} keys...` as any;
+    info.status =
+      `Performing startup key checks (${uncheckedKeys.length} left).` as any;
   } else {
     delete info.status;
   }
 
   if (config.checkKeys) {
-    const turboKeys = keys.filter((k) => !k.isGpt4 && !k.isDisabled);
-    const gpt4Keys = keys.filter((k) => k.isGpt4 && !k.isDisabled);
+    const turboKeys = keys.filter((k) => !k.isGpt4);
+    const gpt4Keys = keys.filter((k) => k.isGpt4);
 
     const quota: Record<string, string> = { turbo: "", gpt4: "" };
-    const turboQuota = keyPool.totalLimitInUsd("openai");
-    const gpt4Quota = keyPool.totalLimitInUsd("openai", { gpt4: true });
+    const turboQuota = keyPool.activeLimitInUsd("openai");
+    const gpt4Quota = keyPool.activeLimitInUsd("openai", { gpt4: true });
 
     // Don't invert this condition; some proxies may be using the now-deprecated
     // 'partial' option which we want to treat as 'full' here.
@@ -116,20 +121,24 @@ function getOpenAIInfo() {
     info.turbo = {
       activeKeys: turboKeys.filter((k) => !k.isDisabled).length,
       trialKeys: turboKeys.filter((k) => k.isTrial).length,
-      totalLimit: quota.turbo,
+      activeLimit: quota.turbo,
+      revokedKeys: turboKeys.filter((k) => k.isRevoked).length,
+      overQuotaKeys: turboKeys.filter((k) => k.isOverQuota).length,
     };
 
     if (hasGpt4) {
       info.gpt4 = {
         activeKeys: gpt4Keys.filter((k) => !k.isDisabled).length,
         trialKeys: gpt4Keys.filter((k) => k.isTrial).length,
-        totalLimit: quota.gpt4,
+        activeLimit: quota.gpt4,
+        revokedKeys: gpt4Keys.filter((k) => k.isRevoked).length,
+        overQuotaKeys: gpt4Keys.filter((k) => k.isOverQuota).length,
       };
     }
 
     if (config.quotaDisplayMode === "none") {
-      delete info.turbo?.totalLimit;
-      delete info.gpt4?.totalLimit;
+      delete info.turbo?.activeLimit;
+      delete info.gpt4?.activeLimit;
     }
   } else {
     info.status = "Key checking is disabled." as any;
