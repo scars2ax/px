@@ -18,8 +18,6 @@ export const OPENAI_SUPPORTED_MODELS: readonly OpenAIModel[] = [
 
 export interface OpenAIKey extends Key {
   readonly service: "openai";
-  /** The current usage of this key. */
-  usage: number;
   /** Threshold at which a warning email will be sent by OpenAI. */
   softLimit: number;
   /** Threshold at which the key will be disabled because it has reached the user-defined limit. */
@@ -54,7 +52,7 @@ export interface OpenAIKey extends Key {
 
 export type OpenAIKeyUpdate = Omit<
   Partial<OpenAIKey>,
-  "key" | "hash" | "lastUsed" | "lastChecked" | "promptCount"
+  "key" | "hash" | "promptCount"
 >;
 
 export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
@@ -183,7 +181,7 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
   /** Called by the key checker to update key information. */
   public update(keyHash: string, update: OpenAIKeyUpdate) {
     const keyFromPool = this.keys.find((k) => k.hash === keyHash)!;
-    Object.assign(keyFromPool, { ...update, lastChecked: Date.now() });
+    Object.assign(keyFromPool, { lastChecked: Date.now(), ...update });
     // this.writeKeyStatus();
   }
 
@@ -192,9 +190,6 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
     const keyFromPool = this.keys.find((k) => k.key === key.key);
     if (!keyFromPool || keyFromPool.isDisabled) return;
     keyFromPool.isDisabled = true;
-    // If it's disabled just set the usage to the hard limit so it doesn't
-    // mess with the aggregate usage.
-    keyFromPool.usage = keyFromPool.hardLimit;
     this.log.warn({ key: key.hash }, "Key disabled");
   }
 
@@ -301,32 +296,14 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
     }
   }
 
-  /**
-   * Returns the remaining aggregate quota for all keys as a percentage.
-   * Can go slightly negative because keys will typically go slightly over their
-   * limit before being disabled.  Can sometimes go *really* negative if the
-   * cron job OpenAI uses to disable keys fails, as the key will essentially
-   * have unlimited quota.
-   **/
-  public remainingQuota({ gpt4 }: { gpt4: boolean } = { gpt4: false }): number {
-    const keys = this.keys.filter((k) => k.isGpt4 === gpt4);
-    if (keys.length === 0) return 0;
-
-    const totalUsage = keys.reduce((acc, key) => acc + key.usage, 0);
-    const totalLimit = keys.reduce((acc, { hardLimit }) => acc + hardLimit, 0);
-
-    return 1 - totalUsage / totalLimit;
-  }
-
-  /** Returns used and available usage in USD. */
-  public usageInUsd({ gpt4 }: { gpt4: boolean } = { gpt4: false }): string {
+  /** Returns the total quota limit of all keys in USD. */
+  public totalLimitInUsd(
+    { gpt4 }: { gpt4: boolean } = { gpt4: false }
+  ): string {
     const keys = this.keys.filter((k) => k.isGpt4 === gpt4);
     if (keys.length === 0) return "???";
-
-    const totalUsage = keys.reduce((acc, key) => acc + key.usage, 0);
     const totalLimit = keys.reduce((acc, { hardLimit }) => acc + hardLimit, 0);
-
-    return `$${totalUsage.toFixed(2)} / $${totalLimit.toFixed(2)}`;
+    return `$${totalLimit.toFixed(2)}`;
   }
 
   /** Writes key status to disk. */
