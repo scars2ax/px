@@ -3,7 +3,6 @@ import { z } from "zod";
 import { config } from "../../../config";
 import { countTokens } from "../../../tokenization";
 import { RequestPreprocessor } from ".";
-import { openAIMessagesToClaudePrompt } from "./transform-outbound-payload";
 
 const CLAUDE_MAX_CONTEXT = config.maxContextTokensAnthropic;
 const OPENAI_MAX_CONTEXT = config.maxContextTokensOpenAI;
@@ -33,10 +32,7 @@ export const checkContextSize: RequestPreprocessor = async (req) => {
       break;
     case "anthropic":
       req.outputTokens = req.body.max_tokens_to_sample;
-      prompt =
-        req.inboundApi === "anthropic"
-          ? req.body.prompt
-          : openAIMessagesToClaudePrompt(req.body.messages);
+      prompt = req.body.prompt;
       break;
     default:
       throw new Error(`Unknown outbound API: ${req.outboundApi}`);
@@ -50,8 +46,8 @@ export const checkContextSize: RequestPreprocessor = async (req) => {
   req.debug = req.debug ?? {};
   req.debug = { ...req.debug, ...result };
 
-  validateContextSize(req);
   maybeReassignModel(req);
+  validateContextSize(req);
 };
 
 function validateContextSize(req: Request) {
