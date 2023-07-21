@@ -103,17 +103,14 @@ function getOpenAIInfo() {
     const gpt4Keys = keys.filter((k) => k.isGpt4 && !k.isDisabled);
 
     const quota: Record<string, string> = { turbo: "", gpt4: "" };
-    const turboQuota = keyPool.remainingQuota("openai") * 100;
-    const gpt4Quota = keyPool.remainingQuota("openai", { gpt4: true }) * 100;
+    const turboQuota = keyPool.totalLimitInUsd("openai");
+    const gpt4Quota = keyPool.totalLimitInUsd("openai", { gpt4: true });
 
-    if (config.quotaDisplayMode === "full") {
-      const turboUsage = keyPool.usageInUsd("openai");
-      const gpt4Usage = keyPool.usageInUsd("openai", { gpt4: true });
-      quota.turbo = `${turboUsage} (${Math.round(turboQuota)}% remaining)`;
-      quota.gpt4 = `${gpt4Usage} (${Math.round(gpt4Quota)}% remaining)`;
-    } else {
-      quota.turbo = `${Math.round(turboQuota)}%`;
-      quota.gpt4 = `${Math.round(gpt4Quota * 100)}%`;
+    // Don't invert this condition; some proxies may be using the now-deprecated
+    // 'partial' option which we want to treat as 'full' here.
+    if (config.quotaDisplayMode !== "none") {
+      quota.turbo = turboQuota;
+      quota.gpt4 = gpt4Quota;
     }
 
     info.turbo = {
