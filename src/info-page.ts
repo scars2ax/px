@@ -78,7 +78,7 @@ function cacheInfoPageHtml(baseUrl: string) {
 type ServiceInfo = {
   activeKeys: number;
   trialKeys?: number;
-  quota: string;
+  totalLimit: string;
   proomptersInQueue: number;
   estimatedQueueTime: string;
 };
@@ -116,20 +116,20 @@ function getOpenAIInfo() {
     info.turbo = {
       activeKeys: turboKeys.filter((k) => !k.isDisabled).length,
       trialKeys: turboKeys.filter((k) => k.isTrial).length,
-      quota: quota.turbo,
+      totalLimit: quota.turbo,
     };
 
     if (hasGpt4) {
       info.gpt4 = {
         activeKeys: gpt4Keys.filter((k) => !k.isDisabled).length,
         trialKeys: gpt4Keys.filter((k) => k.isTrial).length,
-        quota: quota.gpt4,
+        totalLimit: quota.gpt4,
       };
     }
 
     if (config.quotaDisplayMode === "none") {
-      delete info.turbo?.quota;
-      delete info.gpt4?.quota;
+      delete info.turbo?.totalLimit;
+      delete info.gpt4?.totalLimit;
     }
   } else {
     info.status = "Key checking is disabled." as any;
