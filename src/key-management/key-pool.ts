@@ -75,18 +75,11 @@ export class KeyPool {
     }
   }
 
-  public remainingQuota(
-    service: AIService,
-    options?: Record<string, unknown>
-  ): number {
-    return this.getKeyProvider(service).remainingQuota(options);
-  }
-
-  public usageInUsd(
+  public totalLimitInUsd(
     service: AIService,
     options?: Record<string, unknown>
   ): string {
-    return this.getKeyProvider(service).usageInUsd(options);
+    return this.getKeyProvider(service).totalLimitInUsd(options);
   }
 
   private getService(model: Model): AIService {
