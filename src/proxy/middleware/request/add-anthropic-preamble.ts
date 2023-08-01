@@ -15,14 +15,31 @@ export const addAnthropicPreamble: ProxyRequestMiddleware = (
     return;
   }
 
-  let preamble = "";
-  let prompt = req.body.prompt;
   assertAnthropicKey(req.key);
+  
   if (req.key.requiresPreamble) {
-    preamble = prompt.startsWith("\n\nHuman:") ? "" : "\n\nHuman:";
-    req.log.debug({ key: req.key.hash, preamble }, "Adding preamble to prompt");
+    let prompt = req.body.prompt;
+    const preamble = prompt.startsWith("\n\nHuman:") ? "" : "\n\nHuman:";
+    req.log.debug({ key: req.key.hash, preamble }, "Prompt requres preamble");
+    prompt = preamble + prompt;
+
+    // Adds `Assistant:` to the end of the prompt if the turn closest to the
+    // end is from the `Human:` persona.
+    const humanIndex = prompt.lastIndexOf("\n\nHuman:");
+    const assistantIndex = prompt.lastIndexOf("\n\nAssistant:");
+    const shouldAddAssistant = humanIndex > assistantIndex;
+    req.log.debug(
+      {
+        key: req.key.hash,
+        shouldAdd: shouldAddAssistant,
+        hIndex: humanIndex,
+        aIndex: assistantIndex,
+      },
+      "Possibly adding Assistant: to prompt"
+    );
+    if (shouldAddAssistant) prompt += "\n\nAssistant:";
+    req.body.prompt = prompt;
   }
-  req.body.prompt = preamble + prompt;
 };
 
 function assertAnthropicKey(key: Key): asserts key is AnthropicKey {
