@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { Query } from "express-serve-static-core";
 import { z } from "zod";
 import * as userStore from "../../proxy/auth/user-store";
 
@@ -31,23 +32,42 @@ function paginate(set: unknown[], page: number, pageSize: number = 20) {
   };
 }
 
+function parseSort(sort: Query["sort"]) {
+  if (!sort) return null;
+  if (typeof sort === "string") return sort.split(",");
+  if (Array.isArray(sort)) return sort.splice(3) as string[];
+  return null;
+}
+
+function sortBy(fields: string[], asc = true) {
+  return (a: any, b: any) => {
+    for (const field of fields) {
+      if (a[field] !== b[field]) {
+        // always sort nulls to the end
+        if (a[field] == null) return 1;
+        if (b[field] == null) return -1;
+        const result = a[field] < b[field] ? -1 : 1;
+        return asc ? result : -result;
+      }
+    }
+    return 0;
+  };
+}
+
 /**
  * Returns a list of all users, sorted by prompt count and then last used time.
  * GET /admin/users
  */
 usersRouter.get("/", (req, res) => {
-  const users = userStore.getUsers().sort((a, b) => {
-    if (a.promptCount !== b.promptCount) {
-      return b.promptCount - a.promptCount;
-    }
-    return (b.lastUsedAt ?? 0) - (a.lastUsedAt ?? 0);
-  });
+  const sort = parseSort(req.query.sort) || ["promptCount", "lastUsedAt"];
+  const users = userStore.getUsers().sort(sortBy(sort, false));
 
   if (req.headers.accept?.includes("text/html")) {
     const page = Number(req.query.page) || 1;
     const { items, ...pagination } = paginate(users, page);
 
     return res.render("admin/list-users", {
+      sort: sort.join(","),
       users: items,
       ...pagination,
     });

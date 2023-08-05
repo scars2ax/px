@@ -8,11 +8,11 @@
       <thead>
         <tr>
           <th>Token</th>
-          <th>IPs</th>
-          <th>Prompts</th>
+          <th <% if (sort==="ip") { %>class="active"<% } %> ><a href="/admin/users?sort=ip">IPs</a></th>
+          <th <% if (sort==="promptCount") { %>class="active"<% } %> ><a href="/admin/users?sort=promptCount">Prompts</a></th>
           <th>Type</th>
-          <th>Created</th>
-          <th>Last used</th>
+          <th <% if (sort==="createdAt") { %>class="active"<% } %> ><a href="/admin/users?sort=createdAt">Created</a></th>
+          <th <% if (sort==="lastUsedAt") { %>class="active"<% } %> ><a href="/admin/users?sort=lastUsedAt">Last Used</a></th>
           <th>Banned?</th>
           <th></th>
         </tr>
