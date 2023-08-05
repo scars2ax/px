@@ -2,8 +2,7 @@ import express, { Router } from "express";
 import cookieParser from "cookie-parser";
 import { auth } from "./auth";
 import { loginRouter } from "./controllers/login";
-import { usersApiRouter } from "./api/users";
-import { adminUiRouter } from "./controllers";
+import { usersRouter } from "./controllers/users";
 
 const adminRouter = Router();
 
@@ -15,7 +14,9 @@ adminRouter.use(cookieParser());
 
 adminRouter.use("/login", loginRouter);
 adminRouter.use(auth);
-adminRouter.use("/api/users", usersApiRouter);
-adminRouter.use("/", adminUiRouter);
+adminRouter.use("/users", usersRouter);
+adminRouter.get("/", (_req, res) => {
+  res.render("admin/index");
+});
 
 export { adminRouter };

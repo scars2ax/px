@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import * as userStore from "../../proxy/auth/user-store";
 
-const usersApiRouter = Router();
+const usersRouter = Router();
 
 export const UserSchema = z
   .object({
@@ -21,17 +21,38 @@ const UserSchemaWithToken = UserSchema.extend({
   token: z.string(),
 }).strict();
 
+function paginate(set: unknown[], page: number, pageSize: number) {
+  return {
+    page,
+    pageCount: Math.ceil(set.length / pageSize),
+    items: set.slice((page - 1) * pageSize, page * pageSize),
+    nextPage: page * pageSize < set.length ? page + 1 : null,
+    prevPage: page > 1 ? page - 1 : null,
+  };
+}
+
 /**
  * Returns a list of all users, sorted by prompt count and then last used time.
  * GET /admin/users
  */
-usersApiRouter.get("/", (_req, res) => {
+usersRouter.get("/", (req, res) => {
   const users = userStore.getUsers().sort((a, b) => {
     if (a.promptCount !== b.promptCount) {
       return b.promptCount - a.promptCount;
     }
     return (b.lastUsedAt ?? 0) - (a.lastUsedAt ?? 0);
   });
+
+  if (req.headers.accept?.includes("text/html")) {
+    const page = Number(req.query.page) || 1;
+    const { items, ...pagination } = paginate(users, page, 10);
+
+    return res.render("admin/list-users", {
+      users: items,
+      ...pagination,
+    });
+  }
+
   res.json({ users, count: users.length });
 });
 
@@ -39,7 +60,7 @@ usersApiRouter.get("/", (_req, res) => {
  * Returns the user with the given token.
  * GET /admin/users/:token
  */
-usersApiRouter.get("/:token", (req, res) => {
+usersRouter.get("/:token", (req, res) => {
   const user = userStore.getUser(req.params.token);
   if (!user) {
     return res.status(404).json({ error: "Not found" });
@@ -52,7 +73,7 @@ usersApiRouter.get("/:token", (req, res) => {
  * Returns the created user's token.
  * POST /admin/users
  */
-usersApiRouter.post("/", (_req, res) => {
+usersRouter.post("/", (_req, res) => {
   res.json({ token: userStore.createUser() });
 });
 
@@ -62,7 +83,7 @@ usersApiRouter.post("/", (_req, res) => {
  * Returns the upserted user.
  * PUT /admin/users/:token
  */
-usersApiRouter.put("/:token", (req, res) => {
+usersRouter.put("/:token", (req, res) => {
   const result = UserSchema.safeParse(req.body);
   if (!result.success) {
     return res.status(400).json({ error: result.error });
@@ -77,7 +98,7 @@ usersApiRouter.put("/:token", (req, res) => {
  * Returns an object containing the upserted users and the number of upserts.
  * PUT /admin/users
  */
-usersApiRouter.put("/", (req, res) => {
+usersRouter.put("/", (req, res) => {
   const result = z.array(UserSchemaWithToken).safeParse(req.body.users);
   if (!result.success) {
     return res.status(400).json({ error: result.error });
@@ -95,7 +116,7 @@ usersApiRouter.put("/", (req, res) => {
  * Returns the disabled user.
  * DELETE /admin/users/:token
  */
-usersApiRouter.delete("/:token", (req, res) => {
+usersRouter.delete("/:token", (req, res) => {
   const user = userStore.getUser(req.params.token);
   const disabledReason = z
     .string()
@@ -111,4 +132,6 @@ usersApiRouter.delete("/:token", (req, res) => {
   res.json(userStore.getUser(req.params.token));
 });
 
-export { usersApiRouter };
+// UI-specific routes
+
+export { usersRouter };
