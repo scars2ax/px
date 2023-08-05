@@ -13,6 +13,7 @@ declare global {
       /** If the request comes from a RisuAI.xyz user, this is their token. */
       risuToken?: string;
       user?: User;
+      admin?: boolean;
       isStreaming?: boolean;
       startTime: number;
       retryCount: number;

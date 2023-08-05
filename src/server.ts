@@ -14,6 +14,7 @@ import { start as startRequestQueue } from "./proxy/queue";
 import { init as initUserStore } from "./proxy/auth/user-store";
 import { init as initTokenizers } from "./tokenization";
 import { checkOrigin } from "./proxy/check-origin";
+import path from "path";
 
 const PORT = config.port;
 
@@ -52,6 +53,9 @@ app.use(
 // a load balancer/reverse proxy, which is necessary to determine request IP
 // addresses correctly.
 app.set("trust proxy", true);
+
+app.set("view engine", "ejs");
+app.set("views", path.join(__dirname, "views"));
 
 app.get("/health", (_req, res) => res.sendStatus(200));
 app.use(cors());
