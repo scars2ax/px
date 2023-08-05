@@ -2,6 +2,7 @@ import { Router } from "express";
 import { Query } from "express-serve-static-core";
 import { z } from "zod";
 import * as userStore from "../../proxy/auth/user-store";
+import { config } from "../../config";
 
 const usersRouter = Router();
 
@@ -54,6 +55,21 @@ function sortBy(fields: string[], asc = true) {
   };
 }
 
+// UI-specific routes
+usersRouter.get("/create-user", (req, res) => {
+  const recentUsers = userStore
+    .getUsers()
+    .sort(sortBy(["createdAt"], false))
+    .slice(0, 5);
+  const isPersistenceEnabled = config.gatekeeperStore !== "memory";
+  res.render("admin/create-user", {
+    recentUsers,
+    isPersistenceEnabled,
+    newToken: !!req.query.created,
+  });
+});
+
+// API routes
 /**
  * Returns a list of all users, sorted by prompt count and then last used time.
  * GET /admin/users
@@ -93,8 +109,12 @@ usersRouter.get("/:token", (req, res) => {
  * Returns the created user's token.
  * POST /admin/users
  */
-usersRouter.post("/", (_req, res) => {
-  res.json({ token: userStore.createUser() });
+usersRouter.post("/", (req, res) => {
+  const token = userStore.createUser();
+  if (req.headers.accept?.includes("text/html")) {
+    return res.redirect(`/admin/users/create-user?created=true`);
+  }
+  res.json({ token });
 });
 
 /**
@@ -151,7 +171,5 @@ usersRouter.delete("/:token", (req, res) => {
   userStore.disableUser(req.params.token, disabledReason.data);
   res.json(userStore.getUser(req.params.token));
 });
-
-// UI-specific routes
 
 export { usersRouter };
