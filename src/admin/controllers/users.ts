@@ -55,6 +55,10 @@ function sortBy(fields: string[], asc = true) {
   };
 }
 
+function isFromUi(req: any) {
+  return req.headers.accept?.includes("text/html");
+}
+
 // UI-specific routes
 usersRouter.get("/create-user", (req, res) => {
   const recentUsers = userStore
@@ -69,6 +73,23 @@ usersRouter.get("/create-user", (req, res) => {
   });
 });
 
+usersRouter.get("/import-users", (req, res) => {
+  const imported = Number(req.query.imported) || 0;
+  res.render("admin/import-users", { imported });
+});
+
+usersRouter.post("/import-users", (req, res) => {
+  // copied from PUT /admin/users because you can't PUT via html forms nor
+  // redirect with a body to a PUT endpoint as far as I know
+  const data = JSON.parse(req.body.data);
+  const result = z.array(UserSchemaWithToken).safeParse(data.users);
+  if (!result.success) {
+    return res.status(400).json({ error: result.error });
+  }
+  const upserts = result.data.map((user) => userStore.upsertUser(user));
+  res.redirect(`/admin/users/import-users?imported=${upserts.length}`);
+});
+
 // API routes
 /**
  * Returns a list of all users, sorted by prompt count and then last used time.
@@ -78,7 +99,7 @@ usersRouter.get("/", (req, res) => {
   const sort = parseSort(req.query.sort) || ["promptCount", "lastUsedAt"];
   const users = userStore.getUsers().sort(sortBy(sort, false));
 
-  if (req.headers.accept?.includes("text/html")) {
+  if (isFromUi(req)) {
     const page = Number(req.query.page) || 1;
     const { items, ...pagination } = paginate(users, page);
 
@@ -111,7 +132,7 @@ usersRouter.get("/:token", (req, res) => {
  */
 usersRouter.post("/", (req, res) => {
   const token = userStore.createUser();
-  if (req.headers.accept?.includes("text/html")) {
+  if (isFromUi(req)) {
     return res.redirect(`/admin/users/create-user?created=true`);
   }
   res.json({ token });
