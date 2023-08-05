@@ -1,10 +1,10 @@
 import { Router } from "express";
 import { z } from "zod";
-import * as userStore from "../proxy/auth/user-store";
+import * as userStore from "../../proxy/auth/user-store";
 
-const usersRouter = Router();
+const usersApiRouter = Router();
 
-const UserSchema = z
+export const UserSchema = z
   .object({
     ip: z.array(z.string()).optional(),
     type: z.enum(["normal", "special"]).optional(),
@@ -25,7 +25,7 @@ const UserSchemaWithToken = UserSchema.extend({
  * Returns a list of all users, sorted by prompt count and then last used time.
  * GET /admin/users
  */
-usersRouter.get("/", (_req, res) => {
+usersApiRouter.get("/", (_req, res) => {
   const users = userStore.getUsers().sort((a, b) => {
     if (a.promptCount !== b.promptCount) {
       return b.promptCount - a.promptCount;
@@ -39,7 +39,7 @@ usersRouter.get("/", (_req, res) => {
  * Returns the user with the given token.
  * GET /admin/users/:token
  */
-usersRouter.get("/:token", (req, res) => {
+usersApiRouter.get("/:token", (req, res) => {
   const user = userStore.getUser(req.params.token);
   if (!user) {
     return res.status(404).json({ error: "Not found" });
@@ -52,7 +52,7 @@ usersRouter.get("/:token", (req, res) => {
  * Returns the created user's token.
  * POST /admin/users
  */
-usersRouter.post("/", (_req, res) => {
+usersApiRouter.post("/", (_req, res) => {
   res.json({ token: userStore.createUser() });
 });
 
@@ -62,7 +62,7 @@ usersRouter.post("/", (_req, res) => {
  * Returns the upserted user.
  * PUT /admin/users/:token
  */
-usersRouter.put("/:token", (req, res) => {
+usersApiRouter.put("/:token", (req, res) => {
   const result = UserSchema.safeParse(req.body);
   if (!result.success) {
     return res.status(400).json({ error: result.error });
@@ -77,7 +77,7 @@ usersRouter.put("/:token", (req, res) => {
  * Returns an object containing the upserted users and the number of upserts.
  * PUT /admin/users
  */
-usersRouter.put("/", (req, res) => {
+usersApiRouter.put("/", (req, res) => {
   const result = z.array(UserSchemaWithToken).safeParse(req.body.users);
   if (!result.success) {
     return res.status(400).json({ error: result.error });
@@ -95,7 +95,7 @@ usersRouter.put("/", (req, res) => {
  * Returns the disabled user.
  * DELETE /admin/users/:token
  */
-usersRouter.delete("/:token", (req, res) => {
+usersApiRouter.delete("/:token", (req, res) => {
   const user = userStore.getUser(req.params.token);
   const disabledReason = z
     .string()
@@ -111,4 +111,4 @@ usersRouter.delete("/:token", (req, res) => {
   res.json(userStore.getUser(req.params.token));
 });
 
-export { usersRouter };
+export { usersApiRouter };
