@@ -1,0 +1,47 @@
+<%- include("../_partials/admin-header", { title: "Users - OAI Reverse Proxy Admin" }) %>
+    <h1>User Token List</h1>
+    
+    <% if (users.length === 0) { %>
+    <p>No users found.</p>
+    <% } %>
+    <table>
+      <thead>
+        <tr>
+          <th>Token</th>
+          <th>IPs</th>
+          <th>Prompts</th>
+          <th>Type</th>
+          <th>Created</th>
+          <th>Last used</th>
+          <th>Banned?</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% users.forEach(function(user){ %>
+        <tr>
+          <td><%= user.token %></td>
+          <td><%= user.ip.length %></td>
+          <td><%= user.promptCount %></td>
+          <td><%= user.type %></td>
+          <td><%= user.createdAt %></td>
+          <td><%= user.lastUsedAt ?? "never" %></td>
+          <td><%= user.disabledAt ? "Yes" : "No" %> <%= user.disabledReason ? `(${user.disabledReason})` : "" %></td>
+          <td class="actions">
+            <a href="/admin/users/<%= user.token %>/edit" title="Edit">✏️</a>
+            <a href="/admin/users/<%= user.token %>/delete" title="Disable">🚫</a>
+          </td>
+        </tr>
+        <% }); %>
+    </table>
+
+    <ul class="pagination">
+      <% if (page > 1) { %>
+      <li><a href="/admin/users?page=<%= page - 1 %>">&laquo;</a></li>
+      <% } %> <% for (var i = 1; i <= pageCount; i++) { %>
+      <li <% if (i === page) { %>class="active"<% } %>><a href="/admin/users?page=<%= i %>"><%= i %></a></li>
+      <% } %> <% if (page < pageCount) { %>
+      <li><a href="/admin/users?page=<%= page + 1 %>">&raquo;</a></li>
+      <% } %>
+    </ul>
+<%- include("../_partials/admin-footer") %>
