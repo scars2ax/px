@@ -2,6 +2,7 @@ import { assertConfigIsValid, config } from "./config";
 import "source-map-support/register";
 import express from "express";
 import cors from "cors";
+import path from "path";
 import pinoHttp from "pino-http";
 import childProcess from "child_process";
 import { logger } from "./logger";
@@ -14,7 +15,6 @@ import { start as startRequestQueue } from "./proxy/queue";
 import { init as initUserStore } from "./proxy/auth/user-store";
 import { init as initTokenizers } from "./tokenization";
 import { checkOrigin } from "./proxy/check-origin";
-import path from "path";
 
 const PORT = config.port;
 
