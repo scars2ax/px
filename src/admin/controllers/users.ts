@@ -21,7 +21,7 @@ const UserSchemaWithToken = UserSchema.extend({
   token: z.string(),
 }).strict();
 
-function paginate(set: unknown[], page: number, pageSize: number) {
+function paginate(set: unknown[], page: number, pageSize: number = 20) {
   return {
     page,
     pageCount: Math.ceil(set.length / pageSize),
@@ -45,7 +45,7 @@ usersRouter.get("/", (req, res) => {
 
   if (req.headers.accept?.includes("text/html")) {
     const page = Number(req.query.page) || 1;
-    const { items, ...pagination } = paginate(users, page, 10);
+    const { items, ...pagination } = paginate(users, page);
 
     return res.render("admin/list-users", {
       users: items,
