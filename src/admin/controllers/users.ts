@@ -5,7 +5,6 @@ import { z } from "zod";
 import * as userStore from "../../proxy/auth/user-store";
 import { config } from "../../config";
 
-// Initialize Multer with storage and file filter
 const upload = multer({
   storage: multer.memoryStorage(),
   fileFilter: (_req, file, cb) => {
