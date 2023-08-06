@@ -11,10 +11,9 @@
           <th <% if (sort==="ip") { %>class="active"<% } %> ><a href="/admin/users?sort=ip">IPs</a></th>
           <th <% if (sort==="promptCount") { %>class="active"<% } %> ><a href="/admin/users?sort=promptCount">Prompts</a></th>
           <th>Type</th>
-          <th <% if (sort==="createdAt") { %>class="active"<% } %> ><a href="/admin/users?sort=createdAt">Created</a></th>
-          <th <% if (sort==="lastUsedAt") { %>class="active"<% } %> ><a href="/admin/users?sort=lastUsedAt">Last Used</a></th>
-          <th>Banned?</th>
-          <th></th>
+          <th <% if (sort==="createdAt") { %>class="active"<% } %> ><a href="/admin/users?sort=createdAt">Created (UTC)</a></th>
+          <th <% if (sort==="lastUsedAt") { %>class="active"<% } %> ><a href="/admin/users?sort=lastUsedAt">Last Used (UTC)</a></th>
+          <th colspan="2">Banned?</th>
         </tr>
       </thead>
       <tbody>
@@ -26,10 +25,13 @@
           <td><%= user.type %></td>
           <td><%= user.createdAt %></td>
           <td><%= user.lastUsedAt ?? "never" %></td>
-          <td><%= user.disabledAt ? "Yes" : "No" %> <%= user.disabledReason ? `(${user.disabledReason})` : "" %></td>
           <td class="actions">
-            <a href="/admin/users/<%= user.token %>/edit" title="Edit">✏️</a>
-            <a href="/admin/users/<%= user.token %>/delete" title="Disable">🚫</a>
+            <% if (user.disabledAt) { %>
+            <a title="Unban" href="#" class="unban" data-token="<%= user.token %>">🔄️</a>
+            <% } else { %>
+            <a title="Ban" href="#" class="ban" data-token="<%= user.token %>">🚫</a>
+            <% } %>
+          <td><%= user.disabledAt ? "Yes" : "No" %> <%= user.disabledReason ? `(${user.disabledReason})` : "" %></td>
           </td>
         </tr>
         <% }); %>
@@ -44,4 +46,45 @@
       <li><a href="/admin/users?page=<%= page + 1 %>">&raquo;</a></li>
       <% } %>
     </ul>
+    
+<script>
+  document.querySelectorAll("td.actions a.ban").forEach(function (a) {
+    a.addEventListener("click", function (e) {
+      e.preventDefault();
+      var token = a.getAttribute("data-token");
+      if (confirm("Are you sure you want to ban this user?")) {
+        let reason = prompt("Reason for ban:");
+        fetch("/admin/users/" + token + "?disabledReason=" + encodeURIComponent(reason), {
+          method: "DELETE",
+        }).then(() => window.location.reload());
+      }
+    });
+  });
+
+  document.querySelectorAll("td.actions a.unban").forEach(function (a) {
+    a.addEventListener("click", function (e) {
+      e.preventDefault();
+      var token = a.getAttribute("data-token");
+      if (confirm("Are you sure you want to unban this user?")) {
+        fetch(
+          "/admin/users/" + token,
+          { method: "PUT",
+            body: JSON.stringify({ disabledReason: "", disabledAt: 0 }),
+            headers: { "Content-Type": "application/json" },
+           },
+        ).then(() => window.location.reload());
+      }
+    });
+  });
+</script>
+    
+<script>
+  document.querySelectorAll("td").forEach(function(td) {
+    if (td.innerText.match(/^\d{13}$/)) {
+      if (td.innerText == 0) return 'never';
+      var date = new Date(parseInt(td.innerText));
+      td.innerText = date.toISOString().replace("T", " ").replace(/\.\d+Z$/, "");
+    }
+  });
+</script>
 <%- include("../_partials/admin-footer") %>
