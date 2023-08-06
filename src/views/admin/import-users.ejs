@@ -33,9 +33,10 @@
   If a user with the same token already exists, the existing user will be
   updated with the new values.
 </p>
-<form action="/admin/users/import-users" method="post" enctype="application/x-www-form-urlencoded">
-  <textarea name="data" rows="20" cols="120"></textarea>
+<form action="/admin/users/import-users" method="post" enctype="multipart/form-data">
+  <input type="file" name="users" />
   <input type="submit" value="Import" />
+</form>
 </form>
 <% if (imported > 0) { %>
 <p>Imported <code><%= imported %></code> users.</p>
