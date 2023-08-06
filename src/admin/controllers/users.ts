@@ -1,8 +1,21 @@
 import { Router } from "express";
 import { Query } from "express-serve-static-core";
+import multer from "multer";
 import { z } from "zod";
 import * as userStore from "../../proxy/auth/user-store";
 import { config } from "../../config";
+
+// Initialize Multer with storage and file filter
+const upload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype !== "application/json") {
+      cb(new Error("Invalid file type"));
+    } else {
+      cb(null, true);
+    }
+  },
+});
 
 const usersRouter = Router();
 
@@ -78,16 +91,22 @@ usersRouter.get("/import-users", (req, res) => {
   res.render("admin/import-users", { imported });
 });
 
-usersRouter.post("/import-users", (req, res) => {
-  // copied from PUT /admin/users because you can't PUT via html forms nor
-  // redirect with a body to a PUT endpoint as far as I know
-  const data = JSON.parse(req.body.data);
+usersRouter.post("/import-users", upload.single("users"), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: "No file uploaded" });
+  }
+  const data = JSON.parse(req.file.buffer.toString());
   const result = z.array(UserSchemaWithToken).safeParse(data.users);
   if (!result.success) {
     return res.status(400).json({ error: result.error });
   }
   const upserts = result.data.map((user) => userStore.upsertUser(user));
   res.redirect(`/admin/users/import-users?imported=${upserts.length}`);
+});
+
+usersRouter.get("/export-users", (req, res) => {
+  const users = userStore.getUsers();
+  res.render("admin/export-users", { users });
 });
 
 // API routes
