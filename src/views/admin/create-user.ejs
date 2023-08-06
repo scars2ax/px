@@ -2,11 +2,6 @@
 <!-- 
  -->
 <h1>Create User Token</h1>
-<% if (!isPersistenceEnabled) { %>
-<p style="color: red; background-color: #eedddd; padding: 1em">
-  Users will be lost when the server restarts because persistence is not set up. Use the export feature before restarting to save user data.
-</p>
-<% } %>
 <form action="/admin/users" method="post">
   <input type="submit" value="Create" />
 </form>

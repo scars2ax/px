@@ -1,5 +1,6 @@
 import express, { Router } from "express";
 import cookieParser from "cookie-parser";
+import { config } from "../config";
 import { auth } from "./auth";
 import { loginRouter } from "./controllers/login";
 import { usersRouter } from "./controllers/users";
@@ -16,7 +17,9 @@ adminRouter.use("/", loginRouter);
 adminRouter.use(auth);
 adminRouter.use("/users", usersRouter);
 adminRouter.get("/", (_req, res) => {
-  res.render("admin/index");
+  res.render("admin/index", {
+    isPersistenceEnabled: config.gatekeeperStore !== "memory",
+  });
 });
 
 export { adminRouter };

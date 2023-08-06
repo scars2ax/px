@@ -77,10 +77,8 @@ usersRouter.get("/create-user", (req, res) => {
     .getUsers()
     .sort(sortBy(["createdAt"], false))
     .slice(0, 5);
-  const isPersistenceEnabled = config.gatekeeperStore !== "memory";
   res.render("admin/create-user", {
     recentUsers,
-    isPersistenceEnabled,
     newToken: !!req.query.created,
   });
 });
