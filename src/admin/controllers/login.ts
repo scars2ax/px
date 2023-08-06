@@ -1,16 +1,21 @@
-import { Router, Request, Response, NextFunction } from "express";
+import { Router } from "express";
 
 const loginRouter = Router();
 
-loginRouter.get("/", (req: Request, res: Response, next: NextFunction) => {
+loginRouter.get("/login", (req, res) => {
   res.render("admin/login", { failed: req.query.failed });
 });
 
-loginRouter.post("/", (req: Request, res: Response, next: NextFunction) => {
+loginRouter.post("/login", (req, res) => {
   res.cookie("admin-token", req.body.token, {
     maxAge: 1000 * 60 * 60 * 24 * 14,
   });
   res.redirect("/admin");
+});
+
+loginRouter.get("/logout", (req, res) => {
+  res.clearCookie("admin-token");
+  res.redirect("/admin/login");
 });
 
 export { loginRouter };

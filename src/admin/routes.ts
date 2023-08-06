@@ -12,7 +12,7 @@ adminRouter.use(
 );
 adminRouter.use(cookieParser());
 
-adminRouter.use("/login", loginRouter);
+adminRouter.use("/", loginRouter);
 adminRouter.use(auth);
 adminRouter.use("/users", usersRouter);
 adminRouter.get("/", (_req, res) => {
