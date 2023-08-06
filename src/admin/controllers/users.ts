@@ -68,7 +68,7 @@ function sortBy(fields: string[], asc = true) {
 }
 
 function isFromUi(req: any) {
-  return req.headers.accept?.includes("text/html");
+  return req.accepts("json", "html") === "html";
 }
 
 // UI-specific routes

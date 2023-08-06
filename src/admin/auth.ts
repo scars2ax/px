@@ -47,8 +47,8 @@ function handleFailedLogin(req: Request, res: Response) {
   const attempts = failedAttempts.get(req.ip) ?? 0;
   const newAttempts = attempts + 1;
   failedAttempts.set(req.ip, newAttempts);
-  if (req.accepts("html")) {
-    return res.redirect("/admin/login?failed=true");
+  if (req.accepts("json", "html") === "json") {
+    return res.status(401).json({ error: "Unauthorized" });
   }
-  return res.status(401).json({ error: "Unauthorized" });
+  return res.redirect("/admin/login?failed=true");
 }
