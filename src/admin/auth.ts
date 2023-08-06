@@ -39,7 +39,6 @@ export const auth: RequestHandler = (req, res, next) => {
   }
 
   req.log.info({ ip: req.ip }, `Admin request authorized`);
-  req.admin = true;
   next();
 };
 
