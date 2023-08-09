@@ -3,7 +3,13 @@ import multer from "multer";
 import { z } from "zod";
 import { config } from "../../config";
 import * as userStore from "../../proxy/auth/user-store";
-import { UserSchemaWithToken, parseSort, sortBy, paginate } from "../common";
+import {
+  UserSchemaWithToken,
+  parseSort,
+  sortBy,
+  paginate,
+  UserSchema,
+} from "../common";
 
 const router = Router();
 
@@ -32,6 +38,14 @@ router.get("/create-user", (req, res) => {
 router.post("/create-user", (_req, res) => {
   userStore.createUser();
   return res.redirect(`/admin/manage/create-user?created=true`);
+});
+
+router.get("/view-user/:token", (req, res) => {
+  const user = userStore.getUser(req.params.token);
+  if (!user) {
+    return res.status(404).send("User not found");
+  }
+  res.render("admin/view-user", { user });
 });
 
 router.get("/list-users", (req, res) => {
@@ -70,8 +84,14 @@ router.post("/import-users", upload.single("users"), (req, res) => {
 });
 
 router.get("/export-users", (_req, res) => {
+  res.render("admin/export-users");
+});
+
+router.get("/export-users.json", (_req, res) => {
   const users = userStore.getUsers();
-  res.render("admin/export-users", { users });
+  res.setHeader("Content-Disposition", "attachment; filename=users.json");
+  res.setHeader("Content-Type", "application/json");
+  res.send(JSON.stringify({ users }, null, 2));
 });
 
 router.get("/", (_req, res) => {
@@ -79,5 +99,37 @@ router.get("/", (_req, res) => {
     isPersistenceEnabled: config.gatekeeperStore !== "memory",
   });
 });
+
+router.post("/edit-user/:token", (req, res) => {
+  const result = UserSchema.safeParse(req.body);
+  if (!result.success) {
+    return res.status(400).send(result.error);
+  }
+  userStore.upsertUser({ ...result.data, token: req.params.token });
+  return res.sendStatus(204);
+});
+
+router.post("/reactivate-user/:token", (req, res) => {
+  const user = userStore.getUser(req.params.token);
+  if (!user) {
+    return res.status(404).send("User not found");
+  }
+  userStore.upsertUser({
+    token: user.token,
+    disabledAt: 0,
+    disabledReason: "",
+  });
+  return res.sendStatus(204);
+});
+
+router.post("/disable-user/:token", (req, res) => {
+  const user = userStore.getUser(req.params.token);
+  if (!user) {
+    return res.status(404).send("User not found");
+  }
+  userStore.disableUser(req.params.token, req.body.reason);
+  return res.sendStatus(204);
+}); 
+  
 
 export { router as usersUiRouter };

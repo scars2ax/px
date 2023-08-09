@@ -1,6 +1,8 @@
 <%- include("../_partials/admin-header", { title: "Users - OAI Reverse Proxy Admin" }) %>
     <h1>User Token List</h1>
     
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+    
     <% if (users.length === 0) { %>
     <p>No users found.</p>
     <% } else { %>
@@ -19,7 +21,9 @@
       <tbody>
         <% users.forEach(function(user){ %>
         <tr>
-          <td><%= user.token %></td>
+          <td>
+            <code><a href="/admin/manage/view-user/<%= user.token %>"><%= user.token %></a></code>
+          </td>
           <td><%= user.ip.length %></td>
           <td><%= user.promptCount %></td>
           <td><%= user.type %></td>
@@ -58,9 +62,14 @@
       var token = a.getAttribute("data-token");
       if (confirm("Are you sure you want to ban this user?")) {
         let reason = prompt("Reason for ban:");
-        fetch("/admin/users/" + token + "?disabledReason=" + encodeURIComponent(reason), {
-          method: "DELETE",
-        }).then(() => window.location.reload());
+        fetch(
+          "/admin/manage/disable-user/" + token,
+          { 
+            method: "POST", 
+            credentials: "same-origin",
+            body: JSON.stringify({ reason, _csrf: document.querySelector("meta[name=csrf-token]").getAttribute("content") }),
+            headers: { "Content-Type": "application/json" }
+          }).then(() => window.location.reload());
       }
     });
   });
@@ -71,11 +80,13 @@
       var token = a.getAttribute("data-token");
       if (confirm("Are you sure you want to unban this user?")) {
         fetch(
-          "/admin/users/" + token,
-          { method: "PUT",
-            body: JSON.stringify({ disabledReason: "", disabledAt: 0 }),
-            headers: { "Content-Type": "application/json" },
-           },
+          "/admin/manage/reactivate-user/" + token,
+          { 
+            method: "POST", 
+            credentials: "same-origin",
+            body: JSON.stringify({ _csrf: document.querySelector("meta[name=csrf-token]").getAttribute("content") }),
+            headers: { "Content-Type": "application/json" }
+          }
         ).then(() => window.location.reload());
       }
     });
