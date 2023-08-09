@@ -1,9 +1,11 @@
 import express, { Router } from "express";
 import cookieParser from "cookie-parser";
 import { config } from "../config";
-import { auth } from "./auth";
-import { loginRouter } from "./controllers/login";
-import { usersRouter } from "./controllers/users";
+import { authorize } from "./auth";
+import { injectCsrfToken, checkCsrfToken } from "./csrf";
+import { usersApiRouter } from "./api/users";
+import { usersUiRouter } from "./ui/users";
+import { loginRouter } from "./login";
 
 const adminRouter = Router();
 
@@ -12,10 +14,14 @@ adminRouter.use(
   express.urlencoded({ extended: true, limit: "20mb" })
 );
 adminRouter.use(cookieParser());
+adminRouter.use(injectCsrfToken);
 
 adminRouter.use("/", loginRouter);
-adminRouter.use(auth);
-adminRouter.use("/users", usersRouter);
+adminRouter.use(authorize);
+
+adminRouter.use("/manage", checkCsrfToken, usersUiRouter);
+adminRouter.use("/users", usersApiRouter);
+
 adminRouter.get("/", (_req, res) => {
   res.render("admin/index", {
     isPersistenceEnabled: config.gatekeeperStore !== "memory",
