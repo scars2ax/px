@@ -1,10 +1,9 @@
 import express, { Router } from "express";
 import cookieParser from "cookie-parser";
-import { config } from "../config";
 import { authorize } from "./auth";
 import { injectCsrfToken, checkCsrfToken } from "./csrf";
-import { usersApiRouter } from "./api/users";
-import { usersUiRouter } from "./ui/users";
+import { usersApiRouter as apiRouter } from "./api/users";
+import { usersUiRouter as uiRouter } from "./ui/users";
 import { loginRouter } from "./login";
 
 const adminRouter = Router();
@@ -16,16 +15,13 @@ adminRouter.use(
 adminRouter.use(cookieParser());
 adminRouter.use(injectCsrfToken);
 
-adminRouter.use("/", loginRouter);
-adminRouter.use(authorize);
-
-adminRouter.use("/manage", checkCsrfToken, usersUiRouter);
-adminRouter.use("/users", usersApiRouter);
-
-adminRouter.get("/", (_req, res) => {
-  res.render("admin/index", {
-    isPersistenceEnabled: config.gatekeeperStore !== "memory",
-  });
-});
+adminRouter.use("/", checkCsrfToken, loginRouter);
+adminRouter.use("/users", authorize({ via: "header" }), apiRouter);
+adminRouter.use(
+  "/manage",
+  authorize({ via: "cookie" }),
+  checkCsrfToken,
+  uiRouter
+);
 
 export { adminRouter };

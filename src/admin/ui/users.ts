@@ -1,6 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
 import { z } from "zod";
+import { config } from "../../config";
 import * as userStore from "../../proxy/auth/user-store";
 import { UserSchemaWithToken, parseSort, sortBy, paginate } from "../common";
 
@@ -71,6 +72,12 @@ router.post("/import-users", upload.single("users"), (req, res) => {
 router.get("/export-users", (_req, res) => {
   const users = userStore.getUsers();
   res.render("admin/export-users", { users });
+});
+
+router.get("/", (_req, res) => {
+  res.render("admin/index", {
+    isPersistenceEnabled: config.gatekeeperStore !== "memory",
+  });
 });
 
 export { router as usersUiRouter };
