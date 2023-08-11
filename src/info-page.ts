@@ -51,28 +51,45 @@ function cacheInfoPageHtml(baseUrl: string) {
     build: process.env.BUILD_INFO || "dev",
   };
 
+
+
   const title = getServerTitle();
   const headerHtml = buildInfoPageHeader(new showdown.Converter(), title);
 
-  const pageBody = `<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="robots" content="noindex" />
-    <title>${title}</title>
-  </head>
-  <body style="font-family: sans-serif; background-color: #f0f0f0; padding: 1em;">
-    ${headerHtml}
-    <hr />
-    <h2>Service Info</h2>
-    <pre>${JSON.stringify(info, null, 2)}</pre>
-  </body>
-</html>`;
+  
+  const openai_info = getOpenAIInfo()
 
-  infoPageHtml = pageBody;
+  infoPageHtml = info.config.page_body
+		.replace("{headerHtml}", headerHtml)
+		.replace("{title}", title)
+		.replace("{JSON}", JSON.stringify(info, null, 2))
+		.replace("{uptime}", info?.uptime?.toString())
+		 .replace("{endpoints:openai}",info?.endpoints.openai ?? "Not Avaliable" )
+		 .replace("{endpoints:anthropic}",info?.endpoints.anthropic ?? "Not Avaliable" )
+		 .replace("{proompts}", info?.proompts?.toString() ?? "0")
+		 .replace("{proomptersNow}",info?.proomptersNow?.toString() ?? "0")
+		 .replace("{openaiKeys}", (substring: string) => info.openaiKeys.toString())
+		 .replace("{anthropicKeys}", (substring: string) => info.anthropicKeys.toString() )
+		 .replace("{status}", (substring: string) => openai_info.status.toString() ?? "Checking finished")
+		 .replace("{turbo:activeKeys}", (substring: string) => openai_info.turbo?.activeKeys?.toString() ?? "0")
+		 .replace("{turbo:proomptersInQueue}",(substring: string) => openai_info.turbo?.proomptersInQueue?.toString() ?? "0")
+		 .replace("{turbo:estimatedQueueTime}", (substring: string) => openai_info.turbo?.estimatedQueueTime?.toString() ?? "Not Avaliable ")
+		 .replace("{turbo:revokedKeys}", (substring: string) => openai_info.turbo?.revokedKeys?.toString() ?? "0")
+		 .replace("{turbo:overQuotaKeys}", (substring: string) => openai_info.turbo?.overQuotaKeys?.toString() ?? "0")
+		 .replace("{gpt4:activeKeys}",(substring: string) => openai_info.gpt4?.activeKeys?.toString() ?? "0")
+		 .replace("{gpt4:overQuotaKeys}",(substring: string) => openai_info.gpt4?.overQuotaKeys?.toString() ?? "0")
+		 .replace("{gpt4:revokedKeys}",(substring: string) => openai_info.gpt4?.revokedKeys?.toString() ?? "0")
+		 .replace("{gpt4:proomptersInQueue}",(substring: string) => openai_info.gpt4?.proomptersInQueue?.toString() ?? "0")
+		 .replace("{gpt4:estimatedQueueTime}",(substring: string) => openai_info.gpt4?.estimatedQueueTime?.toString() ?? "No wait")
+		 .replace("{config:gatekeeper}",(substring: string) => info.config.gatekeeper).replace("{config:modelRateLimit}", (substring: string) => info.config.modelRateLimit?.toString())
+		 .replace("{config:maxOutputTokensOpenAI}",(substring: string) => info.config.maxOutputTokensOpenAI.toString())
+		 .replace("{config:promptLogging}",(substring: string) => info.config.promptLogging)
+		 .replace("{config:queueMode}", (substring: string) => info.config.queueMode.toString() ?? "Fair")
+		 .replace("{build}",info.build);
+  
   infoPageLastUpdated = Date.now();
 
-  return pageBody;
+  return infoPageHtml;
 }
 
 type ServiceInfo = {
@@ -83,6 +100,7 @@ type ServiceInfo = {
   overQuotaKeys?: number;
   proomptersInQueue: number;
   estimatedQueueTime: string;
+  status: string;
 };
 
 // this has long since outgrown this awful "dump everything in a <pre> tag" approach
@@ -100,16 +118,28 @@ function getOpenAIInfo() {
     info.status =
       `Performing startup key checks (${uncheckedKeys.length} left).` as any;
   } else {
-    delete info.status;
+    info.status = `Finished checking keys.` as any;
   }
 
   if (config.checkKeys) {
     const turboKeys = keys.filter((k) => !k.isGpt4);
     const gpt4Keys = keys.filter((k) => k.isGpt4);
 
+    const quota: Record<string, string> = { turbo: "", gpt4: "" };
+    const turboQuota = keyPool.activeLimitInUsd("openai");
+    const gpt4Quota = keyPool.activeLimitInUsd("openai", { gpt4: true });
+
+    // Don't invert this condition; some proxies may be using the now-deprecated
+    // 'partial' option which we want to treat as 'full' here.
+    if (config.quotaDisplayMode !== "none") {
+      quota.turbo = turboQuota;
+      quota.gpt4 = gpt4Quota;
+    }
+
     info.turbo = {
       activeKeys: turboKeys.filter((k) => !k.isDisabled).length,
       trialKeys: turboKeys.filter((k) => k.isTrial).length,
+      // activeLimit: quota.turbo,
       revokedKeys: turboKeys.filter((k) => k.isRevoked).length,
       overQuotaKeys: turboKeys.filter((k) => k.isOverQuota).length,
     };
@@ -118,9 +148,15 @@ function getOpenAIInfo() {
       info.gpt4 = {
         activeKeys: gpt4Keys.filter((k) => !k.isDisabled).length,
         trialKeys: gpt4Keys.filter((k) => k.isTrial).length,
+        // activeLimit: quota.gpt4,
         revokedKeys: gpt4Keys.filter((k) => k.isRevoked).length,
         overQuotaKeys: gpt4Keys.filter((k) => k.isOverQuota).length,
       };
+    }
+
+    if (config.quotaDisplayMode === "none") {
+      // delete info.turbo?.activeLimit;
+      // delete info.gpt4?.activeLimit;
     }
   } else {
     info.status = "Key checking is disabled." as any;
@@ -130,15 +166,17 @@ function getOpenAIInfo() {
     };
   }
 
-  const turboQueue = getQueueInformation("turbo");
+  if (config.queueMode !== "none") {
+    const turboQueue = getQueueInformation("turbo");
 
-  info.turbo.proomptersInQueue = turboQueue.proomptersInQueue;
-  info.turbo.estimatedQueueTime = turboQueue.estimatedQueueTime;
+    info.turbo.proomptersInQueue = turboQueue.proomptersInQueue;
+    info.turbo.estimatedQueueTime = turboQueue.estimatedQueueTime;
 
-  if (hasGpt4) {
-    const gpt4Queue = getQueueInformation("gpt-4");
-    info.gpt4.proomptersInQueue = gpt4Queue.proomptersInQueue;
-    info.gpt4.estimatedQueueTime = gpt4Queue.estimatedQueueTime;
+    if (hasGpt4) {
+      const gpt4Queue = getQueueInformation("gpt-4");
+      info.gpt4.proomptersInQueue = gpt4Queue.proomptersInQueue;
+      info.gpt4.estimatedQueueTime = gpt4Queue.estimatedQueueTime;
+    }
   }
 
   return info;
@@ -148,9 +186,11 @@ function getAnthropicInfo() {
   const claudeInfo: Partial<ServiceInfo> = {};
   const keys = keyPool.list().filter((k) => k.service === "anthropic");
   claudeInfo.activeKeys = keys.filter((k) => !k.isDisabled).length;
-  const queue = getQueueInformation("claude");
-  claudeInfo.proomptersInQueue = queue.proomptersInQueue;
-  claudeInfo.estimatedQueueTime = queue.estimatedQueueTime;
+  if (config.queueMode !== "none") {
+    const queue = getQueueInformation("claude");
+    claudeInfo.proomptersInQueue = queue.proomptersInQueue;
+    claudeInfo.estimatedQueueTime = queue.estimatedQueueTime;
+  }
   return { claude: claudeInfo };
 }
 
@@ -176,23 +216,25 @@ Logs are anonymous and do not contain IP addresses or timestamps. [You can see t
 **If you are uncomfortable with this, don't send prompts to this proxy!**`;
   }
 
-  const waits: string[] = [];
-  infoBody += `\n## Estimated Wait Times\nIf the AI is busy, your prompt will processed when a slot frees up.`;
+  if (config.queueMode !== "none") {
+    const waits: string[] = [];
+    infoBody += `\n## Estimated Wait Times\nIf the AI is busy, your prompt will processed when a slot frees up.`;
 
-  if (config.openaiKey) {
-    const turboWait = getQueueInformation("turbo").estimatedQueueTime;
-    const gpt4Wait = getQueueInformation("gpt-4").estimatedQueueTime;
-    waits.push(`**Turbo:** ${turboWait}`);
-    if (keyPool.list().some((k) => k.isGpt4) && !config.turboOnly) {
-      waits.push(`**GPT-4:** ${gpt4Wait}`);
+    if (config.openaiKey) {
+      const turboWait = getQueueInformation("turbo").estimatedQueueTime;
+      const gpt4Wait = getQueueInformation("gpt-4").estimatedQueueTime;
+      waits.push(`**Turbo:** ${turboWait}`);
+      if (keyPool.list().some((k) => k.isGpt4) && !config.turboOnly) {
+        waits.push(`**GPT-4:** ${gpt4Wait}`);
+      }
     }
-  }
 
-  if (config.anthropicKey) {
-    const claudeWait = getQueueInformation("claude").estimatedQueueTime;
-    waits.push(`**Claude:** ${claudeWait}`);
+    if (config.anthropicKey) {
+      const claudeWait = getQueueInformation("claude").estimatedQueueTime;
+      waits.push(`**Claude:** ${claudeWait}`);
+    }
+    infoBody += "\n\n" + waits.join(" / ");
   }
-  infoBody += "\n\n" + waits.join(" / ");
 
   if (customGreeting) {
     infoBody += `\n## Server Greeting\n
@@ -203,6 +245,9 @@ ${customGreeting}`;
 
 /** Returns queue time in seconds, or minutes + seconds if over 60 seconds. */
 function getQueueInformation(partition: QueuePartition) {
+  if (config.queueMode === "none") {
+    return {};
+  }
   const waitMs = getEstimatedWaitTime(partition);
   const waitTime =
     waitMs < 60000
