@@ -63,7 +63,7 @@ function cacheInfoPageHtml(baseUrl: string) {
   infoPageHtml = info.config.page_body
 		.replace("{headerHtml}", headerHtml)
 		.replace("{title}", title)
-		.replace("{JSON}", JSON.stringify(info, null, 2))
+		.replace("{JSON}", "<b hidden><pre>"+JSON.stringify(info, null, 2)"</pre></b>")
 		.replace("{uptime}", info?.uptime?.toString())
 		 .replace("{endpoints:openai}",info?.endpoints.openai ?? "Not Avaliable" )
 		 .replace("{endpoints:anthropic}",info?.endpoints.anthropic ?? "Not Avaliable" )
