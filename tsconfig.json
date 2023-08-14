@@ -13,6 +13,9 @@
     "resolveJsonModule": true,
     "useUnknownInCatchVariables": false
   },
+  "lib": [
+    "es2021"
+  ],
   "include": ["src"],
   "exclude": ["node_modules"],
   "files": ["src/types/custom.d.ts"]
