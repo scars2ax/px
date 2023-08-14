@@ -58,6 +58,7 @@ function cacheInfoPageHtml(baseUrl: string) {
 
   
   const openai_info = getOpenAIInfo()
+  const anthropic_info = getAnthropicInfo()
 
   infoPageHtml = info.config.page_body
 		.replace("{headerHtml}", headerHtml)
@@ -85,8 +86,10 @@ function cacheInfoPageHtml(baseUrl: string) {
 		 .replace("{config:maxOutputTokensOpenAI}",(substring: string) => info.config.maxOutputTokensOpenAI.toString())
 		 .replace("{config:promptLogging}",(substring: string) => info.config.promptLogging)
 		 .replace("{config:queueMode}", (substring: string) => info.config.queueMode.toString() ?? "Fair")
-		 .replace("{build}",info.build);
-  
+		 .replace("{build}",info.build)
+     .replace('{anthropic:activeKeys}', (substring: string) => anthropic_info.claude?.activeKeys?.toString() ?? "0")
+     .replace('{anthropic:proomptersInQueue}', (substring: string) => anthropic_info.claude?.proomptersInQueue?.toString() ?? "0")
+     .replace('{anthropic:estimatedQueueTime}', (substring: string) => anthropic_info.claude?.estimatedQueueTime?.toString() ?? "No wait");
   infoPageLastUpdated = Date.now();
 
   return infoPageHtml;
