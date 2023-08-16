@@ -4,6 +4,7 @@ import showdown from "showdown";
 import { config, listConfig } from "./config";
 import { OpenAIKey, keyPool } from "./key-management";
 import { getUniqueIps } from "./proxy/rate-limit";
+import { getPublicUsers } from "./proxy/auth/user-store"; 
 import {
   QueuePartition,
   getEstimatedWaitTime,
@@ -13,6 +14,11 @@ import {
 const INFO_PAGE_TTL = 5000;
 let infoPageHtml: string | undefined;
 let infoPageLastUpdated = 0;
+
+
+export function handleStatusPage(_req: Request) {
+  return getStatusJson(_req);
+};
 
 export const handleInfoPage = (req: Request, res: Response) => {
   if (infoPageLastUpdated + INFO_PAGE_TTL > Date.now()) {
@@ -59,9 +65,14 @@ function cacheInfoPageHtml(baseUrl: string) {
   
   const openai_info = getOpenAIInfo()
   const anthropic_info = getAnthropicInfo()
+  
+  const public_user_info = getPublicUsers();
+  
 
   infoPageHtml = info.config.page_body
 		.replaceAll("{headerHtml}", headerHtml)
+		.replaceAll("{user:aliases}", (substring: string) => info.config.aliases.toString() ?? "{}")
+		.replaceAll("{user:data}", JSON.stringify(public_user_info).toString())
 		.replaceAll("{title}", title)
 		.replaceAll("{JSON}", "<b hidden><pre>"+JSON.stringify(info, null, 2)+"</pre></b>")
 		.replaceAll("{uptime}", info?.uptime?.toString())
@@ -93,6 +104,34 @@ function cacheInfoPageHtml(baseUrl: string) {
   infoPageLastUpdated = Date.now();
 
   return infoPageHtml;
+}
+
+function getStatusJson(req: Request) {
+  const keys = keyPool.list();
+  const baseUrl =
+    process.env.SPACE_ID && !req.get("host")?.includes("hf.space")
+      ? getExternalUrlForHuggingfaceSpaceId(process.env.SPACE_ID)
+      : req.protocol + "://" + req.get("host");
+
+
+  const openaiKeys = keys.filter((k) => k.service === "openai").length;
+  const anthropicKeys = keys.filter((k) => k.service === "anthropic").length;
+  const info = {
+    uptime: process.uptime(),
+    endpoints: {
+      ...(openaiKeys ? { openai: baseUrl + "/proxy/openai" } : {}),
+      ...(anthropicKeys ? { anthropic: baseUrl + "/proxy/anthropic" } : {}),
+    },
+    proompts: keys.reduce((acc, k) => acc + k.promptCount, 0),
+    ...(config.modelRateLimit ? { proomptersNow: getUniqueIps() } : {}),
+    openaiKeys,
+    anthropicKeys,
+    ...(openaiKeys ? getOpenAIInfo() : {}),
+    ...(anthropicKeys ? getAnthropicInfo() : {}),
+    config: listConfig(),
+    build: process.env.BUILD_INFO || "dev",
+  };
+  return info 
 }
 
 type ServiceInfo = {
