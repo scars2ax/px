@@ -161,9 +161,8 @@ export function incrementPromptCount(token: string) {
   if (!user) return;
   user.promptCount++;
   if(user.type == "temp" && (user.disabledAt ?? false) == false) {
-	  if ((user.endTimeLimit ?? 0) == -1) {
+	  if ((user.endTimeLimit ?? 0) == -1 && (user.promptLimit ?? 0) == -1) {
 		  user.endTimeLimit = Date.now() + ((user.timeLimit ?? 0)*1000);
-		  user.promptLimit = -1;
 		  }
 	  if ((user.promptLimit ?? 0) != -1 && user.promptCount >=  (user.promptLimit ?? 0)) {
 		  // Ban user over limit 
@@ -175,8 +174,6 @@ export function incrementPromptCount(token: string) {
 		  user.disabledAt = Date.now();
 	  }
   }
-  
-  
   usersToFlush.add(token);
 }
 
