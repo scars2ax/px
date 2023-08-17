@@ -43,8 +43,11 @@ export function paginate(set: unknown[], page: number, pageSize: number = 20) {
 export const UserSchema = z
   .object({
     ip: z.array(z.string()).optional(),
-    type: z.enum(["normal", "special"]).optional(),
+    type: z.enum(["normal", "special", "temp"]).optional(),
     promptCount: z.number().optional(),
+	  promptLimit: z.number().optional(),
+	  endTimeLimit: z.number().optional(),
+    timeLimit: z.number().optional(),
     tokenCount: z.number().optional(),
     createdAt: z.number().optional(),
     lastUsedAt: z.number().optional(),
