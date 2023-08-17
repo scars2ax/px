@@ -7,14 +7,14 @@
   <input type="submit" value="Create" />
 </form>
 
-<h1>Create Prompt Lmited Temporary User Token</h1>
+<h1>Create Prompt Limited Temporary User Token</h1>
 <form action="/admin/manage/create-temp-user" method="post">
   <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
   <input type="hidden" name="timeLimit" value="-1" />
   <input type="submit" value="Create" /> Prompt limit: <input type="number" value="100" name="promptLimit" />
 </form>
 
-<h1>Create Time Lmited Temporary User Token</h1>
+<h1>Create Time Limited Temporary User Token</h1>
 <form action="/admin/manage/create-temp-user" method="post">
   <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
   <input type="hidden" name="promptLimit" value="-1" />
