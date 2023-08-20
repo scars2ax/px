@@ -264,7 +264,6 @@ export const CountTokenPrompt: ProxyResHandlerWithBody = async (
 		  service: "openai"
 		};
 	  const tokenCount = await countTokens(request);
-	  console.log(tokenCount)
 	  incrementTokenCount(req.user.token,tokenCount.token_count,"openai");
   } else if (req.outboundApi == "anthropic") {
 	 const promptPayload= getPromptForRequest(req);
@@ -275,7 +274,6 @@ export const CountTokenPrompt: ProxyResHandlerWithBody = async (
 		  service: "anthropic"
 		};
 	  const tokenCount = await countTokens(request);
-	  console.log(tokenCount)
 	  incrementTokenCount(req.user.token,tokenCount.token_count,"anthropic");
   }
   
