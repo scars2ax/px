@@ -1,27 +1,30 @@
-import { getTokenizer } from "@anthropic-ai/tokenizer";
 import { Tiktoken } from "tiktoken/lite";
+import claude from "./claude.json";
 
 let encoder: Tiktoken;
 
 export function init() {
-  // they export a `countTokens` function too but it instantiates a new
-  // tokenizer every single time and it is not fast...
-  encoder = getTokenizer();
+  encoder = new Tiktoken(
+    claude.bpe_ranks,
+    claude.special_tokens,
+    claude.pat_str
+  );
   return true;
 }
 
-export function getTokenCount(prompt: string, _model: string) {
-  // Don't try tokenizing if the prompt is massive to prevent DoS.
-  // 500k characters should be sufficient for all supported models.
-  if (prompt.length > 500000) {
-    return {
-      tokenizer: "length fallback",
-      token_count: 100000,
-    };
-  }
+// Tested against:
+// https://github.com/openai/openai-cookbook/blob/main/examples/How_to_count_tokens_with_tiktoken.ipynb
 
-  return {
-    tokenizer: "@anthropic-ai/tokenizer",
-    token_count: encoder.encode(prompt.normalize("NFKC"), "all").length,
-  };
+export function getTokenCount(prompt: string) {
+  let numTokens = 0;
+  if (prompt.length > 500000) {
+	  numTokens = 100000;
+	  return {
+		tokenizer: "tiktoken (prompt length limit exceeded)",
+		token_count: numTokens,
+	  };
+	}
+     numTokens += encoder.encode(prompt.normalize('NFKC'), 'all').length;
+  return { tokenizer: "tiktoken", token_count: numTokens };
 }
+

@@ -63,12 +63,7 @@ const koboldResponseHandler: ProxyResHandlerWithBody = async (
 
   const koboldResponse = {
     results: [{ text: body.choices[0].message.content }],
-    model: body.model,
-    ...(config.promptLogging && {
-      proxy_note: `Prompt logging is enabled on this proxy instance. See ${req.get(
-        "host"
-      )} for more information.`,
-    }),
+    model: body.model
   };
 
   res.send(JSON.stringify(koboldResponse));

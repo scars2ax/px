@@ -36,12 +36,12 @@ router.get("/create-user", (req, res) => {
 });
 
 router.post("/create-user", (_req, res) => {
-  userStore.createUser();
+  userStore.createUser(_req.body.rateLimit);
   return res.redirect(`/admin/manage/create-user?created=true`);
 });
 
 router.post("/create-temp-user", (_req, res) => {
-  userStore.createTempUser(_req.body.promptLimit,_req.body.timeLimit);
+  userStore.createTempUser(_req.body.promptLimit,_req.body.timeLimit,_req.body.rateLimit);
   return res.redirect(`/admin/manage/create-user?created=true`);
 });
 
@@ -57,7 +57,7 @@ router.get("/view-user/:token", (req, res) => {
 });
 
 router.get("/list-users", (req, res) => {
-  const sort = parseSort(req.query.sort) || ["promptCount", "lastUsedAt"];
+  const sort = parseSort(req.query.sort) || ["promptGptCount", "lastUsedAt"];
   const requestedPageSize =
     Number(req.query.perPage) || Number(req.cookies.perPage) || 20;
   const perPage = Math.max(1, Math.min(1000, requestedPageSize));
@@ -83,6 +83,11 @@ router.post("/import-users", upload.single("users"), (req, res) => {
     return res.status(400).json({ error: "No file uploaded" });
   }
   const data = JSON.parse(req.file.buffer.toString());
+
+  data.users = data.users.map((user: userStore.User) => {
+  const { ipPromptCount, ...newUser } = user;
+  return newUser;
+});
   const result = z.array(UserSchemaWithToken).safeParse(data.users);
   if (!result.success) {
     return res.status(400).json({ error: result.error });

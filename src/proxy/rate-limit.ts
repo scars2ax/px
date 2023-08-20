@@ -12,12 +12,12 @@ const lastAttempts = new Map<string, number[]>();
 const expireOldAttempts = (now: number) => (attempt: number) =>
   attempt > now - ONE_MINUTE_MS;
 
-const getTryAgainInMs = (ip: string) => {
+const getTryAgainInMs = (ip: string, customLimit: number) => {
   const now = Date.now();
   const attempts = lastAttempts.get(ip) || [];
   const validAttempts = attempts.filter(expireOldAttempts(now));
 
-  if (validAttempts.length >= RATE_LIMIT) {
+  if (validAttempts.length >= customLimit) {
     return validAttempts[0] - now + ONE_MINUTE_MS;
   } else {
     lastAttempts.set(ip, [...validAttempts, now]);
@@ -25,12 +25,12 @@ const getTryAgainInMs = (ip: string) => {
   }
 };
 
-const getStatus = (ip: string) => {
+const getStatus = (ip: string, customLimit: number) => {
   const now = Date.now();
   const attempts = lastAttempts.get(ip) || [];
   const validAttempts = attempts.filter(expireOldAttempts(now));
   return {
-    remaining: Math.max(0, RATE_LIMIT - validAttempts.length),
+    remaining: Math.max(0, customLimit - validAttempts.length),
     reset: validAttempts.length > 0 ? validAttempts[0] + ONE_MINUTE_MS : now,
   };
 };
@@ -74,20 +74,27 @@ export const ipLimiter = async (
   // If user is authenticated, key rate limiting by their token. Otherwise, key
   // rate limiting by their IP address. Mitigates key sharing.
   const rateLimitKey = req.user?.token || req.risuToken || req.ip;
+  let customLimit = RATE_LIMIT
+  
+  // Get Custom rate limit for token 
+  if (req.user?.token || "undefined" != "undefined") {
+	   customLimit = req.user?.rateLimit ?? RATE_LIMIT;
+	   customLimit+= 2; // don't ask.
+  }
 
-  const { remaining, reset } = getStatus(rateLimitKey);
-  res.set("X-RateLimit-Limit", config.modelRateLimit.toString());
+  const { remaining, reset } = getStatus(rateLimitKey, customLimit);
+  res.set("X-RateLimit-Limit", customLimit.toString());
   res.set("X-RateLimit-Remaining", remaining.toString());
   res.set("X-RateLimit-Reset", reset.toString());
 
-  const tryAgainInMs = getTryAgainInMs(rateLimitKey);
+  const tryAgainInMs = getTryAgainInMs(rateLimitKey, customLimit);
   if (tryAgainInMs > 0) {
     res.set("Retry-After", tryAgainInMs.toString());
     res.status(429).json({
       error: {
         type: "proxy_rate_limited",
         message: `This proxy is rate limited to ${
-          config.modelRateLimit
+          customLimit
         } prompts per minute. Please try again in ${Math.ceil(
           tryAgainInMs / 1000
         )} seconds.`,

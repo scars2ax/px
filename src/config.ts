@@ -89,10 +89,6 @@ type Config = {
   rejectMessage?: string;
   /** Pino log level. */
   logLevel?: "debug" | "info" | "warn" | "error";
-  /** Whether prompts and responses should be logged to persistent storage. */
-  promptLogging?: boolean;
-  /** Which prompt logging backend to use. */
-  promptLoggingBackend?: PromptLoggingBackend;
   /** Base64-encoded Google Sheets API key. */
   googleSheetsKey?: string;
   /** Google Sheets spreadsheet ID. */
@@ -177,8 +173,6 @@ export const config: Config = {
   logLevel: getEnvWithDefault("LOG_LEVEL", "info"),
   checkKeys: getEnvWithDefault("CHECK_KEYS", !isDev),
   quotaDisplayMode: getEnvWithDefault("QUOTA_DISPLAY_MODE", "full"),
-  promptLogging: getEnvWithDefault("PROMPT_LOGGING", false),
-  promptLoggingBackend: getEnvWithDefault("PROMPT_LOGGING_BACKEND", undefined),
   googleSheetsKey: getEnvWithDefault("GOOGLE_SHEETS_KEY", undefined),
   googleSheetsSpreadsheetId: getEnvWithDefault(
     "GOOGLE_SHEETS_SPREADSHEET_ID",
