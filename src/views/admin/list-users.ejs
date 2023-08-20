@@ -12,33 +12,35 @@
           <th>Token</th>
           <th <% if (sort.includes("ip")) { %>class="active"<% } %> ><a href="/admin/manage/list-users?sort=ip">IPs</a></th>
           <th <% if (sort.includes("promptCount")) { %>class="active"<% } %> ><a href="/admin/manage/list-users?sort=promptCount">Prompts</a></th>
+		  <th <% if (sort.includes("tokenCount")) { %>class="active"<% } %> ><a href="/admin/manage/list-users?sort=tokenCount">Tokens</a></th>
           <th>Type</th>
           <th <% if (sort.includes("createdAt")) { %>class="active"<% } %> ><a href="/admin/manage/list-users?sort=createdAt">Created (UTC)</a></th>
           <th <% if (sort.includes("lastUsedAt")) { %>class="active"<% } %> ><a href="/admin/manage/list-users?sort=lastUsedAt">Last Used (UTC)</a></th>
           <th colspan="2">Banned?</th>
         </tr>
       </thead>
-      <tbody>
-        <% users.forEach(function(user){ %>
-        <tr>
-          <td>
-            <code><a href="/admin/manage/view-user/<%= user.token %>"><%= user.token %></a></code>
-          </td>
-          <td><%= user.ip.length %></td>
-          <td><%= user.promptCount %></td>
-          <td><%= user.type %></td>
-          <td><%= user.createdAt %></td>
-          <td><%= user.lastUsedAt ?? "never" %></td>
-          <td class="actions">
-            <% if (user.disabledAt) { %>
-            <a title="Unban" href="#" class="unban" data-token="<%= user.token %>">🔄️</a>
-            <% } else { %>
-            <a title="Ban" href="#" class="ban" data-token="<%= user.token %>">🚫</a>
-            <% } %>
-          <td><%= user.disabledAt ? "Yes" : "No" %> <%= user.disabledReason ? `(${user.disabledReason})` : "" %></td>
-          </td>
-        </tr>
-        <% }); %>
+		<tbody>
+		  <% users.forEach(function(user){ %>
+			  <tr>
+				<td>
+				  <code><a href="/admin/manage/view-user/<%= user.token %>"><%= user.token %></a></code>
+				</td>
+				<td><%= user.ip.length %></td>
+				<td><%= user.promptCount %></td>
+				<td><%= user.tokenClaudeCount+user.tokenGptCount %></td>
+				<td><%= user.type %></td>
+				<td><%= user.createdAt %></td>
+				<td><%= user.lastUsedAt ?? "never" %></td>
+				<td class="actions">
+				  <% if (user.disabledAt) { %>
+					<a title="Unban" href="#" class="unban" data-token="<%= user.token %>">🔄️</a>
+				  <% } else { %>
+					<a title="Ban" href="#" class="ban" data-token="<%= user.token %>">🚫</a>
+				  <% } %>
+				</td>
+				<td><%= user.disabledAt ? "Yes" : "No" %> <%= user.disabledReason ? `(${user.disabledReason})` : "" %></td>
+			  </tr>
+		<% }); %>
     </table>
 
     <ul class="pagination">

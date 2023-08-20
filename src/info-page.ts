@@ -249,14 +249,6 @@ function buildInfoPageHeader(converter: showdown.Converter, title: string) {
 
   let infoBody = `<!-- Header for Showdown's parser, don't remove this line -->
 # ${title}`;
-  if (config.promptLogging) {
-    infoBody += `\n## Prompt logging is enabled!
-The server operator has enabled prompt logging. The prompts you send to this proxy and the AI responses you receive may be saved.
-
-Logs are anonymous and do not contain IP addresses or timestamps. [You can see the type of data logged here, along with the rest of the code.](https://gitgud.io/khanon/oai-reverse-proxy/-/blob/main/src/prompt-logging/index.ts).
-
-**If you are uncomfortable with this, don't send prompts to this proxy!**`;
-  }
 
   if (config.queueMode !== "none") {
     const waits: string[] = [];

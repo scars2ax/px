@@ -10,7 +10,6 @@ import { keyPool } from "./key-management";
 import { adminRouter } from "./admin/routes";
 import { proxyRouter } from "./proxy/routes";
 import { handleInfoPage, handleStatusPage } from "./info-page";
-import { logQueue } from "./prompt-logging";
 import { start as startRequestQueue } from "./proxy/queue";
 import { init as initUserStore } from "./proxy/auth/user-store";
 import { init as initTokenizers } from "./tokenization";
@@ -114,11 +113,6 @@ async function start() {
 
   if (config.gatekeeper === "user_token") {
     await initUserStore();
-  }
-
-  if (config.promptLogging) {
-    logger.info("Starting prompt logging...");
-    logQueue.start();
   }
 
   logger.info("Starting request queue...");

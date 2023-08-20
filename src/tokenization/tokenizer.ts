@@ -39,7 +39,7 @@ export async function countTokens({
   switch (service) {
     case "anthropic":
       return {
-        ...getClaudeTokenCount(prompt, req.body.model),
+        ...getClaudeTokenCount(prompt),
         tokenization_duration_ms: getElapsedMs(time),
       };
     case "openai":

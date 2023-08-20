@@ -17,17 +17,30 @@ export interface User {
   token: string;
   /** The IP addresses the user has connected from. */
   ip: string[];
+  ipPromptCount: Map<string, number>; 
   /** The user's privilege level. */
   type: UserType;
   /** The number of prompts the user has made. */
   promptCount: number;
+  
+  /** Count claude and gpt prompts */
+  promptClaudeCount: number;
+  promptGptCount: number;
+  
+  
   /** Prompt Limit for temp user */ 
   promptLimit?: number;
   /** Time Limit for temp user */ 
   endTimeLimit?: number;
   timeLimit?: number;
-  /** The number of tokens the user has consumed. Not yet implemented. */
-  tokenCount: number;
+  /** The number of tokens the user has consumed. Not yet implemented. (Working on it) */
+  tokenClaudeCount: number;
+  tokenGptCount: number;
+  
+  
+  /** Rate limit of user_token */
+  rateLimit?: number;
+  
   /** The time at which the user was created. */
   createdAt: number;
   /** The time at which the user last connected. */
@@ -62,33 +75,62 @@ export async function init() {
   logger.info("User store initialized.");
 }
 
+
+
+
 /** Creates a new user and returns their token. */
-export function createUser() {
+export function createUser(rLimit: any) {
+  rLimit = parseInt(rLimit)
   const token = uuid();
   users.set(token, {
     token,
     ip: [],
+	ipPromptCount: new Map(),
     type: "normal",
     promptCount: 0,
-    tokenCount: 0,
+	promptClaudeCount: 0,
+	promptGptCount: 0,
+	rateLimit: rLimit,
+    tokenClaudeCount: 0,
+	tokenGptCount: 0,
     createdAt: Date.now(),
   });
   usersToFlush.add(token);
   return token;
 }
 
+
+function generateTempString(): string {
+  const userid = uuid().replace(/-/g, '');
+  let randomizedUUID = '';
+  for (let i = 0; i < userid.length; i++) {
+    const char = userid[i];
+    const randomCase = Math.random() < 0.5 ? char.toLowerCase() : char.toUpperCase();
+    randomizedUUID += randomCase;
+  }
+  return randomizedUUID;
+}
 /** Creates a new temp user and returns their token. */
-export function createTempUser(pLimit: number, tLimit: number) {
-  const token = "temp-"+uuid();
+export function createTempUser(pLimit: any, tLimit: any, rLimit: any) {
+  rLimit = parseInt(rLimit)
+  pLimit = parseInt(pLimit)
+  tLimit = parseInt(tLimit)  
+  const token = "temp-"+generateTempString();
   users.set(token, {
     token,
     ip: [],
+	ipPromptCount: new Map(),
     type: "temp",
     promptCount: 0,
+	promptClaudeCount: 0,
+	promptGptCount: 0,
+	rateLimit: rLimit,
 	promptLimit: pLimit,
 	timeLimit: tLimit,
 	endTimeLimit: -1,
-    tokenCount: 0,
+    tokenClaudeCount: 0,
+	tokenGptCount: 0,
+	
     createdAt: Date.now(),
   });
   usersToFlush.add(token);
@@ -104,7 +146,8 @@ export function getUser(token: string) {
 
 /** Returns a list of all users. */
 export function getUsers() {
-  return Array.from(users.values()).map((user) => ({ ...user }));
+  return Array.from(users.values()).map((user) => ({ ...user 
+  }));
 }
 
 
@@ -113,11 +156,20 @@ export function getPublicUsers() {
 	  const usersArray = Array.from(users);
 	  const updatedUsersArray = usersArray.map((user, index) => {
 		const updatedUser = {
-		  ...user[1],
+		  createdAt: user[1].createdAt,
+		  lastUsedAt: user[1].lastUsedAt,
 		  token: index,
-		  ip: [],
-		  disabledReason: "Hidden"
+		  type: user[1].type,
+		  promptLimit: user[1].promptLimit,
+		  timeLimit: user[1].timeLimit,
+		  endTimeLimit: user[1].endTimeLimit,
+		  promptCount: user[1].promptCount,
+		  promptClaudeCount: user[1].promptClaudeCount,
+		  promptGptCount: user[1].promptGptCount,
+		  tokenClaudeCount: user[1].tokenClaudeCount,
+		  tokenGptCount: user[1].tokenGptCount
 		};
+		// Remove hidden ones (Make them Hidden before to make sure everything is fine ._.)
 		return updatedUser;
 	  });
 	  return updatedUsersArray;
@@ -136,8 +188,12 @@ export function upsertUser(user: UserUpdate) {
     ip: [],
     type: "normal",
     promptCount: 0,
+	ipPromptCount: new Map(),
+	promptClaudeCount: 0,
+	promptGptCount: 0,
 	promptLimit: -1,
-    tokenCount: 0,
+    tokenClaudeCount: 0,
+	tokenGptCount: 0,
     createdAt: Date.now(),
   };
 
@@ -156,34 +212,64 @@ export function upsertUser(user: UserUpdate) {
 }
 
 /** Increments the prompt count for the given user. */
-export function incrementPromptCount(token: string) {
+export function incrementPromptCount(token: string, model: string, user_ip: string) {
   const user = users.get(token);
   if (!user) return;
+  
+  if (user.ipPromptCount.get(user_ip) === undefined) {
+	  user.ipPromptCount.set(user_ip, 1);
+   } else {
+	  const count = user.ipPromptCount.get(user_ip);
+	  if (typeof count === 'number') {
+		user.ipPromptCount.set(user_ip, count + 1);
+		}
+   }
+  
   user.promptCount++;
+  if (model.slice(0, 3) == "gpt") {
+	  user.promptGptCount++;
+  } else if (model.slice(0, 3) == "cla") {
+	  user.promptClaudeCount++;
+  }
+  
+  
   if(user.type == "temp" && (user.disabledAt ?? false) == false) {
 	  if ((user.endTimeLimit ?? 0) == -1 && (user.promptLimit ?? 0) == -1) {
 		  user.endTimeLimit = Date.now() + ((user.timeLimit ?? 0)*1000);
 		  }
 	  if ((user.promptLimit ?? 0) != -1 && user.promptCount >=  (user.promptLimit ?? 0)) {
-		  // Ban user over limit 
-		  user.disabledReason = "user_token's prompt limit reached.";
-		  user.disabledAt = Date.now();
-	  } else if ((user.promptLimit ?? 0) == -1 && Date.now() >= (user.endTimeLimit ?? 0) && (user.timeLimit ?? -1) != -1) {
-		  // Ban user over time limit 
-		  user.disabledReason = "user_token's time limit reached.";
-		  user.disabledAt = Date.now();
+		  // Deletes token 
+		  users.delete(user.token)
+	  } 
+	  if ((user.promptLimit ?? 0) == -1 && Date.now() >= (user.endTimeLimit ?? 0) && (user.timeLimit ?? -1) != -1) {
+		  // Deletes token 
+		  users.delete(user.token);
 	  }
   }
   usersToFlush.add(token);
 }
 
+
+
+
+
+
 /** Increments the token count for the given user by the given amount. */
-export function incrementTokenCount(token: string, amount = 1) {
+export function incrementTokenCount(token: string, amount = 1, service: string) {
   const user = users.get(token);
   if (!user) return;
-  user.tokenCount += amount;
+  
+  if (service == "openai") {
+	user.tokenGptCount += amount;
+  } else if (service == "anthropic") {
+	user.tokenClaudeCount += amount;
+  }
+  
   usersToFlush.add(token);
 }
+
+
+
 
 /**
  * Given a user's token and IP address, authenticates the user and adds the IP

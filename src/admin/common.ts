@@ -39,18 +39,24 @@ export function paginate(set: unknown[], page: number, pageSize: number = 20) {
     prevPage: p > 1 ? p - 1 : null,
   };
 }
+const mapTransform = (value: any) => new Map(value);
+
 
 export const UserSchema = z
   .object({
     ip: z.array(z.string()).optional(),
     type: z.enum(["normal", "special", "temp"]).optional(),
-    promptCount: z.number().optional(),
-	  promptLimit: z.number().optional(),
-	  endTimeLimit: z.number().optional(),
+	promptCount: z.number().optional(),
+	promptClaudeCount: z.number().optional(),
+	promptGptCount: z.number().optional(),
+	promptLimit: z.number().optional(),
+	endTimeLimit: z.number().optional(),
     timeLimit: z.number().optional(),
-    tokenCount: z.number().optional(),
+    tokenClaudeCount: z.number().optional(),
+	tokenGptCount: z.number().optional(),
     createdAt: z.number().optional(),
     lastUsedAt: z.number().optional(),
+	rateLimit: z.number().optional(),
     disabledAt: z.number().optional(),
     disabledReason: z.string().optional(),
   })

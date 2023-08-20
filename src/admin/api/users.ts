@@ -10,7 +10,7 @@ const router = Router();
  * GET /admin/users
  */
 router.get("/", (req, res) => {
-  const sort = parseSort(req.query.sort) || ["promptCount", "lastUsedAt"];
+  const sort = parseSort(req.query.sort) || ["promptGptCount", "lastUsedAt"];
   const users = userStore.getUsers().sort(sortBy(sort, false));
   res.json({ users, count: users.length });
 });
@@ -33,9 +33,11 @@ router.get("/:token", (req, res) => {
  * POST /admin/users
  */
 router.post("/", (req, res) => {
-  const token = userStore.createUser();
+  const token = userStore.createUser(req.body.rateLimit);
   res.json({ token });
 });
+
+
 
 /**
  * Updates the user with the given token, creating them if they don't exist.

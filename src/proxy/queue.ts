@@ -19,7 +19,11 @@ import type { Handler, Request } from "express";
 import { keyPool, SupportedModel } from "../key-management";
 import { logger } from "../logger";
 import { AGNAI_DOT_CHAT_IP } from "./rate-limit";
+
+import { init } from "../tokenization";
+
 import { buildFakeSseMessage } from "./middleware/common";
+
 
 export type QueuePartition = "claude" | "turbo" | "gpt-4";
 
@@ -239,6 +243,10 @@ function cleanQueue() {
 }
 
 export function start() {
+  // initialize both tokenizers 
+  init();
+  log.info(`Started tokenizers.`);
+	
   processQueue();
   cleanQueue();
   log.info(`Started request queue.`);

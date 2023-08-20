@@ -7,10 +7,11 @@ import { config } from "../../../config";
 import { logger } from "../../../logger";
 import { keyPool } from "../../../key-management";
 import { enqueue, trackWaitTime } from "../../queue";
-import { incrementPromptCount } from "../../auth/user-store";
+import { incrementPromptCount, incrementTokenCount } from "../../auth/user-store";
 import { isCompletionRequest, writeErrorResponse } from "../common";
 import { handleStreamedResponse } from "./handle-streamed-response";
-import { logPrompt } from "./log-prompt";
+import { OpenAIPromptMessage, countTokens } from "../../../tokenization";
+import { AIService } from "../../../key-management"
 
 const DECODER_MAP = {
   gzip: util.promisify(zlib.gunzip),
@@ -84,14 +85,14 @@ export const createOnProxyResHandler = (apiMiddleware: ProxyResMiddleware) => {
       if (req.isStreaming) {
         // `handleStreamedResponse` writes to the response and ends it, so
         // we can only execute middleware that doesn't write to the response.
-        middlewareStack.push(trackRateLimit, incrementKeyUsage, logPrompt);
+        middlewareStack.push(trackRateLimit, incrementKeyUsage, CountTokenPrompt);
       } else {
         middlewareStack.push(
           trackRateLimit,
           handleUpstreamErrors,
           incrementKeyUsage,
           copyHttpHeaders,
-          logPrompt,
+          CountTokenPrompt,
           ...apiMiddleware
         );
       }
@@ -195,6 +196,90 @@ export const decodeResponseBody: RawResponseBodyHandler = async (
     });
   });
   return promise;
+};
+
+// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+const getPromptForRequest = (req: Request): string | OaiMessage[] => {
+  // Since the prompt logger only runs after the request has been proxied, we
+  // can assume the body has already been transformed to the target API's
+  // format.
+  if (req.outboundApi === "anthropic") {
+    return req.body.prompt;
+  } else {
+    return req.body.messages;
+  }
+};
+const getResponseForService = ({
+  service,
+  body,
+}: {
+  service: AIService;
+  body: Record<string, any>;
+}): { completion: string; model: string } => {
+  if (service === "anthropic") {
+    return { completion: body.completion.trim(), model: body.model };
+  } else {
+    return { completion: body.choices[0].message.content, model: body.model };
+  }
+};
+
+type OaiMessage = {
+  role: "user" | "assistant" | "system";
+  content: string;
+};
+type TokenCountRequest = {
+  req: Request;
+} & (
+  | { prompt: string; service: "anthropic" }
+  | { prompt: OpenAIPromptMessage[]; service: "openai" }
+);
+
+export const CountTokenPrompt: ProxyResHandlerWithBody = async (
+  _proxyRes,
+  req,
+  _res,
+  responseBody
+) => {
+
+  if (req.user == undefined) {
+	return;
+  };
+  if (typeof responseBody !== "object") {
+    throw new Error("Expected body to be an object");
+  }
+  if (!isCompletionRequest(req)) {
+    return;
+  }
+  
+  
+  // idc if it's not tottaly accurate roughlt it's right... 
+  if (req.outboundApi == "openai") {
+	  const promptPayload: OpenAIPromptMessage[] = Array.isArray(getPromptForRequest(req))
+	  ? (getPromptForRequest(req) as OaiMessage[]).map((message: OaiMessage) => ({ content: message.content, role: message.role || "user" }))
+	  : [{ content: getPromptForRequest(req) as string, role: "user" }];
+
+	  const request: TokenCountRequest = {
+		  req: req,
+		  prompt: promptPayload,
+		  service: "openai"
+		};
+	  const tokenCount = await countTokens(request);
+	  console.log(tokenCount)
+	  incrementTokenCount(req.user.token,tokenCount.token_count,"openai");
+  } else if (req.outboundApi == "anthropic") {
+	 const promptPayload= getPromptForRequest(req);
+	 const promptString = Array.isArray(promptPayload) ? promptPayload.map(message => message.content).join(" ") : promptPayload;
+     const request: TokenCountRequest = {
+		  req: req,
+		  prompt: promptString,
+		  service: "anthropic"
+		};
+	  const tokenCount = await countTokens(request);
+	  console.log(tokenCount)
+	  incrementTokenCount(req.user.token,tokenCount.token_count,"anthropic");
+  }
+  
+  
 };
 
 // TODO: This is too specific to OpenAI's error responses.
@@ -397,8 +482,9 @@ function handleOpenAIRateLimitError(
 const incrementKeyUsage: ProxyResHandlerWithBody = async (_proxyRes, req) => {
   if (isCompletionRequest(req)) {
     keyPool.incrementPrompt(req.key!);
+	
     if (req.user) {
-      incrementPromptCount(req.user.token);
+      incrementPromptCount(req.user.token, req.body.model, req.ip.toString());
     }
   }
 };
