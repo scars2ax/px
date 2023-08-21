@@ -56,9 +56,9 @@
       <td>
         <a href="#" id="ip-list-toggle">Show all (<%- user.ip.length %>)</a>
         <ol id="ip-list" style="display:none; padding-left:1em; margin: 0;">
-          <% user.ip.forEach((ip) => { %>
-            <li><code><%- ip %></code></li>
-          <% }) %>
+          <% user.ip.forEach((ip, index) => { %>
+			<li><code><%- index + 1 %></code></li>
+		  <% }) %>
           </ol>
       </td>
     </tr>
@@ -67,8 +67,8 @@
   <td>
 	<a href="#" id="ipcount-list-toggle">Show all (<%= Array.from(user.ipPromptCount.values()).reduce((acc, count) => acc + count, 0) %>)</a>
 	<ol id="ipcount-list" style="display:none; padding-left:1em; margin: 0;">
-	  <% Array.from(user.ipPromptCount.entries()).forEach(([ip, count]) => { %>
-		<li><code><%= ip %> (Prompts: <%= count %>)</code></li>
+	  <% Array.from(user.ipPromptCount.entries()).forEach(([ip, count], index) => { %>
+		<li><code><%= index + 1 %> (Prompts: <%= count %>)</code></li>
 	  <% }) %>
 	</ol>
   </td>
