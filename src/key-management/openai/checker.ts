@@ -298,8 +298,8 @@ export class OpenAIKeyChecker {
       { key: key.hash, error: error.message },
       "Network error while checking key; trying this key again in a minute."
     );
-    const oneMinute = 60 * 1000;
-    const next = Date.now() - (KEY_CHECK_PERIOD - oneMinute);
+    const oneHour = 3600 * 1000;
+    const next = Date.now() - (KEY_CHECK_PERIOD - oneHour);
     this.updateKey(key.hash, { lastChecked: next });
   }
 
