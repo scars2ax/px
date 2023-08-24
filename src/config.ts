@@ -10,7 +10,7 @@ const isDev = process.env.NODE_ENV !== "production";
 
 type PromptLoggingBackend = "google_sheets";
 
-type Config = {
+export type Config = {
   /** The port the proxy server will listen on. */
   port: number;
   /** Comma-delimited list of OpenAI API keys. */
