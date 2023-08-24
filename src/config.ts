@@ -47,13 +47,21 @@ type Config = {
    * `memory`: Users are stored in memory and are lost on restart (default)
    *
    * `firebase_rtdb`: Users are stored in a Firebase Realtime Database; requires
-   *  `firebaseKey` and `firebaseRtdbUrl` to be set.
+   * `firebaseKey` and `firebaseRtdbUrl` to be set. (deprecated)
+   *
+   * `huggingface_datasets`: Users are stored in a Huggingface Datasets git
+   * repository; requires `hfDatasetRepoUrl` and `hfPrivateSshKey` to be set.
    **/
-  gatekeeperStore: "memory" | "firebase_rtdb";
+  gatekeeperStore: "memory" | "firebase_rtdb" | "huggingface_datasets";
   /** URL of the Firebase Realtime Database if using the Firebase RTDB store. */
   firebaseRtdbUrl?: string;
   /** Base64-encoded Firebase service account key if using the Firebase RTDB store. */
   firebaseKey?: string;
+  /** URL of the Huggingface Datasets git repository if using the Huggingface
+   * Datasets store. */
+  hfDatasetRepoUrl?: string;
+  /** Private SSH key used to push to the Huggingface Dataset repository. */
+  hfPrivateSshKey?: string;
   /**
    * Maximum number of IPs per user, after which their token is disabled.
    * Users with the manually-assigned `special` role are exempt from this limit.
@@ -132,6 +140,8 @@ export const config: Config = {
   maxIpsPerUser: getEnvWithDefault("MAX_IPS_PER_USER", 0),
   firebaseRtdbUrl: getEnvWithDefault("FIREBASE_RTDB_URL", undefined),
   firebaseKey: getEnvWithDefault("FIREBASE_KEY", undefined),
+  hfDatasetRepoUrl: getEnvWithDefault("HF_DATASET_REPO_URL", undefined),
+  hfPrivateSshKey: getEnvWithDefault("HF_PRIVATE_SSH_KEY", undefined),
   modelRateLimit: getEnvWithDefault("MODEL_RATE_LIMIT", 4),
   maxContextTokensOpenAI: getEnvWithDefault("MAX_CONTEXT_TOKENS_OPENAI", 0),
   maxContextTokensAnthropic: getEnvWithDefault(
@@ -270,6 +280,8 @@ export const OMITTED_KEYS: (keyof Config)[] = [
   "googleSheetsKey",
   "firebaseKey",
   "firebaseRtdbUrl",
+  "hfDatasetRepoUrl",
+  "hfPrivateSshKey",
   "gatekeeperStore",
   "maxIpsPerUser",
   "blockedOrigins",
