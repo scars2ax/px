@@ -29,17 +29,20 @@ type OpenAIError = {
   error: { type: string; code: string; param: unknown; message: string };
 };
 
+type CloneFn = typeof OpenAIKeyProvider.prototype.clone;
 type UpdateFn = typeof OpenAIKeyProvider.prototype.update;
 
 export class OpenAIKeyChecker {
   private readonly keys: OpenAIKey[];
   private log = logger.child({ module: "key-checker", service: "openai" });
   private timeout?: NodeJS.Timeout;
+  private cloneKey: CloneFn;
   private updateKey: UpdateFn;
   private lastCheck = 0;
 
-  constructor(keys: OpenAIKey[], updateKey: UpdateFn) {
+  constructor(keys: OpenAIKey[], cloneFn: CloneFn, updateKey: UpdateFn) {
     this.keys = keys;
+    this.cloneKey = cloneFn;
     this.updateKey = updateKey;
   }
 
@@ -131,6 +134,7 @@ export class OpenAIKeyChecker {
         const [provisionedModels, livenessTest] = await Promise.all([
           this.getProvisionedModels(key),
           this.testLiveness(key),
+          this.maybeCreateOrganizationClones(key),
         ]);
         const updates = {
           isGpt4: provisionedModels.gpt4,
@@ -164,7 +168,7 @@ export class OpenAIKeyChecker {
   private async getProvisionedModels(
     key: OpenAIKey
   ): Promise<{ turbo: boolean; gpt4: boolean }> {
-    const opts = { headers: { Authorization: `Bearer ${key.key}` } };
+    const opts = { headers: OpenAIKeyChecker.getHeaders(key) };
     const { data } = await axios.get<GetModelsResponse>(GET_MODELS_URL, opts);
     const models = data.data;
     const turbo = models.some(({ id }) => id.startsWith("gpt-3.5"));
@@ -180,6 +184,29 @@ export class OpenAIKeyChecker {
       lastChecked: keyFromPool.lastChecked,
     });
     return { turbo, gpt4 };
+  }
+
+  private async maybeCreateOrganizationClones(key: OpenAIKey) {
+    if (key.organizationId) return; // already cloned
+    const opts = { headers: { Authorization: `Bearer ${key.key}` } };
+    const { data } = await axios.get<GetOrganizationsResponse>(
+      GET_ORGANIZATIONS_URL,
+      opts
+    );
+    const organizations = data.data;
+    if (organizations.length <= 1) return undefined;
+
+    this.log.info(
+      { parent: key.hash, organizations: organizations.map((org) => org.id) },
+      "Key is associated with multiple organizations; cloning key for each organization."
+    );
+
+    const defaultOrg = organizations.find(({ is_default }) => is_default);
+    const ids = organizations
+      .filter(({ is_default }) => !is_default)
+      .map(({ id }) => id);
+    this.updateKey(key.hash, { organizationId: defaultOrg?.id });
+    this.cloneKey(key.hash, ids);
   }
 
   private handleAxiosError(key: OpenAIKey, error: AxiosError) {
@@ -286,7 +313,7 @@ export class OpenAIKeyChecker {
       POST_CHAT_COMPLETIONS_URL,
       payload,
       {
-        headers: { Authorization: `Bearer ${key.key}` },
+        headers: OpenAIKeyChecker.getHeaders(key),
         validateStatus: (status) => status === 400,
       }
     );
@@ -308,5 +335,13 @@ export class OpenAIKeyChecker {
   ): error is AxiosError<OpenAIError> {
     const data = error.response?.data as any;
     return data?.error?.type;
+  }
+
+  static getHeaders(key: OpenAIKey) {
+    const headers = {
+      Authorization: `Bearer ${key.key}`,
+      ...(key.organizationId && { "OpenAI-Organization": key.organizationId }),
+    };
+    return headers;
   }
 }
