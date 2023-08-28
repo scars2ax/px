@@ -137,10 +137,10 @@ type Config = {
   /**
    * The period over which to enforce token quotas. Quotas will be fully reset
    * at the start of each period, server time. Unused quota does not roll over.
-   * Defaults to `manual`, which means quotas are never automatically reset.
    * You can also provide a cron expression for a custom schedule.
+   * Defaults to no automatic quota refresh.
    */
-  quotaRefreshPeriod: "manual" | "hourly" | "daily" | string;
+  quotaRefreshPeriod?: "hourly" | "daily" | string;
 };
 
 // To change configs, create a file called .env in the root directory.
@@ -196,7 +196,7 @@ export const config: Config = {
     gpt4: getEnvWithDefault("TOKEN_QUOTA_GPT4", 0),
     claude: getEnvWithDefault("TOKEN_QUOTA_CLAUDE", 0),
   },
-  quotaRefreshPeriod: getEnvWithDefault("QUOTA_REFRESH_PERIOD", "manual"),
+  quotaRefreshPeriod: getEnvWithDefault("QUOTA_REFRESH_PERIOD", undefined),
 } as const;
 
 export async function assertConfigIsValid() {

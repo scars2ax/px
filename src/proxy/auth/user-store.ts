@@ -62,7 +62,7 @@ export async function init() {
   if (config.gatekeeperStore === "firebase_rtdb") {
     await initFirebase();
   }
-  if (config.quotaRefreshPeriod !== "manual") {
+  if (config.quotaRefreshPeriod) {
     const quotaRefreshJob = schedule.scheduleJob(getRefreshCrontab(), () => {
       for (const user of users.values()) {
         refreshQuota(user.token);
@@ -282,12 +282,12 @@ function getModelFamily(model: string): QuotaModel {
 }
 
 function getRefreshCrontab() {
-  switch (config.quotaRefreshPeriod) {
+  switch (config.quotaRefreshPeriod!) {
     case "hourly":
       return "0 * * * *";
     case "daily":
       return "0 0 * * *";
     default:
-      return config.quotaRefreshPeriod;
+      return config.quotaRefreshPeriod ?? "0 0 * * *";
   }
 }
