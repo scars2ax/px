@@ -18,9 +18,9 @@ Quotas only apply to `normal`-type users; `special`-type users are exempt from q
 You can use the `QUOTA_REFRESH_PERIOD` environment variable to automatically refresh users' quotas periodically.  This is useful if you want to give users a certain number of tokens per day, for example. The entire quota will be refreshed at the start of the specified period, and any tokens a user has not used will not be carried over.
 
 Set the `QUOTA_REFRESH_PERIOD` environment variable to one of the following values:
-- `manual` (**default**; quotas will not be refreshed automatically)
 - `daily` (at midnight)
 - `hourly`
+- leave unset to disable automatic refreshing
 
 You can also use a cron expression, for example:
 - Every 45 seconds: `*/45 * * * * *`
