@@ -53,7 +53,13 @@ router.get("/list-users", (req, res) => {
   const requestedPageSize =
     Number(req.query.perPage) || Number(req.cookies.perPage) || 20;
   const perPage = Math.max(1, Math.min(1000, requestedPageSize));
-  const users = userStore.getUsers().sort(sortBy(sort, false));
+  const users = userStore
+    .getUsers()
+    .map((user) => {
+      const sum = Object.values(user.tokenCounts).reduce((a, b) => a + b, 0); // TODO: cache
+      return { ...user, sumTokenCounts: sum };
+    })
+    .sort(sortBy(sort, false));
 
   const page = Number(req.query.page) || 1;
   const { items, ...pagination } = paginate(users, page, perPage);
