@@ -12,12 +12,12 @@ This repository can be deployed to a [Huggingface Space](https://huggingface.co/
 - Provide a name for your Space and select "Docker" as the SDK.  Select "Blank" for the template.
 - Click "Create Space" and wait for the Space to be created.
 
-![Create Space](huggingface-createspace.png)
+![Create Space](assets/huggingface-createspace.png)
 
 ### 3. Create an empty Dockerfile
 - Once your Space is created, you'll see an option to "Create the Dockerfile in your browser".  Click that link.
 
-![Create Dockerfile](huggingface-dockerfile.png)
+![Create Dockerfile](assets/huggingface-dockerfile.png)
 - Paste the following into the text editor and click "Save".
 ```dockerfile
 FROM node:18-bullseye-slim
@@ -34,7 +34,7 @@ CMD [ "npm", "start" ]
 ```
 - Click "Commit new file to `main`" to save the Dockerfile.
 
-![Commit](huggingface-savedockerfile.png)
+![Commit](assets/huggingface-savedockerfile.png)
 
 ### 4. Set your API key as a secret
 - Click the Settings button in the top right corner of your repository.
