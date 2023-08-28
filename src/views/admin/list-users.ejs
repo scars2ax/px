@@ -1,8 +1,7 @@
 <%- include("../_partials/admin-header", { title: "Users - OAI Reverse Proxy Admin" }) %>
     <h1>User Token List</h1>
     
-    <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
-    
+    <!-- <input type="hidden" name="_csrf" value="<%= csrfToken %>" /> -->    
     <% if (users.length === 0) { %>
     <p>No users found.</p>
     <% } else { %>
@@ -42,6 +41,13 @@
         </tr>
         <% }); %>
     </table>
+    
+    <% if (quotasEnabled) { %>
+      <form action="/admin/manage/refresh-all-quotas" method="POST">
+        <input type="hidden" name="_csrf" value="<%- csrfToken %>" />
+        <button type="submit" class="btn btn-primary">Refresh All Quotas</button>
+      </form>
+    <% } %>
 
     <ul class="pagination">
       <% if (page > 1) { %>

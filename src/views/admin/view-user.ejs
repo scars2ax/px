@@ -26,7 +26,7 @@
     <tr>
       <th scope="row">Token Counts</th>
       <td>
-        <ul>
+        <ul style="padding-left: 1em; margin: 0">
           <% Object.entries(user.tokenCounts).forEach(([key, count]) => { %>
           <li><strong><%- key %></strong>: <%- count %></li>
           <% }) %>
@@ -36,7 +36,7 @@
     <tr>
       <th scope="row">Token Limits</th>
       <td>
-        <ul>
+        <ul style="padding-left: 1em; margin: 0">
           <% Object.entries(user.tokenLimits).forEach(([key, count]) => { %>
           <li><strong><%- key %></strong>: <%- count %></li>
           <% }) %>
@@ -72,6 +72,14 @@
     </tr>
   </tbody>
 </table>
+
+<% if (quotasEnabled) { %>
+<form action="/admin/manage/refresh-user-quota" method="POST">
+  <input type="hidden" name="token" value="<%- user.token %>" />
+  <input type="hidden" name="_csrf" value="<%- csrfToken %>" />
+  <button type="submit" class="btn btn-primary">Refresh Quotas for User</button>
+</form>
+<% } %>
 
 <script>
   document.getElementById("ip-list-toggle").addEventListener("click", (e) => {

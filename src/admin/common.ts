@@ -1,5 +1,7 @@
 import { z } from "zod";
+import { RequestHandler } from "express";
 import { Query } from "express-serve-static-core";
+import { config } from "../config";
 
 export function parseSort(sort: Query["sort"]) {
   if (!sort) return null;
@@ -47,11 +49,11 @@ export const UserSchema = z
     promptCount: z.number().optional(),
     tokenCount: z.any().optional(), // never used, but remains for compatibility
     tokenCounts: z
-      .object({ claude: z.number(), turbo: z.number(), gpt4: z.number() })
+      .object({ turbo: z.number(), gpt4: z.number(), claude: z.number() })
       .strict()
       .optional(),
     tokenLimits: z
-      .object({ claude: z.number(), turbo: z.number(), gpt4: z.number() })
+      .object({ turbo: z.number(), gpt4: z.number(), claude: z.number() })
       .strict()
       .optional(),
     createdAt: z.number().optional(),
@@ -64,3 +66,13 @@ export const UserSchema = z
 export const UserSchemaWithToken = UserSchema.extend({
   token: z.string(),
 }).strict();
+
+export const injectLocals: RequestHandler = (_req, res, next) => {
+  const quota = config.tokenQuota;
+  res.locals.quotasEnabled =
+    quota.turbo > 0 || quota.gpt4 > 0 || quota.claude > 0;
+
+  res.locals.persistenceEnabled = config.gatekeeperStore !== "memory";
+
+  next();
+};

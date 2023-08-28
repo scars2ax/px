@@ -101,9 +101,7 @@ router.get("/export-users.json", (_req, res) => {
 });
 
 router.get("/", (_req, res) => {
-  res.render("admin/index", {
-    isPersistenceEnabled: config.gatekeeperStore !== "memory",
-  });
+  res.render("admin/index");
 });
 
 router.post("/edit-user/:token", (req, res) => {
@@ -135,7 +133,23 @@ router.post("/disable-user/:token", (req, res) => {
   }
   userStore.disableUser(req.params.token, req.body.reason);
   return res.sendStatus(204);
-}); 
-  
+});
+
+router.post("/refresh-user-quota", (req, res) => {
+  const user = userStore.getUser(req.body.token);
+  if (!user) {
+    return res.status(404).send("User not found");
+  }
+  userStore.refreshQuota(req.body.token);
+  return res.redirect(`/admin/manage/view-user/${req.body.token}`);
+});
+
+router.post("/refresh-all-quotas", (_req, res) => {
+  const users = userStore.getUsers();
+
+  users.forEach((user) => userStore.refreshQuota(user.token));
+
+  return res.send(`Refreshed ${users.length} quotas`);
+});
 
 export { router as usersUiRouter };
