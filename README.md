@@ -10,7 +10,7 @@ Reverse proxy server for the OpenAI and Anthropic APIs. Forwards text generation
   - [Deploy to Repl.it (WIP)](#deploy-to-replit-wip)
 - [Local Development](#local-development)
 - [Custom Page](#custom-page)
-
+- [Credits](#Credits)
 ## What is this?
 If you would like to provide a friend access to an API via keys you own, you can use this to keep your keys safe while still allowing them to generate text with the API. You can also use this if you'd like to build a client-side application which uses the OpenAI or Anthropic APIs, but don't want to build your own backend. You should never embed your real API keys in a client-side application. Instead, you can have your frontend connect to this reverse proxy and forward requests to the downstream service.
 
@@ -78,17 +78,31 @@ Inside html various replacments will happen with these {tags}:
 
 {anthropic:estimatedQueueTime} - How much estimated time it will take for person in Anthropic queue to be processed. 
 
-{turbo:activeKeys} - How many active Openai keys are turbo. 
+{turbo:activeKeys} - How many active Openai keys are turbo.
+
+{turbo:overQuotaKeys} - How many over quota keys are GPT-4
+
+{turbo:revokedKeys} - How many revoked keys are GPT-4
 
 {turbo:proomptersInQueue} - How many people are in Turbo request queue.
 
 {turbo:estimatedQueueTime} - How much estimated time it will take for person in Turbo queue to be processed. 
 
-{gpt4:activeKeys} - How many active Openai keys are GPT-4. 
+{gpt4:activeKeys} - How many active Openai keys are GPT-4.
+
+{gpt4:overQuotaKeys} - How many over quota keys are GPT-4
+
+{gpt4:revokedKeys} - How many revoked keys are GPT-4
 
 {gpt4:proomptersInQueue} - How many people are in GPT-4 request queue.
 
 {gpt4:estimatedQueueTime} - How much estimated time it will take for person in GPT-4 queue to be processed. 
+
+{gpt432k:activeKeys} - How many active Openai keys are GPT-4 32K 
+
+{gpt432k:overQuotaKeys} - How many over quota keys are GPT-4 32K
+
+{gpt432k:revokedKeys} - How many revoked keys are GPT-4 32K
 
 {config:page_body} - Don't use, it will show full raw html.
 
@@ -120,5 +134,10 @@ Inside html various replacments will happen with these {tags}:
 
 {build} - Shows current build name.
 </details>
+
+## Credits 
+
+| **Hmage** | - his code helped me implement "Support for multiple organizations per key" (https://gitgud.io/afurry/goai/-/commit/342ba44d41d6fad94799b048552ef7b8187d81ae)
+
 
 

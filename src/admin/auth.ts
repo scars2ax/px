@@ -3,6 +3,7 @@ import { config } from "../config";
 
 const ADMIN_KEY = config.adminKey;
 const failedAttempts = new Map<string, number>();
+const UnauthorizedText = config.responseOnUnauthorized;
 
 type AuthorizeParams = { via: "cookie" | "header" };
 
@@ -15,7 +16,7 @@ export const authorize: ({ via }: AuthorizeParams) => RequestHandler =
     const attempts = failedAttempts.get(req.ip) ?? 0;
 
     if (!token) {
-      return res.status(401).json({ error: "Unauthorized" });
+      return res.status(401).json({ error: "Unauthorized", statusText: UnauthorizedText });
     }
 
     if (!ADMIN_KEY) {
@@ -23,7 +24,7 @@ export const authorize: ({ via }: AuthorizeParams) => RequestHandler =
         { ip: req.ip },
         `Blocked admin request because no admin key is configured`
       );
-      return res.status(401).json({ error: "Unauthorized" });
+      return res.status(401).json({ error: "Unauthorized", statusText: UnauthorizedText });
     }
 
     if (attempts > 5) {
@@ -51,7 +52,7 @@ function handleFailedLogin(req: Request, res: Response) {
   const newAttempts = attempts + 1;
   failedAttempts.set(req.ip, newAttempts);
   if (req.accepts("json", "html") === "json") {
-    return res.status(401).json({ error: "Unauthorized" });
+    return res.status(401).json({ error: "Unauthorized", statusText: UnauthorizedText });
   }
   res.clearCookie("admin-token");
   return res.redirect("/admin/login?failed=true");

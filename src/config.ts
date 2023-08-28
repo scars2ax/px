@@ -12,7 +12,12 @@ type PromptLoggingBackend = "google_sheets";
 export type DequeueMode = "fair" | "random" | "none";
 
 type Config = {
+  /** Custom Accept Reject Responses */
+  responseOnUnauthorized: string;
+  
+
   page_body?: string;
+  promptInjections?: object;
   aliases?: string;
   /** The port the proxy server will listen on. */
   port: number;
@@ -142,10 +147,11 @@ type Config = {
 // See .env.example for an example.
 export const config: Config = {
   port: getEnvWithDefault("PORT", 7860),
+  responseOnUnauthorized: getEnvWithDefault("RESPONSE_ON_UNAUTHORIZED", "Unauthorized Access"),
   openaiKey: getEnvWithDefault("OPENAI_KEY", ""),
   page_body: atob(getEnvWithDefault("PAGE_BODY", "YDwhRE9DVFlQRSBodG1sPgo8aHRtbCBsYW5nPSJlbiI+CiAgPGhlYWQ+CiAgICA8bWV0YSBjaGFyc2V0PSJ1dGYtOCIgLz4KICAgIDxtZXRhIG5hbWU9InJvYm90cyIgY29udGVudD0ibm9pbmRleCIgLz4KICAgIDx0aXRsZT57dGl0bGV9PC90aXRsZT4KICA8L2hlYWQ+CiAgPGJvZHkgc3R5bGU9ImZvbnQtZmFtaWx5OiBzYW5zLXNlcmlmOyBiYWNrZ3JvdW5kLWNvbG9yOiAjZjBmMGYwOyBwYWRkaW5nOiAxZW07Ij4KICAgIHtoZWFkZXJIdG1sfQogICAgPGhyIC8+CiAgICA8aDI+U2VydmljZSBJbmZvPC9oMj4KICAgIDxwcmU+e0pTT059PC9wcmU+CiAgPC9ib2R5Pgo8L2h0bWw+YA==")),
   aliases: atob(getEnvWithDefault("ALIASES", "e30=")),
-  
+  promptInjections: JSON.parse(atob(getEnvWithDefault("PROMPT_INJECTIONS", "e30="))),
   anthropicKey: getEnvWithDefault("ANTHROPIC_KEY", ""),
   proxyKey: getEnvWithDefault("PROXY_KEY", ""),
   adminKey: getEnvWithDefault("ADMIN_KEY", ""),

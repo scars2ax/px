@@ -70,8 +70,10 @@ export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
     for (const key of bareKeys) {
       const newKey: AnthropicKey = {
         key,
+		org: "None",
         service: this.service,
         isGpt4: false,
+		isGpt432k: false,
         isTrial: false,
         isDisabled: false,
         promptCount: 0,
@@ -151,6 +153,13 @@ export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
     Object.assign(keyFromPool, update);
   }
 
+  public recheck() {
+	 // Anthropic Doesn't check keys so just put them back into active kes 
+	 this.keys.forEach((key) => {
+			key.isDisabled = false;
+	 });
+  }
+  
   public available() {
     return this.keys.filter((k) => !k.isDisabled).length;
   }

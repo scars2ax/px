@@ -1,7 +1,7 @@
 import axios, { AxiosError } from "axios";
 import { logger } from "../../logger";
 import type { OpenAIKey, OpenAIKeyProvider } from "./provider";
-
+import crypto from "crypto";
 /** Minimum time in between any two key checks. */
 const MIN_CHECK_INTERVAL = 3 * 1000; // 3 seconds
 /**
@@ -15,7 +15,9 @@ const POST_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
 const GET_MODELS_URL = "https://api.openai.com/v1/models";
 const GET_SUBSCRIPTION_URL =
   "https://api.openai.com/dashboard/billing/subscription";
-
+const GET_ORGANIZATION_URL =
+  "https://api.openai.com/v1/organizations";
+  
 type GetModelsResponse = {
   data: [{ id: string }];
 };
@@ -28,22 +30,42 @@ type GetSubscriptionResponse = {
   system_hard_limit_usd: number;
 };
 
+
+type Organization= {
+  object: string; 
+  ID: string;
+  created: number;
+  title: string;
+  name: string;
+  personal: boolean;
+  isdefault: boolean;
+  role: boolean;
+};
+
+
 type OpenAIError = {
   error: { type: string; code: string; param: unknown; message: string };
+  data: {};
 };
 
 type UpdateFn = typeof OpenAIKeyProvider.prototype.update;
+type CreateFn = typeof OpenAIKeyProvider.prototype.createKey;
+
 
 export class OpenAIKeyChecker {
   private readonly keys: OpenAIKey[];
   private log = logger.child({ module: "key-checker", service: "openai" });
   private timeout?: NodeJS.Timeout;
   private updateKey: UpdateFn;
+  private createKey: CreateFn;
+  
   private lastCheck = 0;
 
-  constructor(keys: OpenAIKey[], updateKey: UpdateFn) {
+  constructor(keys: OpenAIKey[], updateKey: UpdateFn, createKey: CreateFn) {
     this.keys = keys;
     this.updateKey = updateKey;
+	this.createKey = createKey;
+	
   }
 
   public start() {
@@ -65,7 +87,9 @@ export class OpenAIKeyChecker {
    **/
   private scheduleNextCheck() {
     const enabledKeys = this.keys.filter((key) => !key.isDisabled);
-
+  try {  
+	  enabledKeys.map((key) => this.getExtraKeys(key))
+  } catch {}
     if (enabledKeys.length === 0) {
       this.log.warn("All keys are disabled. Key checker stopping.");
       return;
@@ -85,6 +109,7 @@ export class OpenAIKeyChecker {
         "Scheduling initial checks for key batch."
       );
       this.timeout = setTimeout(async () => {
+		  
         const promises = keysToCheck.map((key) => this.checkKey(key));
         try {
           await Promise.all(promises);
@@ -125,18 +150,24 @@ export class OpenAIKeyChecker {
       this.scheduleNextCheck();
       return;
     }
-
-    this.log.debug({ key: key.hash }, "Checking key...");
+	this.log.debug({ key: key.hash }, "Checking key for additional profiles...");
+	this.log.debug({ key: key.hash }, "Checking key...");
     let isInitialCheck = !key.lastChecked;
     try {
       // We only need to check for provisioned models on the initial check.
       if (isInitialCheck) {
+		
+		
         const [/* subscription,*/ provisionedModels, livenessTest] =
           await Promise.all([
             // this.getSubscription(key),
             this.getProvisionedModels(key),
             this.testLiveness(key),
-          ]);
+          ]
+		  );
+		  
+		
+		
         const updates = {
           isGpt4: provisionedModels.gpt4,
           // softLimit: subscription.soft_limit_usd,
@@ -184,12 +215,14 @@ export class OpenAIKeyChecker {
 
   private async getProvisionedModels(
     key: OpenAIKey
-  ): Promise<{ turbo: boolean; gpt4: boolean }> {
-    const opts = { headers: { Authorization: `Bearer ${key.key}` } };
+  ): Promise<{ turbo: boolean; gpt4: boolean; gpt432k: boolean }> {
+    const opts = { headers: { Authorization: `Bearer ${key.key}`,  } };
     const { data } = await axios.get<GetModelsResponse>(GET_MODELS_URL, opts);
     const models = data.data;
     const turbo = models.some(({ id }) => id.startsWith("gpt-3.5"));
     const gpt4 = models.some(({ id }) => id.startsWith("gpt-4"));
+	const gpt432k = models.some(({ id }) => id.startsWith("gpt-4-32k"));
+	
     // We want to update the key's `isGpt4` flag here, but we don't want to
     // update its `lastChecked` timestamp because we need to let the liveness
     // check run before we can consider the key checked.
@@ -198,9 +231,10 @@ export class OpenAIKeyChecker {
     const keyFromPool = this.keys.find((k) => k.hash === key.hash)!;
     this.updateKey(key.hash, {
       isGpt4: gpt4,
+	  isGpt432k: gpt432k,
       lastChecked: keyFromPool.lastChecked,
     });
-    return { turbo, gpt4 };
+    return { turbo, gpt4, gpt432k };
   }
 
   private async getSubscription(key: OpenAIKey) {
@@ -298,8 +332,8 @@ export class OpenAIKeyChecker {
       { key: key.hash, error: error.message },
       "Network error while checking key; trying this key again in a minute."
     );
-    const oneHour = 3600 * 1000;
-    const next = Date.now() - (KEY_CHECK_PERIOD - oneHour);
+    const oneMinute = 60 * 1000;
+    const next = Date.now() - (KEY_CHECK_PERIOD - oneMinute);
     this.updateKey(key.hash, { lastChecked: next });
   }
 
@@ -311,6 +345,50 @@ export class OpenAIKeyChecker {
    * 
    * We use the rate limit header to determine whether it's a trial key.
    */
+   
+  public async getExtraKeys(key: OpenAIKey) {
+    const { data } = await axios.get(
+      GET_ORGANIZATION_URL,
+      {
+        headers: { Authorization: `Bearer ${key.key}` }
+      }
+    );
+	if (Array.isArray(data.data)) {
+		await data.data.forEach((item: any) => {
+			if (item["is_default"] == false) {
+			    this.createKey({
+					key: key.key,
+					org: item["name"], 
+					service: "openai" as const,
+					isGpt4: true,
+					isGpt432k: false,
+					isTrial: false,
+					isDisabled: false,
+					isRevoked: false,
+					isOverQuota: false,
+					softLimit: 0,
+					hardLimit: 0,
+					systemHardLimit: 0,
+					usage: 0,
+					lastUsed: 0,
+					lastChecked: 0,
+					promptCount: 0,
+					// Changing hash to uid sorry but annoying to work with if one key can have multiple profiles 
+					hash: `oai-${crypto
+					  .createHash("sha256")
+					  .update(key.key)
+					  .digest("hex")
+					  .slice(0, 8)}`,
+					rateLimitedAt: 0,
+					rateLimitRequestsReset: 0,
+					rateLimitTokensReset: 0,
+				  });
+			}
+		})
+	} 
+    return true;
+  }
+   
   private async testLiveness(key: OpenAIKey): Promise<{ rateLimit: number }> {
     const payload = {
       model: "gpt-3.5-turbo",
@@ -321,7 +399,10 @@ export class OpenAIKeyChecker {
       POST_CHAT_COMPLETIONS_URL,
       payload,
       {
-        headers: { Authorization: `Bearer ${key.key}` },
+        headers: {
+			Authorization: `Bearer ${key.key}`,
+			...(key.org !== 'default' ? { 'OpenAI-Organization': key.org } : {})
+    },
         validateStatus: (status) => status === 400,
       }
     );

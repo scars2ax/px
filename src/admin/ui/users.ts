@@ -2,6 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import { z } from "zod";
 import { config } from "../../config";
+import { keyPool } from "../../key-management";
 import * as userStore from "../../proxy/auth/user-store";
 import {
   UserSchemaWithToken,
@@ -36,13 +37,38 @@ router.get("/create-user", (req, res) => {
 });
 
 router.post("/create-user", (_req, res) => {
-  userStore.createUser(_req.body.rateLimit);
+  userStore.createUser(_req.body.rateLimit,_req.body.promptLimit);
   return res.redirect(`/admin/manage/create-user?created=true`);
 });
 
 router.post("/create-temp-user", (_req, res) => {
   userStore.createTempUser(_req.body.promptLimit,_req.body.timeLimit,_req.body.rateLimit);
   return res.redirect(`/admin/manage/create-user?created=true`);
+});
+
+router.post("/update-page", (_req, res) => {
+  config.page_body = atob(_req.body.base64_page);
+  return res.redirect(`/admin`);
+});
+
+router.post("/update-aliases", (_req, res) => {
+  config.aliases = atob(_req.body.base64_aliases);
+  return res.redirect(`/admin`);
+});
+
+router.post("/update-promptinjections", (_req, res) => {
+  config.promptInjections = JSON.parse(atob(_req.body.base64_pinject));
+  return res.redirect(`/admin`);
+});
+
+router.post("/update-unauthresponse", (_req, res) => {
+  config.responseOnUnauthorized = _req.body.base64_unauthresponse;
+  return res.redirect(`/admin`);
+});
+
+router.post("/recheck-keys", (_req, res) => {
+  keyPool.recheck();
+  return res.redirect(`/admin`);
 });
 
 
@@ -78,6 +104,7 @@ router.get("/import-users", (req, res) => {
   res.render("admin/import-users", { imported });
 });
 
+
 router.post("/import-users", upload.single("users"), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: "No file uploaded" });
@@ -98,6 +125,10 @@ router.post("/import-users", upload.single("users"), (req, res) => {
 
 router.get("/export-users", (_req, res) => {
   res.render("admin/export-users");
+});
+
+router.get("/other", (_req, res) => {
+  res.render("admin/other");
 });
 
 router.get("/export-users.json", (_req, res) => {
@@ -141,6 +172,16 @@ router.post("/disable-user/:token", (req, res) => {
     return res.status(404).send("User not found");
   }
   userStore.disableUser(req.params.token, req.body.reason);
+  return res.sendStatus(204);
+}); 
+  
+  
+router.post("/delete-user/:token", (req, res) => {
+  const user = userStore.getUser(req.params.token);
+  if (!user) {
+    return res.status(404).send("User not found");
+  }
+  userStore.deleteUser(user);
   return res.sendStatus(204);
 }); 
   

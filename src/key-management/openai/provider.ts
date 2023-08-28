@@ -5,12 +5,13 @@ import crypto from "crypto";
 import fs from "fs";
 import http from "http";
 import path from "path";
+import { v4 as uuid } from "uuid";
 import { KeyProvider, Key, Model } from "../index";
 import { config } from "../../config";
 import { logger } from "../../logger";
 import { OpenAIKeyChecker } from "./checker";
 
-export type OpenAIModel = "gpt-3.5-turbo" | "gpt-4";
+export type OpenAIModel = "gpt-3.5-turbo" | "gpt-4" | "gpt-4-32k";
 export const OPENAI_SUPPORTED_MODELS: readonly OpenAIModel[] = [
   "gpt-3.5-turbo",
   "gpt-4",
@@ -78,8 +79,10 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
     for (const k of bareKeys) {
       const newKey = {
         key: k,
+		org: "default",
         service: "openai" as const,
         isGpt4: true,
+		isGpt432k: false,
         isTrial: false,
         isDisabled: false,
         isRevoked: false,
@@ -91,23 +94,36 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
         lastUsed: 0,
         lastChecked: 0,
         promptCount: 0,
+		// Changing hash to uid sorry but annoying to work with if one key can have multiple profiles 
         hash: `oai-${crypto
           .createHash("sha256")
-          .update(k)
+          .update(k+uuid())
           .digest("hex")
           .slice(0, 8)}`,
         rateLimitedAt: 0,
         rateLimitRequestsReset: 0,
         rateLimitTokensReset: 0,
+		organizations: {},
       };
       this.keys.push(newKey);
     }
     this.log.info({ keyCount: this.keys.length }, "Loaded OpenAI keys.");
   }
+  
+  public recheck() {
+	  this.checker = new OpenAIKeyChecker(this.keys, this.update.bind(this), this.createKey.bind(this));
+	  this.keys.forEach((key) => {
+			key.isDisabled = false;
+			key.isOverQuota = false; 
+			key.isRevoked = false;
+			key.lastChecked = 0;
+	   });
+      this.checker.start();
+  }
 
   public init() {
     if (config.checkKeys) {
-      this.checker = new OpenAIKeyChecker(this.keys, this.update.bind(this));
+      this.checker = new OpenAIKeyChecker(this.keys, this.update.bind(this), this.createKey.bind(this));
       this.checker.start();
     }
   }
@@ -127,15 +143,30 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
 
   public get(model: Model) {
     const needGpt4 = model.startsWith("gpt-4");
-    const availableKeys = this.keys.filter(
-      (key) => !key.isDisabled && (!needGpt4 || key.isGpt4)
-    );
-    if (availableKeys.length === 0) {
-      let message = needGpt4
-        ? "No GPT-4 keys available.  Try selecting a Turbo model."
-        : "No active OpenAI keys available.";
-      throw new Error(message);
-    }
+	const needGpt432k = model.startsWith("gpt-4-32k");
+	
+    let availableKeys = this.keys.filter(
+		  (key) => !key.isDisabled && (!needGpt4 || key.isGpt4)
+		);
+	
+	if (needGpt4 && needGpt432k == false) {
+		if (availableKeys.length === 0) {
+		  let message = needGpt4
+			? "No GPT-4 keys available.  Try selecting a Turbo model."
+			: "No active OpenAI keys available.";
+		  throw new Error(message);
+		}
+	} else if (needGpt432k) {
+		availableKeys = this.keys.filter(
+		  (key) => !key.isDisabled && (!needGpt432k || key.isGpt432k)
+		);
+		if (availableKeys.length === 0) {
+		  let message = needGpt432k
+			? "No GPT-4-32K keys available.  Try selecting a Gpt-4 model."
+			: "No active OpenAI keys available.";
+		  throw new Error(message);
+		}
+	}
 
     if (needGpt4 && config.turboOnly) {
       throw new Error(
@@ -184,6 +215,14 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
     return { ...selectedKey };
   }
 
+  public createKey(key: any) {
+
+	  const hashExists = this.keys.some(item => item.hash === key.hash );
+	  if (hashExists) {  
+	  } else {
+		this.keys.push(key)
+	  }
+  }
   /** Called by the key checker to update key information. */
   public update(keyHash: string, update: OpenAIKeyUpdate) {
     const keyFromPool = this.keys.find((k) => k.hash === keyHash)!;
@@ -212,10 +251,22 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
    * the request, or returns 0 if a key is ready immediately.
    */
   public getLockoutPeriod(model: Model = "gpt-4"): number {
-    const needGpt4 = model.startsWith("gpt-4");
-    const activeKeys = this.keys.filter(
-      (key) => !key.isDisabled && (!needGpt4 || key.isGpt4)
-    );
+	const needGpt432k = model.startsWith("gpt-4-32k");
+	
+    const needGpt4 = needGpt432k ? false : model.startsWith("gpt-4");
+	
+	let activeKeys = [] 
+
+	if (needGpt432k) {
+	  activeKeys = this.keys.filter(
+         (key) => !key.isDisabled && (!needGpt432k || key.isGpt432k)
+      );
+	} else {
+		activeKeys = this.keys.filter(
+		  (key) => !key.isDisabled && (!needGpt4 || key.isGpt4)
+		);
+	}
+		
 
     if (activeKeys.length === 0) {
       // If there are no active keys for this model we can't fulfill requests.

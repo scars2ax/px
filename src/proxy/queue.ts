@@ -25,7 +25,7 @@ import { init } from "../tokenization";
 import { buildFakeSseMessage } from "./middleware/common";
 
 
-export type QueuePartition = "claude" | "turbo" | "gpt-4";
+export type QueuePartition = "claude" | "turbo" | "gpt-4" | "gpt-4-32k";
 
 const queue: Request[] = [];
 const log = logger.child({ module: "request-queue" });
@@ -141,6 +141,9 @@ function getPartitionForRequest(req: Request): QueuePartition {
   // - turbo: effectively, all other requests
   const provider = req.outboundApi;
   const model = (req.body.model as SupportedModel) ?? "gpt-3.5-turbo";
+  if (provider === "openai" && model.startsWith("gpt-4-32k")) {
+    return "gpt-4-32k";
+  }
   if (provider === "anthropic") {
     return "claude";
   }
@@ -194,12 +197,16 @@ function processQueue() {
   // Currently if a key is locked out on one model it will also stop servicing
   // the others, because we only track one rate limit per key.
   const gpt4Lockout = keyPool.getLockoutPeriod("gpt-4");
+  const gpt432kLockout = keyPool.getLockoutPeriod("gpt-4-32k");
   const turboLockout = keyPool.getLockoutPeriod("gpt-3.5-turbo");
   const claudeLockout = keyPool.getLockoutPeriod("claude-v1");
 
   const reqs: (Request | undefined)[] = [];
   if (gpt4Lockout === 0) {
     reqs.push(dequeue("gpt-4"));
+  }
+  if (gpt432kLockout === 0) {
+    reqs.push(dequeue("gpt-4-32k"));
   }
   if (turboLockout === 0) {
     reqs.push(dequeue("turbo"));

@@ -22,7 +22,7 @@ router.get("/", (req, res) => {
 router.get("/:token", (req, res) => {
   const user = userStore.getUser(req.params.token);
   if (!user) {
-    return res.status(404).json({ error: "Not found" });
+    return res.status(404).json({ error: "Not found"});
   }
   res.json(user);
 });
@@ -33,7 +33,7 @@ router.get("/:token", (req, res) => {
  * POST /admin/users
  */
 router.post("/", (req, res) => {
-  const token = userStore.createUser(req.body.rateLimit);
+  const token = userStore.createUser(req.body.rateLimit, req.body.promptLimit);
   res.json({ token });
 });
 

@@ -62,5 +62,7 @@ export const gatekeeper: RequestHandler = (req, res, next) => {
     }
   }
 
-  res.status(401).json({ error: "Unauthorized" });
+  res.status(200).json({error: { message: config.responseOnUnauthorized }});
+  
 };
+ 
