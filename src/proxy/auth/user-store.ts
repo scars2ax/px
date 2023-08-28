@@ -210,9 +210,13 @@ export function refreshQuota(token: string) {
   if (!user) return;
   const { tokenCounts, tokenLimits } = user;
   const quotas = Object.entries(config.tokenQuota) as [QuotaModel, number][];
-  quotas.forEach(
-    ([model, quota]) => (tokenLimits[model] = tokenCounts[model] + quota)
-  );
+  quotas
+    // If a quota is not configured, don't touch any existing limits a user may
+    // already have been assigned manually.
+    .filter(([, quota]) => quota > 0)
+    .forEach(
+      ([model, quota]) => (tokenLimits[model] = tokenCounts[model] + quota)
+    );
   usersToFlush.add(token);
 }
 

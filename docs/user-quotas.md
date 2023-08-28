@@ -17,6 +17,8 @@ Quotas only apply to `normal`-type users; `special`-type users are exempt from q
 
 You can use the `QUOTA_REFRESH_PERIOD` environment variable to automatically refresh users' quotas periodically.  This is useful if you want to give users a certain number of tokens per day, for example. The entire quota will be refreshed at the start of the specified period, and any tokens a user has not used will not be carried over.
 
+Quotas for all models and users will be refreshed. If you haven't set `TOKEN_QUOTA_*` for a particular model, quotas for that model will not be refreshed (so any manually set quotas will not be overwritten).
+
 Set the `QUOTA_REFRESH_PERIOD` environment variable to one of the following values:
 - `daily` (at midnight)
 - `hourly`
