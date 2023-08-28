@@ -45,7 +45,15 @@ export const UserSchema = z
     ip: z.array(z.string()).optional(),
     type: z.enum(["normal", "special"]).optional(),
     promptCount: z.number().optional(),
-    tokenCount: z.number().optional(),
+    tokenCount: z.any().optional(), // never used, but remains for compatibility
+    tokenCounts: z
+      .object({ claude: z.number(), turbo: z.number(), gpt4: z.number() })
+      .strict()
+      .optional(),
+    tokenLimits: z
+      .object({ claude: z.number(), turbo: z.number(), gpt4: z.number() })
+      .strict()
+      .optional(),
     createdAt: z.number().optional(),
     lastUsedAt: z.number().optional(),
     disabledAt: z.number().optional(),
