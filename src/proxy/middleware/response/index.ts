@@ -92,16 +92,16 @@ export const createOnProxyResHandler = (apiMiddleware: ProxyResMiddleware) => {
         // `handleStreamedResponse` writes to the response and ends it, so
         // we can only execute middleware that doesn't write to the response.
         middlewareStack.push(
-          countResponseTokens,
           trackRateLimit,
+          countResponseTokens,
           incrementUsage,
           logPrompt
         );
       } else {
         middlewareStack.push(
-          countResponseTokens,
           trackRateLimit,
           handleUpstreamErrors,
+          countResponseTokens,
           incrementUsage,
           copyHttpHeaders,
           logPrompt,
