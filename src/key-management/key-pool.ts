@@ -12,6 +12,8 @@ export class KeyPool {
     this.keyProviders.push(new OpenAIKeyProvider());
     this.keyProviders.push(new AnthropicKeyProvider());
   }
+  
+  
 
   public init() {
     this.keyProviders.forEach((provider) => provider.init());
@@ -21,6 +23,13 @@ export class KeyPool {
         "No keys loaded. Ensure either OPENAI_KEY or ANTHROPIC_KEY is set."
       );
     }
+  }
+  
+  public recheck() {
+	this.keyProviders.forEach((provider) => {
+		provider.recheck();
+	})
+	const availableKeys = this.available("all");
   }
 
   public get(model: Model): Key {

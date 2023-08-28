@@ -90,7 +90,7 @@ export const ipLimiter = async (
   const tryAgainInMs = getTryAgainInMs(rateLimitKey, customLimit);
   if (tryAgainInMs > 0) {
     res.set("Retry-After", tryAgainInMs.toString());
-    res.status(429).json({
+    res.status(200).json({
       error: {
         type: "proxy_rate_limited",
         message: `This proxy is rate limited to ${

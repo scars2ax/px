@@ -5,21 +5,25 @@
 <h1>Create Permament User Token</h1>
 <form action="/admin/manage/create-user" method="post">
   <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
-  <input type="submit" value="Create" /> Rate limit (Requests per minute): <input type="number" value=5 name="rateLimit" /><br>
+  Rate limit (Requests per minute): <input type="number" value=5 name="rateLimit" /><br>
+  (Optional) Prompt limit daily (24h resets after creation): <input type="number" value=-1 name="promptLimit" /><br>
+  <input type="submit" value="Create" />
 </form>
  <br><hr>
 <h1>Create Prompt Lmited Temporary User Token</h1>
 <form action="/admin/manage/create-temp-user" method="post">
   <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
   <input type="hidden" name="timeLimit" value=-1 />
-  <input type="submit" value="Create" /> Prompt limit: <input type="number" value=100 name="promptLimit" /> Rate limit (Requests per minute):: <input type="number" value=5 name="rateLimit" /><br>
+  Prompt limit: <input type="number" value=100 name="promptLimit" /><br> Rate limit (Requests per minute): <input type="number" value=5 name="rateLimit" /><br>
+  <input type="submit" value="Create" />
 </form>
  <br><hr>
 <h1>Create Time Lmited Temporary User Token</h1>
 <form action="/admin/manage/create-temp-user" method="post">
   <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
   <input type="hidden" name="promptLimit" value=-1 />
-  <input type="submit" value="Create" /> Time limit (Seconds): <input type="number" value=3600 name="timeLimit" /> Rate limit (Requests per minute): <input type="number" value=5 name="rateLimit" /><br>
+  Time limit (Seconds): <input type="number" value=3600 name="timeLimit" /><br> Rate limit (Requests per minute): <input type="number" value=5 name="rateLimit" /><br>
+  <input type="submit" value="Create" />
 <ul>
 <li> 1 hour   = 3600</li>
 <li> 6 hours  = 21600</li>

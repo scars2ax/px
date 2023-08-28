@@ -62,6 +62,12 @@ function cacheInfoPageHtml(baseUrl: string) {
   const title = getServerTitle();
   const headerHtml = buildInfoPageHeader(new showdown.Converter(), title);
 
+  const temp_info = structuredClone(info)
+  // For Json info 
+  delete temp_info.config.page_body
+  delete temp_info.config.responseOnUnauthorized
+  delete temp_info.config.aliases
+  delete temp_info.config.promptInjections
   
   const openai_info = getOpenAIInfo()
   const anthropic_info = getAnthropicInfo()
@@ -74,7 +80,7 @@ function cacheInfoPageHtml(baseUrl: string) {
 		.replaceAll("{user:aliases}", (substring: string) => info.config.aliases.toString() ?? "{}")
 		.replaceAll("{user:data}", JSON.stringify(public_user_info).toString())
 		.replaceAll("{title}", title)
-		.replaceAll("{JSON}", "<b hidden><pre>"+JSON.stringify(info, null, 2)+"</pre></b>")
+		.replaceAll("{JSON}", JSON.stringify(temp_info, null, 2))
 		.replaceAll("{uptime}", info?.uptime?.toString())
 		 .replaceAll("{endpoints:openai}",info?.endpoints.openai ?? "Not Avaliable" )
 		 .replaceAll("{endpoints:anthropic}",info?.endpoints.anthropic ?? "Not Avaliable" )
@@ -93,6 +99,9 @@ function cacheInfoPageHtml(baseUrl: string) {
 		 .replaceAll("{gpt4:revokedKeys}",(substring: string) => openai_info.gpt4?.revokedKeys?.toString() ?? "0")
 		 .replaceAll("{gpt4:proomptersInQueue}",(substring: string) => openai_info.gpt4?.proomptersInQueue?.toString() ?? "0")
 		 .replaceAll("{gpt4:estimatedQueueTime}",(substring: string) => openai_info.gpt4?.estimatedQueueTime?.toString() ?? "No wait")
+		 .replaceAll("{gpt432k:activeKeys}",(substring: string) => openai_info.gpt432k?.activeKeys?.toString() ?? "0")
+		 .replaceAll("{gpt432k:overQuotaKeys}",(substring: string) => openai_info.gpt432k?.overQuotaKeys?.toString() ?? "0")
+		 .replaceAll("{gpt432k:revokedKeys}",(substring: string) => openai_info.gpt432k?.revokedKeys?.toString() ?? "0")
 		 .replaceAll("{config:gatekeeper}",(substring: string) => info.config.gatekeeper).replace("{config:modelRateLimit}", (substring: string) => info.config.modelRateLimit?.toString())
 		 .replaceAll("{config:maxOutputTokensOpenAI}",(substring: string) => info.config.maxOutputTokensOpenAI.toString())
 		 .replaceAll("{config:promptLogging}",(substring: string) => info.config.promptLogging)
@@ -154,6 +163,8 @@ function getOpenAIInfo() {
     .list()
     .filter((k) => k.service === "openai") as OpenAIKey[];
   const hasGpt4 = keys.some((k) => k.isGpt4) && !config.turboOnly;
+  const hasGpt432k = keys.some((k) => k.isGpt432k) && !config.turboOnly;
+
 
   if (keyPool.anyUnchecked()) {
     const uncheckedKeys = keys.filter((k) => !k.lastChecked);
@@ -164,8 +175,10 @@ function getOpenAIInfo() {
   }
 
   if (config.checkKeys) {
-    const turboKeys = keys.filter((k) => !k.isGpt4);
+    const turboKeys = keys.filter((k) => !k.isGpt4 && !k.isGpt432k);
     const gpt4Keys = keys.filter((k) => k.isGpt4);
+	const gpt432kKeys = keys.filter((k) => k.isGpt432k);
+	
 
     const quota: Record<string, string> = { turbo: "", gpt4: "" };
     const turboQuota = keyPool.activeLimitInUsd("openai");
@@ -195,6 +208,15 @@ function getOpenAIInfo() {
         overQuotaKeys: gpt4Keys.filter((k) => k.isOverQuota).length,
       };
     }
+	
+	if (hasGpt432k) {
+		info.gpt4_32k = {
+        activeKeys: gpt432kKeys.filter((k) => !k.isDisabled).length,
+        revokedKeys: gpt432kKeys.filter((k) => k.isRevoked).length,
+        overQuotaKeys: gpt432kKeys.filter((k) => k.isOverQuota).length,
+      };
+		
+	}
 
     if (config.quotaDisplayMode === "none") {
       // delete info.turbo?.activeLimit;
@@ -206,6 +228,11 @@ function getOpenAIInfo() {
     info.gpt4 = {
       activeKeys: keys.filter((k) => !k.isDisabled && k.isGpt4).length,
     };
+	
+	info.gpt4_32k = {
+      activeKeys: keys.filter((k) => !k.isDisabled && k.isGpt432k).length,
+    };
+	
   }
 
   if (config.queueMode !== "none") {

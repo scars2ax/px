@@ -79,7 +79,7 @@ export async function init() {
 
 
 /** Creates a new user and returns their token. */
-export function createUser(rLimit: any) {
+export function createUser(rLimit: any, pLimit: any) {
   rLimit = parseInt(rLimit)
   const token = uuid();
   users.set(token, {
@@ -91,6 +91,7 @@ export function createUser(rLimit: any) {
 	promptClaudeCount: 0,
 	promptGptCount: 0,
 	rateLimit: rLimit,
+	promptLimit: pLimit,
     tokenClaudeCount: 0,
 	tokenGptCount: 0,
     createdAt: Date.now(),
@@ -136,7 +137,16 @@ export function createTempUser(pLimit: any, tLimit: any, rLimit: any) {
   usersToFlush.add(token);
   return token;
 }
+export function deleteUser(user: User): boolean {
+  const token = user.token;
 
+  if (users.has(token)) {
+    users.delete(token);
+    return true;
+  }
+
+  return false;
+}
 
 
 /** Returns the user with the given token if they exist. */
@@ -245,7 +255,31 @@ export function incrementPromptCount(token: string, model: string, user_ip: stri
 		  // Deletes token 
 		  users.delete(user.token);
 	  }
+	  
+  // Very much requested daily limit ._. here you go...
+  } else if (user.type == "normal"  && (user.disabledAt ?? false) == false && (user.promptLimit ?? -1) != -1) {
+	  if ((user.endTimeLimit ?? 0) == -1) {
+			user.endTimeLimit = Date.now() + (86400 * 1000)
+	  }
+	  // Reached daily limit
+	  if (user.promptCount >= (user.promptLimit ?? 0)) {
+		  user.disabledAt = Date.now();
+		  user.disabledReason = "dailylimit";
+	  }
+	  // Reset if person didn't exceed but next day has passed 
+	  if (Date.now() >= (user.endTimeLimit ?? 0)) {
+		  user.promptCount = 0 
+		  user.endTimeLimit = Date.now() + (86400 * 1000)
+	  }
+  } else if (user.type == "normal"  && (user.disabledReason ?? false) == "dailylimit" && (user.promptLimit ?? -1) != -1 && (user.endTimeLimit ?? 0) != 0) {
+	  // Check if daily limit resets
+	  if (Date.now() >= (user.endTimeLimit ?? 0)) {
+		  user.promptCount = 0 
+		  user.endTimeLimit = Date.now() + (86400 * 1000)
+	  }
   }
+  
+  
   usersToFlush.add(token);
 }
 
