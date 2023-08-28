@@ -148,10 +148,7 @@ class DatasetPersistence {
     });
   }
 
-  static assertConfigured(input: Config): asserts input is Config & {
-    hfDatasetRepoUrl: string;
-    hfPrivateSshKey: string;
-  } {
+  static assertConfigured(input: Config): asserts input is ConfigWithDatasets {
     if (!input.hfDatasetRepoUrl) {
       throw new Error("HF_DATASET_REPO_URL is required when using Datasets.");
     }
@@ -161,5 +158,10 @@ class DatasetPersistence {
     }
   }
 }
+
+type ConfigWithDatasets = Config & {
+  hfDatasetRepoUrl: string;
+  hfPrivateSshKey: string;
+};
 
 export { DatasetPersistence };
