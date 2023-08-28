@@ -1,6 +1,6 @@
 import type { Request, RequestHandler } from "express";
 import { config } from "../../config";
-import { authenticate, getUser } from "./user-store";
+import { authenticate, getUser, hasAvailableQuota } from "./user-store";
 
 const GATEKEEPER = config.gatekeeper;
 const PROXY_KEY = config.proxyKey;
@@ -48,6 +48,14 @@ export const gatekeeper: RequestHandler = (req, res, next) => {
   if (GATEKEEPER === "user_token" && token) {
     const user = authenticate(token, req.ip);
     if (user) {
+      if (!hasAvailableQuota(token, req.body.model)) {
+        return res.status(429).json({
+          error: "You have exceeded your proxy token quota for this model.",
+          quota: user.tokenLimits,
+          used: user.tokenCounts,
+        });
+      }
+
       req.user = user;
       return next();
     } else {
