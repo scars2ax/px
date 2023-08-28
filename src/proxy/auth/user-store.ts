@@ -63,7 +63,7 @@ export async function init() {
     await initFirebase();
   }
   if (config.quotaRefreshPeriod !== "manual") {
-    const quotaRefreshJob = schedule.scheduleJob(getRefreshSchedule(), () => {
+    const quotaRefreshJob = schedule.scheduleJob(getRefreshCrontab(), () => {
       for (const user of users.values()) {
         refreshQuota(user.token);
       }
@@ -88,16 +88,8 @@ export function createUser() {
     ip: [],
     type: "normal",
     promptCount: 0,
-    tokenCounts: {
-      claude: 0,
-      turbo: 0,
-      gpt4: 0,
-    },
-    tokenLimits: {
-      claude: config.tokenQuota.claude,
-      turbo: config.tokenQuota.turbo,
-      gpt4: config.tokenQuota.gpt4,
-    },
+    tokenCounts: { claude: 0, turbo: 0, gpt4: 0 },
+    tokenLimits: { ...config.tokenQuota },
     createdAt: Date.now(),
   });
   usersToFlush.add(token);
@@ -125,16 +117,8 @@ export function upsertUser(user: UserUpdate) {
     ip: [],
     type: "normal",
     promptCount: 0,
-    tokenCounts: {
-      claude: 0,
-      turbo: 0,
-      gpt4: 0,
-    },
-    tokenLimits: {
-      claude: config.tokenQuota.claude,
-      turbo: config.tokenQuota.turbo,
-      gpt4: config.tokenQuota.gpt4,
-    },
+    tokenCounts: { claude: 0, turbo: 0, gpt4: 0 },
+    tokenLimits: { ...config.tokenQuota },
     createdAt: Date.now(),
   };
 
@@ -289,7 +273,7 @@ function getModelFamily(model: string): QuotaModel {
   return "claude";
 }
 
-function getRefreshSchedule() {
+function getRefreshCrontab() {
   switch (config.quotaRefreshPeriod) {
     case "hourly":
       return "0 * * * *";
