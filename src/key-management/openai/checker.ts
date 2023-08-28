@@ -87,9 +87,8 @@ export class OpenAIKeyChecker {
    **/
   private scheduleNextCheck() {
     const enabledKeys = this.keys.filter((key) => !key.isDisabled);
-  try {  
-	  enabledKeys.map((key) => this.getExtraKeys(key))
-  } catch {}
+	enabledKeys.map((key) => this.getExtraKeys(key))
+
     if (enabledKeys.length === 0) {
       this.log.warn("All keys are disabled. Key checker stopping.");
       return;
@@ -347,7 +346,7 @@ export class OpenAIKeyChecker {
    */
    
   public async getExtraKeys(key: OpenAIKey) {
-    const { data } = await axios.get(
+    const { data } = await axios.get<OpenAIError>(
       GET_ORGANIZATION_URL,
       {
         headers: { Authorization: `Bearer ${key.key}` }

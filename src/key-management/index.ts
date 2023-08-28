@@ -22,6 +22,10 @@ export interface Key {
   isGpt432k: boolean;
   /** Whether this key is currently disabled, meaning its quota has been exceeded or it has been revoked. */
   isDisabled: boolean;
+  
+  
+  /** Anthropic specific if keys is totally invalid */
+  isRevoked: boolean;
   /** The number of prompts that have been sent with this key. */
   promptCount: number;
   /** The time at which this key was last used. */

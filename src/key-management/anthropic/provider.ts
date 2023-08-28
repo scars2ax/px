@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { Key, KeyProvider } from "..";
 import { config } from "../../config";
 import { logger } from "../../logger";
+import axios, { AxiosError } from "axios";
 
 // https://docs.anthropic.com/claude/reference/selecting-a-model
 export const ANTHROPIC_SUPPORTED_MODELS = [
@@ -29,6 +30,7 @@ export interface AnthropicKey extends Key {
   rateLimitedAt: number;
   /** The time until which this key is rate limited. */
   rateLimitedUntil: number;
+  isRevoked: boolean;
   /**
    * Whether this key requires a special preamble.  For unclear reasons, some
    * Anthropic keys will throw an error if the prompt does not begin with a
@@ -76,6 +78,7 @@ export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
 		isGpt432k: false,
         isTrial: false,
         isDisabled: false,
+		isRevoked: false, 
         promptCount: 0,
         lastUsed: 0,
         rateLimitedAt: 0,
@@ -92,10 +95,34 @@ export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
     }
     this.log.info({ keyCount: this.keys.length }, "Loaded Anthropic keys.");
   }
+  
+  // change any > propper type 
+  private async checkValidity(key: any) {
+	  const payload = `
+		{ "model": "claude-1", "prompt": "\\n\\nHuman: Hello, world!\\n\\nAssistant:", "max_tokens_to_sample": 256, "stream": false }`
+	  try {
+		const response = await axios.post(
+			'https://api.anthropic.com/v1/complete', JSON.parse(payload), { headers: { 'anthropic-version': '2023-06-01', 'content-type': 'application/json', 'x-api-key': key } }
+		);
+	  } catch (error) {
+		  if (error.response && error.response.hasOwnProperty('data') && error.response['data']['error'] &&
+			  error.response['data']['error']['type'] === "authentication_error") {
 
+			  if (error.response['data']['error']['message'] === "Invalid API Key") {
+			      key.isRevoked = true; 
+		      } else if (error.response['data']['error']['message'] === "This account is not authorized to use the API. Please check with Anthropic support if you think this is in error.") {
+			      key.isDisabled = true;
+		      }
+		  } 
+	} 
+  }
+  
   public init() {
-    // Nothing to do as Anthropic's API doesn't provide any usage information so
-    // there is no key checker implementation and no need to start it.
+    // Simple checker Type of keys 
+	for (const key of this.keys) {
+		const promises = this.keys.map(key => this.checkValidity(key));
+		return Promise.all(promises);
+	}
   }
 
   public list() {
@@ -105,7 +132,7 @@ export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
   public get(_model: AnthropicModel) {
     // Currently, all Anthropic keys have access to all models. This will almost
     // certainly change when they move out of beta later this year.
-    const availableKeys = this.keys.filter((k) => !k.isDisabled);
+    const availableKeys = this.keys.filter((k) => !k.isDisabled && !k.isRevoked);
     if (availableKeys.length === 0) {
       throw new Error("No Anthropic keys available.");
     }
@@ -158,10 +185,11 @@ export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
 	 this.keys.forEach((key) => {
 			key.isDisabled = false;
 	 });
+	 this.init();
   }
   
   public available() {
-    return this.keys.filter((k) => !k.isDisabled).length;
+    return this.keys.filter((k) => !k.isDisabled && !k.isRevoked).length;
   }
 
   // No key checker for Anthropic
@@ -176,7 +204,7 @@ export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
   }
 
   public getLockoutPeriod(_model: AnthropicModel) {
-    const activeKeys = this.keys.filter((k) => !k.isDisabled);
+    const activeKeys = this.keys.filter((k) => !k.isDisabled && !k.isRevoked);
     // Don't lock out if there are no keys available or the queue will stall.
     // Just let it through so the add-key middleware can throw an error.
     if (activeKeys.length === 0) return 0;

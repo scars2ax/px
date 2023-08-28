@@ -108,6 +108,8 @@ function cacheInfoPageHtml(baseUrl: string) {
 		 .replaceAll("{config:queueMode}", (substring: string) => info.config.queueMode.toString() ?? "Fair")
 		 .replaceAll("{build}",info.build)
      .replaceAll('{anthropic:activeKeys}', (substring: string) => anthropic_info.claude?.activeKeys?.toString() ?? "0")
+	 .replaceAll('{anthropic:revokedKeys}', (substring: string) => anthropic_info.claude?.revokedKeys?.toString() ?? "0")
+	 .replaceAll('{anthropic:disabledKeys}', (substring: string) => anthropic_info.claude?.disabledKeys?.toString() ?? "0")
      .replaceAll('{anthropic:proomptersInQueue}', (substring: string) => anthropic_info.claude?.proomptersInQueue?.toString() ?? "0")
      .replaceAll('{anthropic:estimatedQueueTime}', (substring: string) => anthropic_info.claude?.estimatedQueueTime?.toString() ?? "No wait");
   infoPageLastUpdated = Date.now();
@@ -146,6 +148,7 @@ function getStatusJson(req: Request) {
 type ServiceInfo = {
   activeKeys: number;
   trialKeys?: number;
+  disabledKeys: number;
   // activeLimit: string;
   revokedKeys?: number;
   overQuotaKeys?: number;
@@ -254,7 +257,9 @@ function getOpenAIInfo() {
 function getAnthropicInfo() {
   const claudeInfo: Partial<ServiceInfo> = {};
   const keys = keyPool.list().filter((k) => k.service === "anthropic");
-  claudeInfo.activeKeys = keys.filter((k) => !k.isDisabled).length;
+  claudeInfo.activeKeys = keys.filter((k) => !k.isDisabled && !k.isRevoked).length;
+  claudeInfo.revokedKeys = keys.filter((k) => k.isRevoked).length;
+  claudeInfo.disabledKeys = keys.filter((k) => k.isDisabled).length;
   if (config.queueMode !== "none") {
     const queue = getQueueInformation("claude");
     claudeInfo.proomptersInQueue = queue.proomptersInQueue;
