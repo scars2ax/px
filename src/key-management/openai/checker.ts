@@ -14,8 +14,6 @@ const KEY_CHECK_PERIOD = 60 * 60 * 1000; // 1 hour
 const POST_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
 const GET_MODELS_URL = "https://api.openai.com/v1/models";
 const GET_ORGANIZATIONS_URL = "https://api.openai.com/v1/organizations";
-const GET_SUBSCRIPTION_URL =
-  "https://api.openai.com/dashboard/billing/subscription";
 
 type GetModelsResponse = {
   data: [{ id: string }];
