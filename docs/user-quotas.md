@@ -23,12 +23,12 @@ Set the `QUOTA_REFRESH_PERIOD` environment variable to one of the following valu
 - leave unset to disable automatic refreshing
 
 You can also use a cron expression, for example:
-- Every 45 seconds: `*/45 * * * * *`
-- Every 30 minutes: `*/30 * * * *`
-- Every 6 hours: `0 */6 * * *`
-- Every 3 days: `0 0 */3 * *`
-- Daily, but at mid-day: `0 12 * * *`
+- Every 45 seconds: `"*/45 * * * * *"`
+- Every 30 minutes: `"*/30 * * * *"`
+- Every 6 hours: `"0 */6 * * *"`
+- Every 3 days: `"0 0 */3 * *"`
+- Daily, but at mid-day: `"0 12 * * *"`
 
-All times are in the server's local time zone.
+Make sure to enclose the cron expression in quotation marks.
 
-Refer to [crontab.guru](https://crontab.guru/) for more examples.
+All times are in the server's local time zone. Refer to [crontab.guru](https://crontab.guru/) for more examples.
