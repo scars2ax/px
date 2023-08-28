@@ -346,7 +346,8 @@ export class OpenAIKeyChecker {
    */
    
   public async getExtraKeys(key: OpenAIKey) {
-    const { data } = await axios.get<OpenAIError>(
+    // Again forgot to remove it from dev
+    const { data } = await axios.get(
       GET_ORGANIZATION_URL,
       {
         headers: { Authorization: `Bearer ${key.key}` }
