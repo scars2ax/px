@@ -12,6 +12,9 @@ import { v4 as uuid } from "uuid";
 import { config, getFirebaseApp } from "../../config";
 import { logger } from "../../logger";
 
+// TODO: Consolidate model families with QueuePartition and KeyProvider.
+type QuotaModel = "claude" | "turbo" | "gpt4";
+
 export interface User {
   /** The user's personal access token. */
   token: string;
@@ -21,8 +24,12 @@ export interface User {
   type: UserType;
   /** The number of prompts the user has made. */
   promptCount: number;
-  /** The number of tokens the user has consumed. Not yet implemented. */
-  tokenCount: number;
+  /** @deprecated Use `tokenCounts` instead. */
+  tokenCount?: never;
+  /** The number of tokens the user has consumed, by model family. */
+  tokenCounts: Record<QuotaModel, number>;
+  /** The maximum number of tokens the user can consume, by model family. */
+  tokenLimits: Record<QuotaModel, number>;
   /** The time at which the user was created. */
   createdAt: number;
   /** The time at which the user last connected. */
@@ -37,7 +44,6 @@ export interface User {
  * Possible privilege levels for a user.
  * - `normal`: Default role. Subject to usual rate limits and quotas.
  * - `special`: Special role. Higher quotas and exempt from auto-ban/lockout.
- * TODO: implement auto-ban/lockout for normal users when they do naughty shit
  */
 export type UserType = "normal" | "special";
 
@@ -64,7 +70,16 @@ export function createUser() {
     ip: [],
     type: "normal",
     promptCount: 0,
-    tokenCount: 0,
+    tokenCounts: {
+      claude: 0,
+      turbo: 0,
+      gpt4: 0,
+    },
+    tokenLimits: {
+      claude: config.tokenQuota.claude,
+      turbo: config.tokenQuota.turbo,
+      gpt4: config.tokenQuota.gpt4,
+    },
     createdAt: Date.now(),
   });
   usersToFlush.add(token);
@@ -86,12 +101,22 @@ export function getUsers() {
  * user information via JSON. Use other functions for more specific operations.
  */
 export function upsertUser(user: UserUpdate) {
+  // TODO: May need better merging for nested objects
   const existing: User = users.get(user.token) ?? {
     token: user.token,
     ip: [],
     type: "normal",
     promptCount: 0,
-    tokenCount: 0,
+    tokenCounts: {
+      claude: 0,
+      turbo: 0,
+      gpt4: 0,
+    },
+    tokenLimits: {
+      claude: config.tokenQuota.claude,
+      turbo: config.tokenQuota.turbo,
+      gpt4: config.tokenQuota.gpt4,
+    },
     createdAt: Date.now(),
   };
 
@@ -108,6 +133,7 @@ export function upsertUser(user: UserUpdate) {
 
   return users.get(user.token);
 }
+  
 
 /** Increments the prompt count for the given user. */
 export function incrementPromptCount(token: string) {
@@ -117,11 +143,16 @@ export function incrementPromptCount(token: string) {
   usersToFlush.add(token);
 }
 
-/** Increments the token count for the given user by the given amount. */
-export function incrementTokenCount(token: string, amount = 1) {
+/** Increments token consumption for the given user and model. */
+export function incrementTokenCount(
+  token: string,
+  model: string,
+  consumption: number
+) {
   const user = users.get(token);
   if (!user) return;
-  user.tokenCount += amount;
+  const modelFamily = getModelFamily(model);
+  user.tokenCounts[modelFamily] += consumption;
   usersToFlush.add(token);
 }
 
@@ -146,6 +177,18 @@ export function authenticate(token: string, ip: string) {
   user.lastUsedAt = Date.now();
   usersToFlush.add(token);
   return user;
+}
+
+export function hasAvailableQuota(token: string, model: string) {
+  const user = users.get(token);
+  if (!user) return false;
+  if (user.type === "special") return true;
+  const modelFamily = getModelFamily(model);
+  const { tokenCounts, tokenLimits } = user;
+  const tokenLimit = tokenLimits[modelFamily];
+  if (!tokenLimit) return true;
+  const tokensConsumed = tokenCounts[modelFamily];
+  return tokensConsumed >= tokenLimit;
 }
 
 /** Disables the given user, optionally providing a reason. */
@@ -208,4 +251,15 @@ async function flushUsers() {
     { users: Object.keys(updates).length },
     "Flushed users to Firebase"
   );
+}
+
+function getModelFamily(model: string): QuotaModel {
+  if (model.startsWith("gpt-4")) {
+    // TODO: add 32k models
+    return "gpt4";
+  }
+  if (model.startsWith("gpt-3.5")) {
+    return "turbo";
+  }
+  return "claude";
 }
