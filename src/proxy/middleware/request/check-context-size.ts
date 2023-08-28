@@ -105,7 +105,7 @@ function assertRequestHasTokenCounts(
     outputTokens: z.number().int().min(1),
   })
     .nonstrict()
-    .parse(req);
+    .parse({ promptTokens: req.promptTokens, outputTokens: req.outputTokens });
 }
 
 /**
