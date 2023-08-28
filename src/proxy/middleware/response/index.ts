@@ -7,7 +7,10 @@ import { config } from "../../../config";
 import { logger } from "../../../logger";
 import { keyPool } from "../../../key-management";
 import { enqueue, trackWaitTime } from "../../queue";
-import { incrementPromptCount } from "../../auth/user-store";
+import {
+  incrementPromptCount,
+  incrementTokenCount,
+} from "../../auth/user-store";
 import { isCompletionRequest, writeErrorResponse } from "../common";
 import { handleStreamedResponse } from "./handle-streamed-response";
 import { logPrompt } from "./log-prompt";
@@ -84,12 +87,12 @@ export const createOnProxyResHandler = (apiMiddleware: ProxyResMiddleware) => {
       if (req.isStreaming) {
         // `handleStreamedResponse` writes to the response and ends it, so
         // we can only execute middleware that doesn't write to the response.
-        middlewareStack.push(trackRateLimit, incrementKeyUsage, logPrompt);
+        middlewareStack.push(trackRateLimit, incrementUsage, logPrompt);
       } else {
         middlewareStack.push(
           trackRateLimit,
           handleUpstreamErrors,
-          incrementKeyUsage,
+          incrementUsage,
           copyHttpHeaders,
           logPrompt,
           ...apiMiddleware
@@ -394,11 +397,14 @@ function handleOpenAIRateLimitError(
   return errorPayload;
 }
 
-const incrementKeyUsage: ProxyResHandlerWithBody = async (_proxyRes, req) => {
+const incrementUsage: ProxyResHandlerWithBody = async (_proxyRes, req) => {
   if (isCompletionRequest(req)) {
     keyPool.incrementPrompt(req.key!);
     if (req.user) {
       incrementPromptCount(req.user.token);
+      const model = req.body.model;
+      const tokensUsed = req.promptTokens! + req.outputTokens!;
+      incrementTokenCount(req.user.token, model, tokensUsed);
     }
   }
 };
