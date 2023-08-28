@@ -13,6 +13,7 @@ const KEY_CHECK_PERIOD = 60 * 60 * 1000; // 1 hour
 
 const POST_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
 const GET_MODELS_URL = "https://api.openai.com/v1/models";
+const GET_ORGANIZATIONS_URL = "https://api.openai.com/v1/organizations";
 const GET_SUBSCRIPTION_URL =
   "https://api.openai.com/dashboard/billing/subscription";
 
@@ -20,12 +21,8 @@ type GetModelsResponse = {
   data: [{ id: string }];
 };
 
-type GetSubscriptionResponse = {
-  plan: { title: string };
-  has_payment_method: boolean;
-  soft_limit_usd: number;
-  hard_limit_usd: number;
-  system_hard_limit_usd: number;
+type GetOrganizationsResponse = {
+  data: [{ id: string; is_default: boolean }];
 };
 
 type OpenAIError = {
@@ -131,17 +128,12 @@ export class OpenAIKeyChecker {
     try {
       // We only need to check for provisioned models on the initial check.
       if (isInitialCheck) {
-        const [/* subscription,*/ provisionedModels, livenessTest] =
-          await Promise.all([
-            // this.getSubscription(key),
-            this.getProvisionedModels(key),
-            this.testLiveness(key),
-          ]);
+        const [provisionedModels, livenessTest] = await Promise.all([
+          this.getProvisionedModels(key),
+          this.testLiveness(key),
+        ]);
         const updates = {
           isGpt4: provisionedModels.gpt4,
-          // softLimit: subscription.soft_limit_usd,
-          // hardLimit: subscription.hard_limit_usd,
-          // systemHardLimit: subscription.system_hard_limit_usd,
           isTrial: livenessTest.rateLimit <= 250,
           softLimit: 0,
           hardLimit: 0,
@@ -150,18 +142,8 @@ export class OpenAIKeyChecker {
         this.updateKey(key.hash, updates);
       } else {
         // Provisioned models don't change, so we don't need to check them again
-        const [/* subscription, */ _livenessTest] = await Promise.all([
-          // this.getSubscription(key),
-          this.testLiveness(key),
-        ]);
-        const updates = {
-          // softLimit: subscription.soft_limit_usd,
-          // hardLimit: subscription.hard_limit_usd,
-          // systemHardLimit: subscription.system_hard_limit_usd,
-          softLimit: 0,
-          hardLimit: 0,
-          systemHardLimit: 0,
-        };
+        const [_livenessTest] = await Promise.all([this.testLiveness(key)]);
+        const updates = { softLimit: 0, hardLimit: 0, systemHardLimit: 0 };
         this.updateKey(key.hash, updates);
       }
       this.log.info({ key: key.hash }, "Key check complete.");
@@ -198,20 +180,6 @@ export class OpenAIKeyChecker {
       lastChecked: keyFromPool.lastChecked,
     });
     return { turbo, gpt4 };
-  }
-
-  private async getSubscription(key: OpenAIKey) {
-    const { data } = await axios.get<GetSubscriptionResponse>(
-      GET_SUBSCRIPTION_URL,
-      { headers: { Authorization: `Bearer ${key.key}` } }
-    );
-    // See note above about updating the key's `lastChecked` timestamp.
-    const keyFromPool = this.keys.find((k) => k.hash === key.hash)!;
-    this.updateKey(key.hash, {
-      isTrial: !data.has_payment_method,
-      lastChecked: keyFromPool.lastChecked,
-    });
-    return data;
   }
 
   private handleAxiosError(key: OpenAIKey, error: AxiosError) {
