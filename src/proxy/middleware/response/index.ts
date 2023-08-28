@@ -3,7 +3,6 @@ import { Request, Response } from "express";
 import * as http from "http";
 import util from "util";
 import zlib from "zlib";
-import { config } from "../../../config";
 import { logger } from "../../../logger";
 import { keyPool } from "../../../key-management";
 import { enqueue, trackWaitTime } from "../../queue";
@@ -11,9 +10,14 @@ import {
   incrementPromptCount,
   incrementTokenCount,
 } from "../../auth/user-store";
-import { isCompletionRequest, writeErrorResponse } from "../common";
+import {
+  getCompletionForService,
+  isCompletionRequest,
+  writeErrorResponse,
+} from "../common";
 import { handleStreamedResponse } from "./handle-streamed-response";
 import { logPrompt } from "./log-prompt";
+import { countTokens } from "../../../tokenization";
 
 const DECODER_MAP = {
   gzip: util.promisify(zlib.gunzip),
@@ -87,9 +91,15 @@ export const createOnProxyResHandler = (apiMiddleware: ProxyResMiddleware) => {
       if (req.isStreaming) {
         // `handleStreamedResponse` writes to the response and ends it, so
         // we can only execute middleware that doesn't write to the response.
-        middlewareStack.push(trackRateLimit, incrementUsage, logPrompt);
+        middlewareStack.push(
+          countResponseTokens,
+          trackRateLimit,
+          incrementUsage,
+          logPrompt
+        );
       } else {
         middlewareStack.push(
+          countResponseTokens,
           trackRateLimit,
           handleUpstreamErrors,
           incrementUsage,
@@ -406,6 +416,44 @@ const incrementUsage: ProxyResHandlerWithBody = async (_proxyRes, req) => {
       const tokensUsed = req.promptTokens! + req.outputTokens!;
       incrementTokenCount(req.user.token, model, tokensUsed);
     }
+  }
+};
+
+const countResponseTokens: ProxyResHandlerWithBody = async (
+  _proxyRes,
+  req,
+  _res,
+  body
+) => {
+  // This function is prone to breaking if the upstream API makes even minor
+  // changes to the response format, especially for SSE responses. If you're
+  // seeing errors in this function, check the reassembled response body from
+  // handleStreamedResponse to see if the upstream API has changed.
+  try {
+    if (typeof body !== "object") {
+      throw new Error("Expected body to be an object");
+    }
+
+    const service = req.outboundApi;
+    const { completion } = getCompletionForService({ service, body });
+    const tokens = await countTokens({ req, completion, service });
+
+    req.log.debug(
+      { service, tokens, prevOutputTokens: req.outputTokens },
+      `Counted tokens for completion`
+    );
+    if (req.debug) {
+      req.debug.completion_tokens = tokens;
+    }
+
+    req.outputTokens = tokens.token_count;
+  } catch (error) {
+    req.log.error(
+      error,
+      "Error while counting completion tokens; assuming `max_output_tokens`"
+    );
+    // req.outputTokens will already be set to `max_output_tokens` from the
+    // prompt counting middleware, so we don't need to do anything here.
   }
 };
 

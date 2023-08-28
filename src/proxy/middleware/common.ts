@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import httpProxy from "http-proxy";
 import { ZodError } from "zod";
+import { AIService } from "../../key-management";
 
 const OPENAI_CHAT_COMPLETION_ENDPOINT = "/v1/chat/completions";
 const ANTHROPIC_COMPLETION_ENDPOINT = "/v1/complete";
@@ -140,4 +141,18 @@ export function buildFakeSseMessage(
     };
   }
   return `data: ${JSON.stringify(fakeEvent)}\n\n`;
+}
+
+export function getCompletionForService({
+  service,
+  body,
+}: {
+  service: AIService;
+  body: Record<string, any>;
+}): { completion: string; model: string } {
+  if (service === "anthropic") {
+    return { completion: body.completion.trim(), model: body.model };
+  } else {
+    return { completion: body.choices[0].message.content, model: body.model };
+  }
 }
