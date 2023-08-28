@@ -72,6 +72,12 @@ export async function init() {
         "Token quotas refreshed."
       );
     });
+
+    if (!quotaRefreshJob) {
+      throw new Error(
+        "Unable to schedule quota refresh. Is QUOTA_REFRESH_PERIOD set correctly?"
+      );
+    }
     log.debug(
       { nextRefresh: quotaRefreshJob.nextInvocation() },
       "Scheduled token quota refresh."
@@ -184,10 +190,12 @@ export function hasAvailableQuota(token: string, model: string) {
   const user = users.get(token);
   if (!user) return false;
   if (user.type === "special") return true;
+
   const modelFamily = getModelFamily(model);
   const { tokenCounts, tokenLimits } = user;
   const tokenLimit = tokenLimits[modelFamily];
   if (!tokenLimit) return true;
+
   const tokensConsumed = tokenCounts[modelFamily];
   return tokensConsumed >= tokenLimit;
 }
