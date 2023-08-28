@@ -94,7 +94,7 @@ export function createUser() {
     ip: [],
     type: "normal",
     promptCount: 0,
-    tokenCounts: { claude: 0, turbo: 0, gpt4: 0 },
+    tokenCounts: { turbo: 0, gpt4: 0, claude: 0 },
     tokenLimits: { ...config.tokenQuota },
     createdAt: Date.now(),
   });
@@ -123,7 +123,7 @@ export function upsertUser(user: UserUpdate) {
     ip: [],
     type: "normal",
     promptCount: 0,
-    tokenCounts: { claude: 0, turbo: 0, gpt4: 0 },
+    tokenCounts: { turbo: 0, gpt4: 0, claude: 0 },
     tokenLimits: { ...config.tokenQuota },
     createdAt: Date.now(),
   };
@@ -186,7 +186,11 @@ export function authenticate(token: string, ip: string) {
   return user;
 }
 
-export function hasAvailableQuota(token: string, model: string) {
+export function hasAvailableQuota(
+  token: string,
+  model: string,
+  requested: number
+) {
   const user = users.get(token);
   if (!user) return false;
   if (user.type === "special") return true;
@@ -194,10 +198,17 @@ export function hasAvailableQuota(token: string, model: string) {
   const modelFamily = getModelFamily(model);
   const { tokenCounts, tokenLimits } = user;
   const tokenLimit = tokenLimits[modelFamily];
+
   if (!tokenLimit) return true;
 
-  const tokensConsumed = tokenCounts[modelFamily];
-  return tokensConsumed >= tokenLimit;
+  const tokensConsumed = tokenCounts[modelFamily] + requested;
+  console.log({
+    tokenCounts,
+    modelFamily,
+    tokenLimit,
+    requested,
+  });
+  return tokensConsumed < tokenLimit;
 }
 
 export function refreshQuota(token: string) {

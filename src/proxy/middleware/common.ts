@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import httpProxy from "http-proxy";
 import { ZodError } from "zod";
 import { AIService } from "../../key-management";
+import { QuotaExceededError } from "./request/apply-quota-limits";
 
 const OPENAI_CHAT_COMPLETION_ENDPOINT = "/v1/chat/completions";
 const ANTHROPIC_COMPLETION_ENDPOINT = "/v1/complete";
@@ -64,9 +65,7 @@ export const handleInternalError = (
   res: Response
 ) => {
   try {
-    const isZod = err instanceof ZodError;
-    const isForbidden = err.name === "ForbiddenError";
-    if (isZod) {
+    if (err instanceof ZodError) {
       writeErrorResponse(req, res, 400, {
         error: {
           type: "proxy_validation_error",
@@ -76,7 +75,7 @@ export const handleInternalError = (
           message: err.message,
         },
       });
-    } else if (isForbidden) {
+    } else if (err.name === "ForbiddenError") {
       // Spoofs a vaguely threatening OpenAI error message. Only invoked by the
       // block-zoomers rewriter to scare off tiktokers.
       writeErrorResponse(req, res, 403, {
@@ -85,6 +84,16 @@ export const handleInternalError = (
           code: "policy_violation",
           param: null,
           message: err.message,
+        },
+      });
+    } else if (err instanceof QuotaExceededError) {
+      writeErrorResponse(req, res, 429, {
+        error: {
+          type: "proxy_quota_exceeded",
+          code: "quota_exceeded",
+          message: `You've exceeded your token quota for this model type.`,
+          info: err.quotaInfo,
+          stack: err.stack,
         },
       });
     } else {

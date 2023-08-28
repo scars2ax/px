@@ -108,7 +108,7 @@ const anthropicResponseHandler: ProxyResHandlerWithBody = async (
 
   if (req.inboundApi === "openai") {
     req.log.info("Transforming Anthropic response to OpenAI format");
-    body = transformAnthropicResponse(body);
+    body = transformAnthropicResponse(body, req);
   }
 
   // TODO: Remove once tokenization is stable
@@ -126,17 +126,19 @@ const anthropicResponseHandler: ProxyResHandlerWithBody = async (
  * on-the-fly.
  */
 function transformAnthropicResponse(
-  anthropicBody: Record<string, any>
+  anthropicBody: Record<string, any>,
+  req: Request
 ): Record<string, any> {
+  const totalTokens = (req.promptTokens ?? 0) + (req.outputTokens ?? 0);
   return {
     id: "ant-" + anthropicBody.log_id,
     object: "chat.completion",
     created: Date.now(),
     model: anthropicBody.model,
     usage: {
-      prompt_tokens: 0,
-      completion_tokens: 0,
-      total_tokens: 0,
+      prompt_tokens: req.promptTokens,
+      completion_tokens: req.outputTokens,
+      total_tokens: totalTokens,
     },
     choices: [
       {

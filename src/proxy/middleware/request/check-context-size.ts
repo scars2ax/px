@@ -95,6 +95,7 @@ function validateContextSize(req: Request) {
   req.debug.prompt_tokens = promptTokens;
   req.debug.max_model_tokens = modelMax;
   req.debug.max_proxy_tokens = proxyMax;
+  req.debug.completion_tokens = outputTokens;
 }
 
 function assertRequestHasTokenCounts(

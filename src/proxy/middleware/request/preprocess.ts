@@ -2,6 +2,7 @@ import { RequestHandler } from "express";
 import { handleInternalError } from "../common";
 import {
   RequestPreprocessor,
+  applyQuotaLimits,
   checkContextSize,
   setApiFormat,
   transformOutboundPayload,
@@ -19,6 +20,7 @@ export const createPreprocessorMiddleware = (
     setApiFormat(apiFormat),
     transformOutboundPayload,
     checkContextSize,
+    applyQuotaLimits,
     ...(additionalPreprocessors ?? []),
   ];
 
