@@ -279,10 +279,10 @@ export const OMITTED_KEYS: (keyof Config)[] = [
 
 const getKeys = Object.keys as <T extends object>(obj: T) => Array<keyof T>;
 
-export function listConfig(): Record<string, string> {
-  const result: Record<string, string> = {};
-  for (const key of getKeys(config)) {
-    const value = config[key]?.toString() || "";
+export function listConfig(obj: Config = config): Record<string, any> {
+  const result: Record<string, any> = {};
+  for (const key of getKeys(obj)) {
+    const value = obj[key]?.toString() || "";
 
     const shouldOmit =
       OMITTED_KEYS.includes(key) || value === "" || value === "undefined";
@@ -296,6 +296,10 @@ export function listConfig(): Record<string, string> {
       result[key] = "********";
     } else {
       result[key] = value;
+    }
+
+    if (typeof obj[key] === "object") {
+      result[key] = listConfig(obj[key] as unknown as Config);
     }
   }
   return result;
