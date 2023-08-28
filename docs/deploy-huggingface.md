@@ -82,8 +82,6 @@ MAX_OUTPUT_TOKENS_ANTHROPIC=512
 # Block prompts containing disallowed characters
 REJECT_DISALLOWED=false
 REJECT_MESSAGE="This content violates /aicg/'s acceptable use policy."
-# Show exact quota usage on the Server Info page
-QUOTA_DISPLAY_MODE=full
 ```
 
 See `.env.example` for a full list of available settings, or check `config.ts` for details on what each setting does.
