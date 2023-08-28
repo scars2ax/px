@@ -1,7 +1,7 @@
 import { Request } from "express";
 import { z } from "zod";
 import { config } from "../../../config";
-import { countTokens } from "../../../tokenization";
+import { OpenAIPromptMessage, countTokens } from "../../../tokenization";
 import { RequestPreprocessor } from ".";
 
 const CLAUDE_MAX_CONTEXT = config.maxContextTokensAnthropic;
@@ -15,22 +15,26 @@ const OPENAI_MAX_CONTEXT = config.maxContextTokensOpenAI;
  * request body.
  */
 export const checkContextSize: RequestPreprocessor = async (req) => {
-  let prompt;
+  const service = req.outboundApi;
+  let result;
 
-  switch (req.outboundApi) {
-    case "openai":
+  switch (service) {
+    case "openai": {
       req.outputTokens = req.body.max_tokens;
-      prompt = req.body.messages;
+      const prompt: OpenAIPromptMessage[] = req.body.messages;
+      result = await countTokens({ req, prompt, service });
       break;
-    case "anthropic":
+    }
+    case "anthropic": {
       req.outputTokens = req.body.max_tokens_to_sample;
-      prompt = req.body.prompt;
+      const prompt: string = req.body.prompt;
+      result = await countTokens({ req, prompt, service });
       break;
+    }
     default:
       throw new Error(`Unknown outbound API: ${req.outboundApi}`);
   }
 
-  const result = await countTokens({ req, prompt, service: req.outboundApi });
   req.promptTokens = result.token_count;
 
   // TODO: Remove once token counting is stable
