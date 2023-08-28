@@ -8,6 +8,7 @@ import { ipLimiter } from "./rate-limit";
 import { handleProxyError } from "./middleware/common";
 import {
   addKey,
+  applyQuotaLimits,
   addAnthropicPreamble,
   blockZoomerOrigins,
   createPreprocessorMiddleware,
@@ -72,6 +73,7 @@ const rewriteAnthropicRequest = (
   res: http.ServerResponse
 ) => {
   const rewriterPipeline = [
+    applyQuotaLimits,
     addKey,
     addAnthropicPreamble,
     languageFilter,

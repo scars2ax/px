@@ -202,12 +202,6 @@ export function hasAvailableQuota(
   if (!tokenLimit) return true;
 
   const tokensConsumed = tokenCounts[modelFamily] + requested;
-  console.log({
-    tokenCounts,
-    modelFamily,
-    tokenLimit,
-    requested,
-  });
   return tokensConsumed < tokenLimit;
 }
 

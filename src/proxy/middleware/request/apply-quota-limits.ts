@@ -1,6 +1,6 @@
 import { hasAvailableQuota } from "../../auth/user-store";
 import { isCompletionRequest } from "../common";
-import { RequestPreprocessor } from ".";
+import { ProxyRequestMiddleware } from ".";
 
 export class QuotaExceededError extends Error {
   public quotaInfo: any;
@@ -11,7 +11,7 @@ export class QuotaExceededError extends Error {
   }
 }
 
-export const applyQuotaLimits: RequestPreprocessor = (req) => {
+export const applyQuotaLimits: ProxyRequestMiddleware = (_proxyReq, req) => {
   if (!isCompletionRequest(req) || !req.user) {
     return;
   }
