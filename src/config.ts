@@ -117,14 +117,30 @@ type Config = {
    * prevent excessive spend.  Applies only to OpenAI.
    */
   turboOnly?: boolean;
+  /**
+   * The number of (LLM) tokens a user can consume before requests are rejected.
+   * Limits include both prompt and response tokens. `special` users are exempt.
+   * Defaults to 0, which means no limit.
+   *
+   * Note: Changes are not automatically applied to existing users. Use the
+   * admin API or UI to update existing users, or use the QUOTA_REFRESH_PERIOD
+   * setting to periodically set all users' quotas to these values.
+   */
   tokenQuota: {
-    /** Token limit for GPT-3.5 Turbo models. */
+    /** Token allowance for GPT-3.5 Turbo models. */
     turbo: number;
-    /** Token limit for GPT-4 models. */
+    /** Token allowance for GPT-4 models. */
     gpt4: number;
-    /** Token limit for Claude models. */
+    /** Token allowance for Claude models. */
     claude: number;
   };
+  /**
+   * The period over which to enforce token quotas. Quotas will be fully reset
+   * at the start of each period, server time. Unused quota does not roll over.
+   * Defaults to `manual`, which means quotas are never automatically reset.
+   * You can also provide a cron expression for a custom schedule.
+   */
+  quotaRefreshPeriod: "manual" | "hourly" | "daily" | string;
 };
 
 // To change configs, create a file called .env in the root directory.
@@ -180,6 +196,7 @@ export const config: Config = {
     gpt4: getEnvWithDefault("TOKEN_QUOTA_GPT4", 0),
     claude: getEnvWithDefault("TOKEN_QUOTA_CLAUDE", 0),
   },
+  quotaRefreshPeriod: getEnvWithDefault("QUOTA_REFRESH_PERIOD", "manual"),
 } as const;
 
 export async function assertConfigIsValid() {

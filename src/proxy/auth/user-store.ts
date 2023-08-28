@@ -8,9 +8,12 @@
  */
 
 import admin from "firebase-admin";
+import schedule from "node-schedule";
 import { v4 as uuid } from "uuid";
 import { config, getFirebaseApp } from "../../config";
 import { logger } from "../../logger";
+
+const log = logger.child({ module: "users" });
 
 // TODO: Consolidate model families with QueuePartition and KeyProvider.
 type QuotaModel = "claude" | "turbo" | "gpt4";
@@ -55,11 +58,26 @@ const users: Map<string, User> = new Map();
 const usersToFlush = new Set<string>();
 
 export async function init() {
-  logger.info({ store: config.gatekeeperStore }, "Initializing user store...");
+  log.info({ store: config.gatekeeperStore }, "Initializing user store...");
   if (config.gatekeeperStore === "firebase_rtdb") {
     await initFirebase();
   }
-  logger.info("User store initialized.");
+  if (config.quotaRefreshPeriod !== "manual") {
+    const quotaRefreshJob = schedule.scheduleJob(getRefreshSchedule(), () => {
+      for (const user of users.values()) {
+        refreshQuota(user.token);
+      }
+      log.info(
+        { users: users.size, nextRefresh: quotaRefreshJob.nextInvocation() },
+        "Token quotas refreshed."
+      );
+    });
+    log.debug(
+      { nextRefresh: quotaRefreshJob.nextInvocation() },
+      "Scheduled token quota refresh."
+    );
+  }
+  log.info("User store initialized.");
 }
 
 /** Creates a new user and returns their token. */
@@ -133,7 +151,6 @@ export function upsertUser(user: UserUpdate) {
 
   return users.get(user.token);
 }
-  
 
 /** Increments the prompt count for the given user. */
 export function incrementPromptCount(token: string) {
@@ -191,6 +208,17 @@ export function hasAvailableQuota(token: string, model: string) {
   return tokensConsumed >= tokenLimit;
 }
 
+export function refreshQuota(token: string) {
+  const user = users.get(token);
+  if (!user) return;
+  const { tokenCounts, tokenLimits } = user;
+  const quotas = Object.entries(config.tokenQuota) as [QuotaModel, number][];
+  quotas.forEach(
+    ([model, quota]) => (tokenLimits[model] = tokenCounts[model] + quota)
+  );
+  usersToFlush.add(token);
+}
+
 /** Disables the given user, optionally providing a reason. */
 export function disableUser(token: string, reason?: string) {
   const user = users.get(token);
@@ -206,7 +234,7 @@ export function disableUser(token: string, reason?: string) {
 let firebaseTimeout: NodeJS.Timeout | undefined;
 
 async function initFirebase() {
-  logger.info("Connecting to Firebase...");
+  log.info("Connecting to Firebase...");
   const app = getFirebaseApp();
   const db = admin.database(app);
   const usersRef = db.ref("users");
@@ -214,7 +242,7 @@ async function initFirebase() {
   const users: Record<string, User> | null = snapshot.val();
   firebaseTimeout = setInterval(flushUsers, 20 * 1000);
   if (!users) {
-    logger.info("No users found in Firebase.");
+    log.info("No users found in Firebase.");
     return;
   }
   for (const token in users) {
@@ -222,7 +250,7 @@ async function initFirebase() {
   }
   usersToFlush.clear();
   const numUsers = Object.keys(users).length;
-  logger.info({ users: numUsers }, "Loaded users from Firebase");
+  log.info({ users: numUsers }, "Loaded users from Firebase");
 }
 
 async function flushUsers() {
@@ -247,10 +275,7 @@ async function flushUsers() {
   }
 
   await usersRef.update(updates);
-  logger.info(
-    { users: Object.keys(updates).length },
-    "Flushed users to Firebase"
-  );
+  log.info({ users: Object.keys(updates).length }, "Flushed users to Firebase");
 }
 
 function getModelFamily(model: string): QuotaModel {
@@ -262,4 +287,15 @@ function getModelFamily(model: string): QuotaModel {
     return "turbo";
   }
   return "claude";
+}
+
+function getRefreshSchedule() {
+  switch (config.quotaRefreshPeriod) {
+    case "hourly":
+      return "0 * * * *";
+    case "daily":
+      return "0 0 * * *";
+    default:
+      return config.quotaRefreshPeriod;
+  }
 }
