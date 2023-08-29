@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 import type firebase from "firebase-admin";
 import pino from "pino";
+import type { ModelFamily } from "./key-management/models";
 dotenv.config();
 
 // Can't import the usual logger here because it itself needs the config.
@@ -115,8 +116,11 @@ type Config = {
   /**
    * Whether the proxy should disallow requests for GPT-4 models in order to
    * prevent excessive spend.  Applies only to OpenAI.
+   * @deprecated Use `allowedModelFamilies` instead.
    */
   turboOnly?: boolean;
+  /** Which model families to allow requests for. Applies only to OpenAI. */
+  allowedModelFamilies: ModelFamily[];
   /**
    * The number of (LLM) tokens a user can consume before requests are rejected.
    * Limits include both prompt and response tokens. `special` users are exempt.
@@ -170,6 +174,11 @@ export const config: Config = {
     ["MAX_OUTPUT_TOKENS_ANTHROPIC", "MAX_OUTPUT_TOKENS"],
     400
   ),
+  allowedModelFamilies: getEnvWithDefault("ALLOWED_MODEL_FAMILIES", [
+    "turbo",
+    "gpt4",
+    "claude",
+  ]),
   rejectDisallowed: getEnvWithDefault("REJECT_DISALLOWED", false),
   rejectMessage: getEnvWithDefault(
     "REJECT_MESSAGE",
@@ -200,6 +209,15 @@ export const config: Config = {
 } as const;
 
 export async function assertConfigIsValid() {
+  if (config.turboOnly) {
+    startupLogger.warn(
+      "TURBO_ONLY is deprecated. Use ALLOWED_MODEL_FAMILIES=turbo instead."
+    );
+    config.allowedModelFamilies = config.allowedModelFamilies.filter(
+      (f) => !f.includes("gpt4")
+    );
+  }
+
   if (!["none", "proxy_key", "user_token"].includes(config.gatekeeper)) {
     throw new Error(
       `Invalid gatekeeper mode: ${config.gatekeeper}. Must be one of: none, proxy_key, user_token.`
@@ -320,6 +338,13 @@ function getEnvWithDefault<T>(env: string | string[], defaultValue: T): T {
     if (env === "OPENAI_KEY" || env === "ANTHROPIC_KEY") {
       return value as unknown as T;
     }
+
+    // Intended to be used for comma-delimited lists
+    if (defaultValue instanceof Array) {
+      const split = value.split(",");
+      return split.map((v) => JSON.parse(v)) as T;
+    }
+
     return JSON.parse(value) as T;
   } catch (err) {
     return value as unknown as T;

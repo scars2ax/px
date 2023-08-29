@@ -2,7 +2,11 @@ import { RequestHandler, Request, Router } from "express";
 import * as http from "http";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import { config } from "../config";
-import { keyPool } from "../key-management";
+import {
+  OpenAIModelFamily,
+  getOpenAIModelFamily,
+  keyPool,
+} from "../key-management";
 import { logger } from "../logger";
 import { createQueueMiddleware } from "./queue";
 import { ipLimiter } from "./rate-limit";
@@ -31,25 +35,29 @@ function getModelsResponse() {
   }
 
   // https://platform.openai.com/docs/models/overview
-  const gptVariants = [
+  const knownModels = [
     "gpt-4",
     "gpt-4-0613",
-    "gpt-4-0314", // EOL 2023-09-13
+    "gpt-4-0314", // EOL 2024-06-13
     "gpt-4-32k",
     "gpt-4-32k-0613",
-    "gpt-4-32k-0314", // EOL 2023-09-13
+    "gpt-4-32k-0314", // EOL 2024-06-13
     "gpt-3.5-turbo",
-    "gpt-3.5-turbo-0301", // EOL 2023-09-13
+    "gpt-3.5-turbo-0301", // EOL 2024-06-13
     "gpt-3.5-turbo-0613",
     "gpt-3.5-turbo-16k",
     "gpt-3.5-turbo-16k-0613",
   ];
 
-  const gpt4Available = keyPool.list().filter((key) => {
-    return key.service === "openai" && !key.isDisabled && key.isGpt4;
-  }).length;
+  const availableModelFamilies = new Set<OpenAIModelFamily>();
+  for (const key of keyPool.list()) {
+    if (key.isDisabled || key.service !== "openai") continue;
+    key.modelFamilies.forEach((family) =>
+      availableModelFamilies.add(family as OpenAIModelFamily)
+    );
+  }
 
-  const models = gptVariants
+  const models = knownModels
     .map((id) => ({
       id,
       object: "model",
@@ -69,10 +77,7 @@ function getModelsResponse() {
       parent: null,
     }))
     .filter((model) => {
-      if (model.id.startsWith("gpt-4")) {
-        return gpt4Available > 0;
-      }
-      return true;
+      return getOpenAIModelFamily(model.id) in availableModelFamilies;
     });
 
   modelsCache = { object: "list", data: models };

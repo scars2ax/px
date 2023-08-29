@@ -9,8 +9,9 @@ import { KeyProvider, Key, Model } from "../index";
 import { config } from "../../config";
 import { logger } from "../../logger";
 import { OpenAIKeyChecker } from "./checker";
+import { OpenAIModelFamily, getOpenAIModelFamily } from "../models";
 
-export type OpenAIModel = "gpt-3.5-turbo" | "gpt-4";
+export type OpenAIModel = "gpt-3.5-turbo" | "gpt-4" | "gpt-4-32k";
 export const OPENAI_SUPPORTED_MODELS: readonly OpenAIModel[] = [
   "gpt-3.5-turbo",
   "gpt-4",
@@ -18,6 +19,7 @@ export const OPENAI_SUPPORTED_MODELS: readonly OpenAIModel[] = [
 
 export interface OpenAIKey extends Key {
   readonly service: "openai";
+  modelFamilies: OpenAIModelFamily[];
   /**
    * Some keys are assigned to multiple organizations, each with their own quota
    * limits. We clone the key for each organization and track usage/disabled
@@ -85,7 +87,7 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
       const newKey = {
         key: k,
         service: "openai" as const,
-        isGpt4: true,
+        modelFamilies: ["turbo" as const, "gpt4" as const],
         isTrial: false,
         isDisabled: false,
         isRevoked: false,
@@ -134,21 +136,19 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
   }
 
   public get(model: Model) {
-    const needGpt4 = model.startsWith("gpt-4");
+    const neededFamily = getOpenAIModelFamily(model);
     const availableKeys = this.keys.filter(
-      (key) => !key.isDisabled && (!needGpt4 || key.isGpt4)
+      (key) => !key.isDisabled && key.modelFamilies.includes(neededFamily)
     );
+
     if (availableKeys.length === 0) {
-      let message = needGpt4
-        ? "No GPT-4 keys available.  Try selecting a Turbo model."
-        : "No active OpenAI keys available.";
-      throw new Error(message);
+      throw new Error(
+        `No active keys available for model family ${neededFamily}.`
+      );
     }
 
-    if (needGpt4 && config.turboOnly) {
-      throw new Error(
-        "Proxy operator has disabled GPT-4 to reduce quota usage.  Try selecting a Turbo model."
-      );
+    if (!config.allowedModelFamilies.includes(neededFamily)) {
+      throw new Error("Proxy operator has disabled access to this model.");
     }
 
     // Select a key, from highest priority to lowest priority:
@@ -243,9 +243,9 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
    * the request, or returns 0 if a key is ready immediately.
    */
   public getLockoutPeriod(model: Model = "gpt-4"): number {
-    const needGpt4 = model.startsWith("gpt-4");
+    const neededFamily = getOpenAIModelFamily(model);
     const activeKeys = this.keys.filter(
-      (key) => !key.isDisabled && (!needGpt4 || key.isGpt4)
+      (key) => !key.isDisabled && key.modelFamilies.includes(neededFamily)
     );
 
     if (activeKeys.length === 0) {
