@@ -299,7 +299,7 @@ const handleUpstreamErrors: ProxyResHandlerWithBody = async (
       if (errorPayload.error?.code === "model_not_found") {
         const requestedModel = req.body.model;
         const modelFamily = getOpenAIModelFamily(requestedModel);
-        errorPayload.proxy_note = `The key assigned to this request does not support the requested model (${requestedModel}, family: ${modelFamily}).`;
+        errorPayload.proxy_note = `The key assigned to your prompt does not support the requested model (${requestedModel}, family: ${modelFamily}).`;
         req.log.error(
           { key: req.key?.hash, model: requestedModel, modelFamily },
           "Prompt was routed to a key that does not support the requested model."

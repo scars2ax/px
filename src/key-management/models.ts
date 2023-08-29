@@ -17,7 +17,8 @@ export function getOpenAIModelFamily(model: string): OpenAIModelFamily {
   for (const [regex, family] of Object.entries(OPENAI_MODEL_FAMILY_MAP)) {
     if (model.match(regex)) return family;
   }
-  logger.warn({ model }, "Unmapped model family");
+  const stack = new Error().stack;
+  logger.warn({ model, stack }, "Unmapped model family");
   return "gpt4";
 }
 
