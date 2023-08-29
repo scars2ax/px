@@ -150,7 +150,10 @@ export class OpenAIKeyChecker {
         const updates = { softLimit: 0, hardLimit: 0, systemHardLimit: 0 };
         this.updateKey(key.hash, updates);
       }
-      this.log.info({ key: key.hash }, "Key check complete.");
+      this.log.info(
+        { key: key.hash, models: key.modelFamilies },
+        "Key check complete."
+      );
     } catch (error) {
       // touch the key so we don't check it again for a while
       this.updateKey(key.hash, {});
