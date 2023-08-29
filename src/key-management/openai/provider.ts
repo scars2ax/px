@@ -142,13 +142,13 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
     );
 
     if (availableKeys.length === 0) {
-      throw new Error(
-        `No active keys available for model family ${neededFamily}.`
-      );
+      throw new Error(`No active keys available for ${neededFamily} models.`);
     }
 
     if (!config.allowedModelFamilies.includes(neededFamily)) {
-      throw new Error("Proxy operator has disabled access to this model.");
+      throw new Error(
+        `Proxy operator has disabled access to ${neededFamily} models.`
+      );
     }
 
     // Select a key, from highest priority to lowest priority:
