@@ -6,7 +6,7 @@ export type ModelFamily = OpenAIModelFamily | AnthropicModelFamily;
 export type ModelFamilyMap = { [regex: string]: ModelFamily };
 
 export const OPENAI_MODEL_FAMILY_MAP: { [regex: string]: OpenAIModelFamily } = {
-  "^gpt-4-\\d{4}-32k$": "gpt4-32k",
+  "^gpt-4-32k-\\d{4}$": "gpt4-32k",
   "^gpt-4-32k$": "gpt4-32k",
   "^gpt-4-\\d{4}$": "gpt4",
   "^gpt-4$": "gpt4",

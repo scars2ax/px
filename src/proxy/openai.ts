@@ -3,6 +3,7 @@ import * as http from "http";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import { config } from "../config";
 import {
+  ModelFamily,
   OpenAIModelFamily,
   getOpenAIModelFamily,
   keyPool,
@@ -49,13 +50,17 @@ function getModelsResponse() {
     "gpt-3.5-turbo-16k-0613",
   ];
 
-  const availableModelFamilies = new Set<OpenAIModelFamily>();
+  let available = new Set<OpenAIModelFamily>();
   for (const key of keyPool.list()) {
     if (key.isDisabled || key.service !== "openai") continue;
     key.modelFamilies.forEach((family) =>
-      availableModelFamilies.add(family as OpenAIModelFamily)
+      available.add(family as OpenAIModelFamily)
     );
   }
+  const allowed = new Set<ModelFamily>(config.allowedModelFamilies);
+  available = new Set([...available].filter((x) => allowed.has(x)));
+
+  console.log(available);
 
   const models = knownModels
     .map((id) => ({
@@ -76,9 +81,7 @@ function getModelsResponse() {
       root: id,
       parent: null,
     }))
-    .filter((model) => {
-      return getOpenAIModelFamily(model.id) in availableModelFamilies;
-    });
+    .filter((model) => available.has(getOpenAIModelFamily(model.id)));
 
   modelsCache = { object: "list", data: models };
   modelsCacheTime = new Date().getTime();
