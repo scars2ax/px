@@ -7,7 +7,7 @@ declare global {
     interface Request {
       key?: Key;
       /** Denotes the format of the user's submitted request. */
-      inboundApi: AIService | "kobold";
+      inboundApi: AIService;
       /** Denotes the format of the request being proxied to the API. */
       outboundApi: AIService;
       /** If the request comes from a RisuAI.xyz user, this is their token. */

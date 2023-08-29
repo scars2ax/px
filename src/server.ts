@@ -26,7 +26,7 @@ app.use(
     logger,
     autoLogging: {
       ignore: (req) => {
-        const ignored = ["/proxy/kobold/api/v1/model", "/health"];
+        const ignored = ["/health"];
         return ignored.includes(req.url as string);
       },
     },

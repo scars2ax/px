@@ -17,7 +17,6 @@ export { finalizeBody } from "./finalize-body";
 export { languageFilter } from "./language-filter";
 export { limitCompletions } from "./limit-completions";
 export { removeOriginHeaders } from "./remove-origin-headers";
-export { transformKoboldPayload } from "./transform-kobold-payload";
 
 /**
  * Middleware that runs prior to the request being handled by http-proxy-
