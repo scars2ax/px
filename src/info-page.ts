@@ -91,29 +91,23 @@ type ServiceInfo = {
  */
 function getOpenAIInfo() {
   const info: { [model: string]: Partial<ServiceInfo> } = {};
-  const allowedFamilies = new Set(config.allowedModelFamilies);
-  let availableFamilies = new Set<OpenAIModelFamily>();
+  const allowed = new Set(config.allowedModelFamilies);
+  let available = new Set<OpenAIModelFamily>();
 
   const keys = keyPool.list().filter((k) => {
-    // doing this in `filter` to try to reduce the insane number of times we
-    // are iterating over the key list
     if (k.service === "openai") {
-      k.modelFamilies.forEach((family) =>
-        availableFamilies.add(family as OpenAIModelFamily)
-      );
+      k.modelFamilies.forEach((f) => available.add(f as OpenAIModelFamily));
       return true;
     }
     return false;
-  }) as OpenAIKey[];
+  }) as Omit<OpenAIKey, "key">[];
 
-  availableFamilies = new Set(
-    [...availableFamilies].filter((f) => allowedFamilies.has(f))
-  );
+  available = new Set([...available].filter((f) => allowed.has(f)));
 
   if (keyPool.anyUnchecked()) {
     const uncheckedKeys = keys.filter((k) => !k.lastChecked);
     info.status =
-      `Performing startup key checks (${uncheckedKeys.length} left).` as any;
+      `Performing key checks (${uncheckedKeys.length} left).` as any;
   } else {
     delete info.status;
   }
@@ -121,10 +115,12 @@ function getOpenAIInfo() {
   if (config.checkKeys) {
     const keysByModel = keys.reduce(
       (acc, k) => {
-        // only put keys in the most important family they belong to
-        if (k.modelFamilies.includes("gpt4-32k")) {
+        // only put keys in the most important family they belong to.
+        // if a model family is disabled, key will be in the next most
+        // important family.
+        if (k.modelFamilies.includes("gpt4-32k") && allowed.has("gpt4-32k")) {
           acc["gpt4-32k"].push(k);
-        } else if (k.modelFamilies.includes("gpt4")) {
+        } else if (k.modelFamilies.includes("gpt4") && allowed.has("gpt4")) {
           acc["gpt4"].push(k);
         } else {
           acc["turbo"].push(k);
@@ -133,7 +129,7 @@ function getOpenAIInfo() {
       },
       { turbo: [], gpt4: [], "gpt4-32k": [] } as Record<
         OpenAIModelFamily,
-        OpenAIKey[]
+        Omit<OpenAIKey, "key">[]
       >
     );
 
@@ -150,7 +146,7 @@ function getOpenAIInfo() {
       overQuotaKeys: turboKeys.filter((k) => k.isOverQuota).length,
     };
 
-    if (availableFamilies.has("gpt4")) {
+    if (available.has("gpt4")) {
       info.gpt4 = {
         activeKeys: gpt4Keys.filter((k) => !k.isDisabled).length,
         trialKeys: gpt4Keys.filter((k) => k.isTrial).length,
@@ -159,7 +155,7 @@ function getOpenAIInfo() {
       };
     }
 
-    if (availableFamilies.has("gpt4-32k")) {
+    if (available.has("gpt4-32k")) {
       info["gpt4-32k"] = {
         activeKeys: gpt432kKeys.filter((k) => !k.isDisabled).length,
         trialKeys: gpt432kKeys.filter((k) => k.isTrial).length,
@@ -182,13 +178,13 @@ function getOpenAIInfo() {
   info.turbo.proomptersInQueue = turboQueue.proomptersInQueue;
   info.turbo.estimatedQueueTime = turboQueue.estimatedQueueTime;
 
-  if (availableFamilies.has("gpt4")) {
+  if (available.has("gpt4")) {
     const gpt4Queue = getQueueInformation("gpt4");
     info.gpt4.proomptersInQueue = gpt4Queue.proomptersInQueue;
     info.gpt4.estimatedQueueTime = gpt4Queue.estimatedQueueTime;
   }
 
-  if (availableFamilies.has("gpt4-32k")) {
+  if (available.has("gpt4-32k")) {
     const gpt432kQueue = getQueueInformation("gpt4-32k");
     info["gpt4-32k"].proomptersInQueue = gpt432kQueue.proomptersInQueue;
     info["gpt4-32k"].estimatedQueueTime = gpt432kQueue.estimatedQueueTime;
