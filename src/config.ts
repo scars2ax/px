@@ -113,12 +113,6 @@ type Config = {
    * Desination URL to redirect blocked requests to, for non-JSON requests.
    */
   blockRedirect?: string;
-  /**
-   * Whether the proxy should disallow requests for GPT-4 models in order to
-   * prevent excessive spend.  Applies only to OpenAI.
-   * @deprecated Use `allowedModelFamilies` instead.
-   */
-  turboOnly?: boolean;
   /** Which model families to allow requests for. Applies only to OpenAI. */
   allowedModelFamilies: ModelFamily[];
   /**
@@ -177,6 +171,7 @@ export const config: Config = {
   allowedModelFamilies: getEnvWithDefault("ALLOWED_MODEL_FAMILIES", [
     "turbo",
     "gpt4",
+    "gpt4-32k",
     "claude",
   ]),
   rejectDisallowed: getEnvWithDefault("REJECT_DISALLOWED", false),
@@ -199,7 +194,6 @@ export const config: Config = {
     "You must be over the age of majority in your country to use this service."
   ),
   blockRedirect: getEnvWithDefault("BLOCK_REDIRECT", "https://www.9gag.com"),
-  turboOnly: getEnvWithDefault("TURBO_ONLY", false),
   tokenQuota: {
     turbo: getEnvWithDefault("TOKEN_QUOTA_TURBO", 0),
     gpt4: getEnvWithDefault("TOKEN_QUOTA_GPT4", 0),
@@ -209,7 +203,7 @@ export const config: Config = {
 } as const;
 
 export async function assertConfigIsValid() {
-  if (config.turboOnly) {
+  if (process.env.TURBO_ONLY === "true") {
     startupLogger.warn(
       "TURBO_ONLY is deprecated. Use ALLOWED_MODEL_FAMILIES=turbo instead."
     );
@@ -316,7 +310,7 @@ export function listConfig(obj: Config = config): Record<string, any> {
       result[key] = value;
     }
 
-    if (typeof obj[key] === "object") {
+    if (typeof obj[key] === "object" && !Array.isArray(obj[key])) {
       result[key] = listConfig(obj[key] as unknown as Config);
     }
   }
@@ -340,13 +334,16 @@ function getEnvWithDefault<T>(env: string | string[], defaultValue: T): T {
     }
 
     // Intended to be used for comma-delimited lists
-    if (defaultValue instanceof Array) {
-      const split = value.split(",");
-      return split.map((v) => JSON.parse(v)) as T;
+    if (Array.isArray(defaultValue)) {
+      return value.split(",").map((v) => v.trim()) as T;
     }
 
     return JSON.parse(value) as T;
   } catch (err) {
+    startupLogger.error(
+      { env: env, value: value, err },
+      "Failed to parse config value."
+    );
     return value as unknown as T;
   }
 }

@@ -91,7 +91,8 @@ type ServiceInfo = {
  */
 function getOpenAIInfo() {
   const info: { [model: string]: Partial<ServiceInfo> } = {};
-  const availableFamilies = new Set<OpenAIModelFamily>();
+  const allowedFamilies = new Set(config.allowedModelFamilies);
+  let availableFamilies = new Set<OpenAIModelFamily>();
 
   const keys = keyPool.list().filter((k) => {
     // doing this in `filter` to try to reduce the insane number of times we
@@ -105,6 +106,10 @@ function getOpenAIInfo() {
     return false;
   }) as OpenAIKey[];
 
+  availableFamilies = new Set(
+    [...availableFamilies].filter((f) => allowedFamilies.has(f))
+  );
+
   if (keyPool.anyUnchecked()) {
     const uncheckedKeys = keys.filter((k) => !k.lastChecked);
     info.status =
@@ -114,17 +119,23 @@ function getOpenAIInfo() {
   }
 
   if (config.checkKeys) {
-    const keysByModel = keys.reduce((acc, k) => {
-      // only put keys in the most important family they belong to
-      if (k.modelFamilies.includes("gpt4-32k")) {
-        acc["gpt4-32k"].push(k);
-      } else if (k.modelFamilies.includes("gpt4")) {
-        acc["gpt4"].push(k);
-      } else {
-        acc["turbo"].push(k);
-      }
-      return acc;
-    }, {} as Record<OpenAIModelFamily, OpenAIKey[]>);
+    const keysByModel = keys.reduce(
+      (acc, k) => {
+        // only put keys in the most important family they belong to
+        if (k.modelFamilies.includes("gpt4-32k")) {
+          acc["gpt4-32k"].push(k);
+        } else if (k.modelFamilies.includes("gpt4")) {
+          acc["gpt4"].push(k);
+        } else {
+          acc["turbo"].push(k);
+        }
+        return acc;
+      },
+      { turbo: [], gpt4: [], "gpt4-32k": [] } as Record<
+        OpenAIModelFamily,
+        OpenAIKey[]
+      >
+    );
 
     const turboKeys = keysByModel["turbo"];
     const gpt4Keys = keysByModel["gpt4"];
