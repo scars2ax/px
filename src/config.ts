@@ -340,10 +340,6 @@ function getEnvWithDefault<T>(env: string | string[], defaultValue: T): T {
 
     return JSON.parse(value) as T;
   } catch (err) {
-    startupLogger.error(
-      { env: env, value: value, err },
-      "Failed to parse config value."
-    );
     return value as unknown as T;
   }
 }
