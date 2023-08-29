@@ -153,16 +153,22 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
 
     // Select a key, from highest priority to lowest priority:
     // 1. Keys which are not rate limited
-    //    a. We ignore rate limits from over a minute ago
+    //    a. We ignore rate limits from >30 seconds ago
     //    b. If all keys were rate limited in the last minute, select the
     //       least recently rate limited key
     // 2. Keys which are trials
-    // 3. Keys which have not been used in the longest time
+    // 3. Keys which do *not* have access to GPT-4-32k
+    // 4. Keys which have not been used in the longest time
 
     const now = Date.now();
-    const rateLimitThreshold = 60 * 1000;
+    const rateLimitThreshold = 30 * 1000;
 
     const keysByPriority = availableKeys.sort((a, b) => {
+      // TODO: this isn't quite right; keys are briefly artificially rate-
+      // limited when they are selected, so this will deprioritize keys that
+      // may not actually be limited, simply because they were used recently.
+      // This should be adjusted to use a new `rateLimitedUntil` field instead
+      // of `rateLimitedAt`.
       const aRateLimited = now - a.rateLimitedAt < rateLimitThreshold;
       const bRateLimited = now - b.rateLimitedAt < rateLimitThreshold;
 
@@ -171,12 +177,31 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
       if (aRateLimited && bRateLimited) {
         return a.rateLimitedAt - b.rateLimitedAt;
       }
+      // Neither key is rate limited, continue
 
       if (a.isTrial && !b.isTrial) return -1;
       if (!a.isTrial && b.isTrial) return 1;
+      // Neither or both keys are trials, continue
+
+      const aHas32k = a.modelFamilies.includes("gpt4-32k");
+      const bHas32k = b.modelFamilies.includes("gpt4-32k");
+      if (aHas32k && !bHas32k) return 1;
+      if (!aHas32k && bHas32k) return -1;
+      // Neither or both keys have 32k, continue
 
       return a.lastUsed - b.lastUsed;
     });
+
+    // logger.debug(
+    //   {
+    //     byPriority: keysByPriority.map((k) => ({
+    //       hash: k.hash,
+    //       isRateLimited: now - k.rateLimitedAt < rateLimitThreshold,
+    //       modelFamilies: k.modelFamilies,
+    //     })),
+    //   },
+    //   "Keys sorted by priority"
+    // );
 
     const selectedKey = keysByPriority[0];
     selectedKey.lastUsed = now;
