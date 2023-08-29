@@ -102,6 +102,9 @@ function cacheInfoPageHtml(baseUrl: string) {
 		 .replaceAll("{gpt432k:activeKeys}",(substring: string) => openai_info.gpt4_32k?.activeKeys?.toString() ?? "0")
 		 .replaceAll("{gpt432k:overQuotaKeys}",(substring: string) => openai_info.gpt4_32k?.overQuotaKeys?.toString() ?? "0")
 		 .replaceAll("{gpt432k:revokedKeys}",(substring: string) => openai_info.gpt4_32k?.revokedKeys?.toString() ?? "0")
+		 .replaceAll("{gpt432k:proomptersInQueue}",(substring: string) => openai_info.gpt4_32k?.proomptersInQueue?.toString() ?? "0")
+		 .replaceAll("{gpt432k:estimatedQueueTime}",(substring: string) => openai_info.gpt4_32k?.estimatedQueueTime?.toString() ?? "0")
+		 
 		 .replaceAll("{config:gatekeeper}",(substring: string) => info.config.gatekeeper).replace("{config:modelRateLimit}", (substring: string) => info.config.modelRateLimit?.toString())
 		 .replaceAll("{config:maxOutputTokensOpenAI}",(substring: string) => info.config.maxOutputTokensOpenAI.toString())
 		 .replaceAll("{config:promptLogging}",(substring: string) => info.config.promptLogging)
@@ -249,6 +252,13 @@ function getOpenAIInfo() {
       info.gpt4.proomptersInQueue = gpt4Queue.proomptersInQueue;
       info.gpt4.estimatedQueueTime = gpt4Queue.estimatedQueueTime;
     }
+	
+	if (hasGpt432k) {
+      const gpt432kQueue = getQueueInformation("gpt-4-32k");
+      info.gpt4_32k.proomptersInQueue = gpt432kQueue.proomptersInQueue;
+      info.gpt4_32k.estimatedQueueTime = gpt432kQueue.estimatedQueueTime;
+    }
+	
   }
 
   return info;
@@ -289,10 +299,15 @@ function buildInfoPageHeader(converter: showdown.Converter, title: string) {
     if (config.openaiKey) {
       const turboWait = getQueueInformation("turbo").estimatedQueueTime;
       const gpt4Wait = getQueueInformation("gpt-4").estimatedQueueTime;
+	  const gpt432kWait = getQueueInformation("gpt-4-32k").estimatedQueueTime;
       waits.push(`**Turbo:** ${turboWait}`);
       if (keyPool.list().some((k) => k.isGpt4) && !config.turboOnly) {
         waits.push(`**GPT-4:** ${gpt4Wait}`);
       }
+	  if (keyPool.list().some((k) => k.isGpt432k) && !config.turboOnly) {
+        waits.push(`**GPT-4_32k:** ${gpt432kWait}`);
+      }
+	  
     }
 
     if (config.anthropicKey) {
