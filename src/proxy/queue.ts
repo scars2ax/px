@@ -22,7 +22,7 @@ import {
   keyPool,
   ModelFamily,
   SupportedModel,
-} from "../key-management";
+} from "../shared/key-management";
 import { logger } from "../logger";
 import { AGNAI_DOT_CHAT_IP } from "./rate-limit";
 import { buildFakeSseMessage } from "./middleware/common";

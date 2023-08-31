@@ -6,7 +6,7 @@ import path from "path";
 import pinoHttp from "pino-http";
 import childProcess from "child_process";
 import { logger } from "./logger";
-import { keyPool } from "./key-management";
+import { keyPool } from "./shared/key-management";
 import { adminRouter } from "./admin/routes";
 import { proxyRouter } from "./proxy/routes";
 import { handleInfoPage } from "./info-page";

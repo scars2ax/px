@@ -1,5 +1,5 @@
 import { Express } from "express-serve-static-core";
-import { AIService, Key } from "../key-management/index";
+import { AIService, Key } from "../shared/key-management/index";
 import { User } from "../proxy/auth/user-store";
 
 declare global {

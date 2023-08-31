@@ -4,7 +4,7 @@ import * as http from "http";
 import util from "util";
 import zlib from "zlib";
 import { logger } from "../../../logger";
-import { getOpenAIModelFamily, keyPool } from "../../../key-management";
+import { getOpenAIModelFamily, keyPool } from "../../../shared/key-management";
 import { enqueue, trackWaitTime } from "../../queue";
 import {
   incrementPromptCount,

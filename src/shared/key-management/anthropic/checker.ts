@@ -1,5 +1,5 @@
 import axios, { AxiosError } from "axios";
-import { logger } from "../../logger";
+import { logger } from "../../../logger";
 import type { AnthropicKey, AnthropicKeyProvider } from "./provider";
 
 /** Minimum time in between any two key checks. */

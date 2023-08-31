@@ -7,7 +7,7 @@ import {
   OpenAIModelFamily,
   getOpenAIModelFamily,
   keyPool,
-} from "../key-management";
+} from "../shared/key-management";
 import { logger } from "../logger";
 import { createQueueMiddleware } from "./queue";
 import { ipLimiter } from "./rate-limit";

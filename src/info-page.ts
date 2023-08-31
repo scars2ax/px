@@ -8,7 +8,7 @@ import {
   OpenAIKey,
   OpenAIModelFamily,
   keyPool,
-} from "./key-management";
+} from "./shared/key-management";
 import { getUniqueIps } from "./proxy/rate-limit";
 import { getEstimatedWaitTime, getQueueLength } from "./proxy/queue";
 import { logger } from "./logger";

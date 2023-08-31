@@ -1,5 +1,5 @@
 import axios, { AxiosError } from "axios";
-import { logger } from "../../logger";
+import { logger } from "../../../logger";
 import type { OpenAIKey, OpenAIKeyProvider } from "./provider";
 import type { OpenAIModelFamily } from "../models";
 

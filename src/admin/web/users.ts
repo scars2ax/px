@@ -4,7 +4,7 @@ import { z } from "zod";
 import { config } from "../../config";
 import * as userStore from "../../proxy/auth/user-store";
 import { parseSort, sortBy, paginate, HttpError } from "../../common";
-import { ModelFamily, keyPool } from "../../key-management";
+import { ModelFamily, keyPool } from "../../shared/key-management";
 import { getTokenCostUsd, prettyTokens } from "../../shared/stats";
 import { UserSchema, UserSchemaWithToken } from "../common";
 

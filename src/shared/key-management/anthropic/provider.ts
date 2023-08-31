@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { Key, KeyProvider } from "..";
-import { config } from "../../config";
-import { logger } from "../../logger";
+import { config } from "../../../config";
+import { logger } from "../../../logger";
 import type { AnthropicModelFamily } from "../models";
 import { AnthropicKeyChecker } from "./checker";
 

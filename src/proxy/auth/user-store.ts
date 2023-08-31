@@ -11,7 +11,7 @@ import admin from "firebase-admin";
 import schedule from "node-schedule";
 import { v4 as uuid } from "uuid";
 import { config, getFirebaseApp } from "../../config";
-import { ModelFamily } from "../../key-management";
+import { ModelFamily } from "../../shared/key-management";
 import { logger } from "../../logger";
 
 const log = logger.child({ module: "users" });

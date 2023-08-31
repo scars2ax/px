@@ -1,7 +1,7 @@
 import dotenv from "dotenv";
 import type firebase from "firebase-admin";
 import pino from "pino";
-import type { ModelFamily } from "./key-management/models";
+import type { ModelFamily } from "./shared/key-management/models";
 dotenv.config();
 
 // Can't import the usual logger here because it itself needs the config.

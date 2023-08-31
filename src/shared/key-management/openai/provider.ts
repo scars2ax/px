@@ -6,8 +6,8 @@ import fs from "fs";
 import http from "http";
 import path from "path";
 import { KeyProvider, Key, Model } from "../index";
-import { config } from "../../config";
-import { logger } from "../../logger";
+import { config } from "../../../config";
+import { logger } from "../../../logger";
 import { OpenAIKeyChecker } from "./checker";
 import { OpenAIModelFamily, getOpenAIModelFamily } from "../models";
 
