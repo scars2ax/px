@@ -2,7 +2,7 @@ import express, { Router } from "express";
 import cookieParser from "cookie-parser";
 import { authorize } from "./auth";
 import { HttpError, injectLocals } from "./common";
-import { injectCsrfToken, checkCsrfToken } from "./csrf";
+import { injectCsrfToken, checkCsrfToken } from "../csrf";
 import { loginRouter } from "./login";
 import { usersApiRouter as apiRouter } from "./api/users";
 import { usersUiRouter as uiRouter } from "./ui/users";
