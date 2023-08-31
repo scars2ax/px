@@ -1,11 +1,5 @@
 import { Query } from "express-serve-static-core";
 
-export class HttpError extends Error {
-  constructor(public status: number, message: string) {
-    super(message);
-  }
-}
-
 export function parseSort(sort: Query["sort"]) {
   if (!sort) return null;
   if (typeof sort === "string") return sort.split(",");
