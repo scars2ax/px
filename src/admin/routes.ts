@@ -1,7 +1,8 @@
 import express, { Router } from "express";
 import cookieParser from "cookie-parser";
 import { authorize } from "./auth";
-import { HttpError, injectLocals } from "../common";
+import { HttpError } from "../shared/ui-utils";
+import { injectLocals } from "../shared/inject-locals";
 import { injectCsrfToken, checkCsrfToken } from "../csrf";
 import { loginRouter } from "./login";
 import { usersApiRouter as apiRouter } from "./api/users";

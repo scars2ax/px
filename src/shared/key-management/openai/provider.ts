@@ -9,7 +9,7 @@ import { KeyProvider, Key, Model } from "../index";
 import { config } from "../../../config";
 import { logger } from "../../../logger";
 import { OpenAIKeyChecker } from "./checker";
-import { OpenAIModelFamily, getOpenAIModelFamily } from "../models";
+import { OpenAIModelFamily, getOpenAIModelFamily } from "../../models";
 
 export type OpenAIModel = "gpt-3.5-turbo" | "gpt-4" | "gpt-4-32k";
 export const OPENAI_SUPPORTED_MODELS: readonly OpenAIModel[] = [

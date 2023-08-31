@@ -1,4 +1,4 @@
-import { logger } from "../../logger";
+import { logger } from "../logger";
 
 export type OpenAIModelFamily = "turbo" | "gpt4" | "gpt4-32k";
 export type AnthropicModelFamily = "claude";

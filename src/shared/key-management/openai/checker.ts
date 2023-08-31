@@ -1,7 +1,7 @@
 import axios, { AxiosError } from "axios";
 import { logger } from "../../../logger";
 import type { OpenAIKey, OpenAIKeyProvider } from "./provider";
-import type { OpenAIModelFamily } from "../models";
+import type { OpenAIModelFamily } from "../../models";
 
 /** Minimum time in between any two key checks. */
 const MIN_CHECK_INTERVAL = 3 * 1000; // 3 seconds

@@ -2,13 +2,8 @@ import fs from "fs";
 import { Request, Response } from "express";
 import showdown from "showdown";
 import { config, listConfig } from "./config";
-import {
-  AnthropicKey,
-  ModelFamily,
-  OpenAIKey,
-  OpenAIModelFamily,
-  keyPool,
-} from "./shared/key-management";
+import { AnthropicKey, OpenAIKey, keyPool } from "./shared/key-management";
+import { ModelFamily, OpenAIModelFamily } from "./shared/models";
 import { getUniqueIps } from "./proxy/rate-limit";
 import { getEstimatedWaitTime, getQueueLength } from "./proxy/queue";
 import { logger } from "./logger";

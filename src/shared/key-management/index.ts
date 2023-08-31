@@ -4,7 +4,7 @@ import {
   AnthropicModel,
 } from "./anthropic/provider";
 import { KeyPool } from "./key-pool";
-import type { ModelFamily } from "./models";
+import type { ModelFamily } from "../models";
 
 export type AIService = "openai" | "anthropic";
 export type Model = OpenAIModel | AnthropicModel;
@@ -66,9 +66,3 @@ export type SupportedModel = (typeof SUPPORTED_MODELS)[number];
 export { OPENAI_SUPPORTED_MODELS, ANTHROPIC_SUPPORTED_MODELS };
 export { AnthropicKey } from "./anthropic/provider";
 export { OpenAIKey } from "./openai/provider";
-export type {
-  OpenAIModelFamily,
-  AnthropicModelFamily,
-  ModelFamily,
-} from "./models";
-export { getOpenAIModelFamily, getClaudeModelFamily } from "./models";
