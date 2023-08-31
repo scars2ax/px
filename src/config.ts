@@ -205,6 +205,18 @@ export const config: Config = {
   quotaRefreshPeriod: getEnvWithDefault("QUOTA_REFRESH_PERIOD", undefined),
 } as const;
 
+function generateCookieSecret() {
+  if (process.env.COOKIE_SECRET !== undefined) {
+    return process.env.COOKIE_SECRET;
+  }
+
+  const seed = "" + config.adminKey + config.openaiKey + config.anthropicKey;
+  const crypto = require("crypto");
+  return crypto.createHash("sha256").update(seed).digest("hex");
+}
+
+export const COOKIE_SECRET = generateCookieSecret();
+
 export async function assertConfigIsValid() {
   if (process.env.TURBO_ONLY === "true") {
     startupLogger.warn(
