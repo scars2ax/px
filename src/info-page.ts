@@ -12,7 +12,7 @@ import {
 import { getUniqueIps } from "./proxy/rate-limit";
 import { getEstimatedWaitTime, getQueueLength } from "./proxy/queue";
 import { logger } from "./logger";
-import { getTokenCostUsd, prettyTokens } from "./stats";
+import { getTokenCostUsd, prettyTokens } from "./shared/stats";
 
 const INFO_PAGE_TTL = 2000;
 let infoPageHtml: string | undefined;

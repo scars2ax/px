@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { z } from "zod";
 import * as userStore from "../../proxy/auth/user-store";
-import { UserSchema, UserSchemaWithToken, parseSort, sortBy } from "../common";
+import { parseSort, sortBy } from "../../common";
+import { UserSchema, UserSchemaWithToken } from "../common";
 
 const router = Router();
 

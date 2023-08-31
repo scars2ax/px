@@ -1,11 +1,11 @@
 import express, { Router } from "express";
 import cookieParser from "cookie-parser";
 import { authorize } from "./auth";
-import { HttpError, injectLocals } from "./common";
+import { HttpError, injectLocals } from "../common";
 import { injectCsrfToken, checkCsrfToken } from "../csrf";
 import { loginRouter } from "./login";
 import { usersApiRouter as apiRouter } from "./api/users";
-import { usersUiRouter as uiRouter } from "./ui/users";
+import { usersWebRouter as webRouter } from "./web/users";
 
 const adminRouter = Router();
 
@@ -21,7 +21,7 @@ adminRouter.use("/users", authorize({ via: "header" }), apiRouter);
 adminRouter.use(checkCsrfToken); // All UI routes require CSRF token
 adminRouter.use(injectLocals);
 adminRouter.use("/", loginRouter);
-adminRouter.use("/manage", authorize({ via: "cookie" }), uiRouter);
+adminRouter.use("/manage", authorize({ via: "cookie" }), webRouter);
 
 adminRouter.use(
   (

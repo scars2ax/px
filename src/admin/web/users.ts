@@ -3,16 +3,10 @@ import multer from "multer";
 import { z } from "zod";
 import { config } from "../../config";
 import * as userStore from "../../proxy/auth/user-store";
-import {
-  UserSchemaWithToken,
-  parseSort,
-  sortBy,
-  paginate,
-  UserSchema,
-  HttpError,
-} from "../common";
+import { parseSort, sortBy, paginate, HttpError } from "../../common";
 import { ModelFamily, keyPool } from "../../key-management";
-import { getTokenCostUsd, prettyTokens } from "../../stats";
+import { getTokenCostUsd, prettyTokens } from "../../shared/stats";
+import { UserSchema, UserSchemaWithToken } from "../common";
 
 const router = Router();
 
@@ -185,4 +179,4 @@ router.post("/maintenance", (req, res) => {
   return res.redirect(`/admin/manage?flash=${message}`);
 });
 
-export { router as usersUiRouter };
+export { router as usersWebRouter };
