@@ -17,7 +17,7 @@ import {
 } from "../common";
 import { handleStreamedResponse } from "./handle-streamed-response";
 import { logPrompt } from "./log-prompt";
-import { countTokens } from "../../../tokenization";
+import { countTokens } from "../../../shared/tokenization";
 
 const DECODER_MAP = {
   gzip: util.promisify(zlib.gunzip),

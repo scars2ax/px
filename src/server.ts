@@ -13,7 +13,7 @@ import { handleInfoPage } from "./info-page";
 import { logQueue } from "./shared/prompt-logging";
 import { start as startRequestQueue } from "./proxy/queue";
 import { init as initUserStore } from "./proxy/auth/user-store";
-import { init as initTokenizers } from "./tokenization";
+import { init as initTokenizers } from "./shared/tokenization";
 import { checkOrigin } from "./proxy/check-origin";
 import { userRouter } from "./user/routes";
 
