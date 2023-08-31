@@ -52,7 +52,11 @@ app.use(
 app.set("trust proxy", true);
 
 app.set("view engine", "ejs");
-app.set("views", path.join(__dirname, "views"));
+app.set("views", [
+  path.join(__dirname, "admin/web/views"),
+  path.join(__dirname, "user/web/views"),
+  path.join(__dirname, "shared/views"),
+]);
 
 app.get("/health", (_req, res) => res.sendStatus(200));
 app.use(cors());

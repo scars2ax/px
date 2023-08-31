@@ -26,7 +26,7 @@ router.get("/create-user", (req, res) => {
     .getUsers()
     .sort(sortBy(["createdAt"], false))
     .slice(0, 5);
-  res.render("admin/create-user", {
+  res.render("admin_create-user", {
     recentUsers,
     newToken: !!req.query.created,
   });
@@ -47,7 +47,7 @@ router.get("/view-user/:token", (req, res) => {
       message: "User's quota was refreshed",
     };
   }
-  res.render("admin/view-user", { user });
+  res.render("admin_view-user", { user });
 });
 
 router.get("/list-users", (req, res) => {
@@ -73,7 +73,7 @@ router.get("/list-users", (req, res) => {
   const page = Number(req.query.page) || 1;
   const { items, ...pagination } = paginate(users, page, perPage);
 
-  return res.render("admin/list-users", {
+  return res.render("admin_list-users", {
     sort: sort.join(","),
     users: items,
     ...pagination,
@@ -81,7 +81,7 @@ router.get("/list-users", (req, res) => {
 });
 
 router.get("/import-users", (_req, res) => {
-  res.render("admin/import-users");
+  res.render("admin_import-users");
 });
 
 router.post("/import-users", upload.single("users"), (req, res) => {
@@ -92,13 +92,13 @@ router.post("/import-users", upload.single("users"), (req, res) => {
   if (!result.success) throw new HttpError(400, result.error.toString());
 
   const upserts = result.data.map((user) => userStore.upsertUser(user));
-  res.render("admin/import-users", {
+  res.render("admin_import-users", {
     flash: { type: "success", message: `${upserts.length} users imported` },
   });
 });
 
 router.get("/export-users", (_req, res) => {
-  res.render("admin/export-users");
+  res.render("admin_export-users");
 });
 
 router.get("/export-users.json", (_req, res) => {
@@ -109,7 +109,7 @@ router.get("/export-users.json", (_req, res) => {
 });
 
 router.get("/", (_req, res) => {
-  res.render("admin/index");
+  res.render("admin_index");
 });
 
 router.post("/edit-user/:token", (req, res) => {

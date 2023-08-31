@@ -1,4 +1,4 @@
-<%- include("../_partials/common-header", { title: "Login" }) %>
+<%- include("_partials/common-header", { title: "Login" }) %>
     <h1>Login</h1>
     <form action="/admin/login" method="post">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>" />

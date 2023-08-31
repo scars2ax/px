@@ -33,14 +33,14 @@ adminRouter.use(
     const data: any = { message: err.message, stack: err.stack };
     if (err instanceof HttpError) {
       data.status = err.status;
-      return res.status(err.status).render("admin/error", data);
+      return res.status(err.status).render("admin_error", data);
     } else if (err.name === "ForbiddenError") {
       data.status = 403;
       if (err.message === "invalid csrf token") {
         data.message =
           "Invalid CSRF token; try refreshing the previous page before submitting again.";
       }
-      return res.status(403).render("admin/error", { ...data, flash: null });
+      return res.status(403).render("admin_error", { ...data, flash: null });
     }
     res.status(500).json({ error: data });
   }

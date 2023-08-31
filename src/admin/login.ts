@@ -3,7 +3,7 @@ import { Router } from "express";
 const loginRouter = Router();
 
 loginRouter.get("/login", (req, res) => {
-  res.render("admin/login", {
+  res.render("admin_login", {
     flash: req.query.failed
       ? { type: "error", message: "Invalid admin key" }
       : null,
