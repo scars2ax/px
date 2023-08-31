@@ -1,0 +1,80 @@
+<%- include("_partials/shared_header", { title: "User Token Info" }) %>
+<h1>User Token Info</h1>
+<form action="/user/lookup" method="post">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+  <label for="token">User Token</label>
+  <input type="password" name="token" value="<%= user?.token %>" />
+  <input type="submit" value="Submit" />
+</form>
+<% if (user) { %>
+<table class="striped">
+  <tbody>
+    <tr>
+      <th scope="row">Token</th>
+      <td colspan="2"><%- user.token %></td>
+    </tr>
+    <tr>
+      <th scope="row">Nickname</th>
+      <td><%- user.nickname ?? "none" %></td>
+      <td class="actions">
+        <a title="Edit" id="edit-nickname" href="#" onclick="updateNickname()">✏️</a>
+      </td>
+    </tr>
+    <tr>
+      <th scope="row">Type</th>
+      <td colspan="2"><%- user.type %></td>
+    </tr>
+    <tr>
+      <th scope="row">Prompt Count</th>
+      <td colspan="2"><%- user.promptCount %></td>
+    </tr>
+    <tr>
+      <th scope="row">Token Counts</th>
+      <td colspan="2">
+        <ul style="padding-left: 1em; margin: 0">
+          <% Object.entries(user.tokenCounts).forEach(([key, count]) => { %>
+          <li><strong><%- key %></strong>: <%- count %></li>
+          <% }) %>
+        </ul>
+      </td>
+    </tr>
+    <tr>
+      <th scope="row">Token Limits</th>
+      <td colspan="2">
+        <ul style="padding-left: 1em; margin: 0">
+          <% Object.entries(user.tokenLimits).forEach(([key, count]) => { %>
+          <li><strong><%- key %></strong>: <%- count %></li>
+          <% }) %>
+        </ul>
+      </td>
+    </tr>
+    <tr>
+      <th scope="row">Created At</th>
+      <td colspan="2"><%- user.createdAt %></td>
+    </tr>
+    <tr>
+      <th scope="row">Last Used At</th>
+      <td colspan="2"><%- user.lastUsedAt || "never" %></td>
+    </tr>
+  </tbody>
+</table>
+
+<form id="edit-nickname-form" style="display: none" action="/user/edit-nickname" method="post">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+  <input type="hidden" name="token" value="<%= user.token %>" />
+  <input type="hidden" name="nickname" value="<%= user.nickname %>" />
+</form>
+
+<script>
+  function updateNickname() {
+    const form = document.getElementById("edit-nickname-form");
+    const existing = form.nickname.value;
+    const value = prompt("Enter a new nickname", existing);
+    if (value !== null) {
+      form.nickname.value = value;
+      form.submit();
+    }
+  }
+</script>
+
+<% } %> <%- include("_partials/user_footer") %>

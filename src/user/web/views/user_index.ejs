@@ -1,10 +1,4 @@
-<%- include("_partials/common-header", { title: "Stats Lookup" }) %>
-    <h1>Stats Lookup</h1>
-    <form action="/stats/lookup" method="post">
-      <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
-      <label for="token">User Token</label>
-      <input type="password" name="token" />
-      <input type="submit" value="Submit" />
-    </form>
+<%- include("_partials/shared_header", { title: "Stats Lookup" }) %>
+    <h1>Index</h1>
   </body>
 </html>
