@@ -1,8 +1,8 @@
 import express, { Router } from "express";
-import cookieParser from "cookie-parser";
-import { injectCsrfToken, checkCsrfToken } from "../csrf";
+import { injectCsrfToken, checkCsrfToken } from "../shared/inject-csrf";
 import { selfServeRouter } from "./web/self-serve";
 import { injectLocals } from "../shared/inject-locals";
+import { withSession } from "../shared/with-session";
 
 const userRouter = Router();
 
@@ -10,7 +10,7 @@ userRouter.use(
   express.json({ limit: "1mb" }),
   express.urlencoded({ extended: true, limit: "1mb" })
 );
-userRouter.use(cookieParser());
+userRouter.use(withSession);
 userRouter.use(injectCsrfToken, checkCsrfToken);
 userRouter.use(injectLocals);
 
@@ -23,8 +23,8 @@ userRouter.use(
     res: express.Response,
     _next: express.NextFunction
   ) => {
-    const data: any = { message: err.message, stack: err.stack };
-    res.status(500).render("user_error", data);
+    const data: any = { message: err.message, stack: err.stack, status: 500 };
+    res.status(500).render("user_error", { ...data, flash: null });
   }
 );
 

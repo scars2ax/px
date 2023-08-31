@@ -1,9 +1,9 @@
 import express, { Router } from "express";
-import cookieParser from "cookie-parser";
 import { authorize } from "./auth";
-import { HttpError } from "../shared/ui-utils";
+import { HttpError } from "../shared/errors";
 import { injectLocals } from "../shared/inject-locals";
-import { injectCsrfToken, checkCsrfToken } from "../csrf";
+import { withSession } from "../shared/with-session";
+import { injectCsrfToken, checkCsrfToken } from "../shared/inject-csrf";
 import { loginRouter } from "./login";
 import { usersApiRouter as apiRouter } from "./api/users";
 import { usersWebRouter as webRouter } from "./web/users";
@@ -14,12 +14,12 @@ adminRouter.use(
   express.json({ limit: "20mb" }),
   express.urlencoded({ extended: true, limit: "20mb" })
 );
-adminRouter.use(cookieParser());
+adminRouter.use(withSession);
 adminRouter.use(injectCsrfToken);
 
 adminRouter.use("/users", authorize({ via: "header" }), apiRouter);
 
-adminRouter.use(checkCsrfToken); // All UI routes require CSRF token
+adminRouter.use(checkCsrfToken);
 adminRouter.use(injectLocals);
 adminRouter.use("/", loginRouter);
 adminRouter.use("/manage", authorize({ via: "cookie" }), webRouter);

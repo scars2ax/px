@@ -16,12 +16,12 @@ const { generateToken, doubleCsrfProtection } = doubleCsrf({
 });
 
 const injectCsrfToken: express.RequestHandler = (req, res, next) => {
-  res.locals.csrfToken = generateToken(res, req);
-  // force generation of new token on back button
-  // TODO: implement session-based CSRF tokens
-  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-  res.setHeader("Pragma", "no-cache");
-  res.setHeader("Expires", "0");
+  const session = req.session as any;
+  if (!session.csrf) {
+    req.log.debug("Generating new CSRF token");
+    session.csrf = generateToken(res, req);
+  }
+  res.locals.csrfToken = session.csrf;
   next();
 };
 

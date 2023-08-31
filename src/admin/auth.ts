@@ -10,7 +10,7 @@ export const authorize: ({ via }: AuthorizeParams) => RequestHandler =
   ({ via }) =>
   (req, res, next) => {
     const bearerToken = req.headers.authorization?.slice("Bearer ".length);
-    const cookieToken = req.cookies["admin-token"];
+    const cookieToken = req.session.adminToken;
     const token = via === "cookie" ? cookieToken : bearerToken;
     const attempts = failedAttempts.get(req.ip) ?? 0;
 
@@ -53,6 +53,6 @@ function handleFailedLogin(req: Request, res: Response) {
   if (req.accepts("json", "html") === "json") {
     return res.status(401).json({ error: "Unauthorized" });
   }
-  res.clearCookie("admin-token");
+  delete req.session.adminToken;
   return res.redirect("/admin/login?failed=true");
 }
