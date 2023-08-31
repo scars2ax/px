@@ -1,5 +1,5 @@
 import { ZodType, z } from "zod";
-import { UserTokenCounts } from "../proxy/auth/user-store";
+import { UserTokenCounts } from "../shared/users/user-store";
 
 const tokenCountsSchema: ZodType<UserTokenCounts> = z
   .object({

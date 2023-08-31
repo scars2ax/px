@@ -1,6 +1,6 @@
 import { Express } from "express-serve-static-core";
 import { AIService, Key } from "../shared/key-management/index";
-import { User } from "../proxy/auth/user-store";
+import { User } from "../shared/users/user-store";
 
 declare global {
   namespace Express {

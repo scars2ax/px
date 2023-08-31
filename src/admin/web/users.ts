@@ -2,7 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import { z } from "zod";
 import { config } from "../../config";
-import * as userStore from "../../proxy/auth/user-store";
+import * as userStore from "../../shared/users/user-store";
 import { parseSort, sortBy, paginate, HttpError } from "../../shared/ui-utils";
 import { keyPool } from "../../shared/key-management";
 import { ModelFamily } from "../../shared/models";

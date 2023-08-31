@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import * as userStore from "../../proxy/auth/user-store";
+import * as userStore from "../../shared/users/user-store";
 import { parseSort, sortBy } from "../../shared/ui-utils";
 import { UserSchema, UserSchemaWithToken } from "../common";
 

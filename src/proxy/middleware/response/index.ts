@@ -10,7 +10,7 @@ import { enqueue, trackWaitTime } from "../../queue";
 import {
   incrementPromptCount,
   incrementTokenCount,
-} from "../../auth/user-store";
+} from "../../../shared/users/user-store";
 import {
   getCompletionForService,
   isCompletionRequest,
