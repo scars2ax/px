@@ -8,8 +8,8 @@ support because it relies on local state to match up with the remote state. */
 import { google, sheets_v4 } from "googleapis";
 import type { CredentialBody } from "google-auth-library";
 import type { GaxiosResponse } from "googleapis-common";
-import { config } from "../../config";
-import { logger } from "../../logger";
+import { config } from "../../../config";
+import { logger } from "../../../logger";
 import { PromptLogEntry } from "..";
 
 // There is always a sheet called __index__ which contains a list of all the

@@ -1,7 +1,7 @@
 /* Queues incoming prompts/responses and periodically flushes them to configured
  * logging backend. */
 
-import { logger } from "../logger";
+import { logger } from "../../logger";
 import { PromptLogEntry } from ".";
 import { sheets } from "./backends";
 

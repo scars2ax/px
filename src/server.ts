@@ -10,7 +10,7 @@ import { keyPool } from "./shared/key-management";
 import { adminRouter } from "./admin/routes";
 import { proxyRouter } from "./proxy/routes";
 import { handleInfoPage } from "./info-page";
-import { logQueue } from "./prompt-logging";
+import { logQueue } from "./shared/prompt-logging";
 import { start as startRequestQueue } from "./proxy/queue";
 import { init as initUserStore } from "./proxy/auth/user-store";
 import { init as initTokenizers } from "./tokenization";
