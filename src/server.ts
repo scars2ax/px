@@ -15,6 +15,7 @@ import { start as startRequestQueue } from "./proxy/queue";
 import { init as initUserStore } from "./proxy/auth/user-store";
 import { init as initTokenizers } from "./tokenization";
 import { checkOrigin } from "./proxy/check-origin";
+import { userRouter } from "./user/routes";
 
 const PORT = config.port;
 
@@ -61,6 +62,7 @@ app.use(checkOrigin);
 app.get("/", handleInfoPage);
 app.use("/admin", adminRouter);
 app.use("/proxy", proxyRouter);
+app.use("/user", userRouter);
 
 // 500 and 404
 app.use((err: any, _req: unknown, res: express.Response, _next: unknown) => {
