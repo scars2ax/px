@@ -7,7 +7,7 @@
  */
 import crypto from "crypto";
 import { Request, Response, NextFunction } from "express";
-import { logger } from "../../logger";
+import { logger } from "../logger";
 
 const log = logger.child({ module: "check-risu-token" });
 
