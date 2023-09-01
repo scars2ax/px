@@ -2,10 +2,8 @@ import { doubleCsrf } from "csrf-csrf";
 import express from "express";
 import { COOKIE_SECRET } from "../config";
 
-const CSRF_SECRET = COOKIE_SECRET;
-
 const { generateToken, doubleCsrfProtection } = doubleCsrf({
-  getSecret: () => CSRF_SECRET,
+  getSecret: () => COOKIE_SECRET,
   cookieName: "csrf",
   cookieOptions: { sameSite: "strict", path: "/" },
   getTokenFromRequest: (req) => {
