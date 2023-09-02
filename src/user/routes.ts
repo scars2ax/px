@@ -1,6 +1,6 @@
 import express, { Router } from "express";
 import { injectCsrfToken, checkCsrfToken } from "../shared/inject-csrf";
-import { selfServeRouter } from "./web/self-serve";
+import { selfServiceRouter } from "./web/self-service";
 import { injectLocals } from "../shared/inject-locals";
 import { withSession } from "../shared/with-session";
 
@@ -14,7 +14,7 @@ userRouter.use(withSession);
 userRouter.use(injectCsrfToken, checkCsrfToken);
 userRouter.use(injectLocals);
 
-userRouter.use(selfServeRouter);
+userRouter.use(selfServiceRouter);
 
 userRouter.use(
   (

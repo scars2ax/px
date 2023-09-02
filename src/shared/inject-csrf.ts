@@ -14,7 +14,7 @@ const { generateToken, doubleCsrfProtection } = doubleCsrf({
 });
 
 const injectCsrfToken: express.RequestHandler = (req, res, next) => {
-  const session = req.session as any;
+  const session = req.session;
   if (!session.csrf) {
     session.csrf = generateToken(res, req);
   }

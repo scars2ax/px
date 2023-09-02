@@ -1,12 +1,13 @@
 import { Router } from "express";
-import sanitize from "sanitize-html";
 import { UserSchema } from "../../shared/users/schema";
 import * as userStore from "../../shared/users/user-store";
 import { UserInputError } from "../../shared/errors";
+import { prettyTokens } from "../../shared/stats";
+import { sanitizeAndTrim } from "../../shared/utils";
 
 const router = Router();
 
-router.get("/", (req, res) => {
+router.get("/", (_req, res) => {
   res.render("user_index");
 });
 
@@ -27,18 +28,18 @@ router.post("/lookup", (req, res) => {
 });
 
 router.post("/edit-nickname", (req, res) => {
-  const { token, nickname: rawNickname } = req.body;
-  const nicknameSchema = UserSchema.pick({ nickname: true });
-  const result = nicknameSchema
-    .transform(({ nickname }) => ({
-      nickname: sanitize(nickname?.trim() ?? ""),
-    }))
-    .safeParse({ nickname: rawNickname });
+  const nicknameUpdateSchema = UserSchema.pick({ token: true, nickname: true })
+    .extend({
+      nickname: UserSchema.shape.nickname.transform((v) => sanitizeAndTrim(v)),
+    })
+    .strict();
+
+  const result = nicknameUpdateSchema.safeParse(req.body);
   if (!result.success) {
     throw new UserInputError(result.error.message);
   }
 
-  const existing = userStore.getUser(token);
+  const existing = userStore.getUser(result.data.token);
   if (!existing) {
     throw new UserInputError("Invalid user token.");
   }
@@ -51,4 +52,4 @@ router.post("/edit-nickname", (req, res) => {
   });
 });
 
-export { router as selfServeRouter };
+export { router as selfServiceRouter };
