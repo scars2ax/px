@@ -6,7 +6,7 @@ import { withSession } from "../shared/with-session";
 import { injectCsrfToken, checkCsrfToken } from "../shared/inject-csrf";
 import { loginRouter } from "./login";
 import { usersApiRouter as apiRouter } from "./api/users";
-import { usersWebRouter as webRouter } from "./web/users";
+import { usersWebRouter as webRouter } from "./web/manage";
 
 const adminRouter = Router();
 

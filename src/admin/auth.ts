@@ -30,7 +30,7 @@ export const authorize: ({ via }: AuthorizeParams) => RequestHandler =
       return res.status(401).json({ error: "Too many attempts" });
     }
 
-    if (token === ADMIN_KEY) {
+    if (token && token === ADMIN_KEY) {
       return next();
     }
 
