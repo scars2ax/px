@@ -1,4 +1,5 @@
 import { Query } from "express-serve-static-core";
+import sanitize from "sanitize-html";
 
 export function parseSort(sort: Query["sort"]) {
   if (!sort) return null;
@@ -37,4 +38,14 @@ export function paginate(set: unknown[], page: number, pageSize: number = 20) {
     nextPage: p * pageSize < set.length ? p + 1 : null,
     prevPage: p > 1 ? p - 1 : null,
   };
+}
+
+export function sanitizeAndTrim(
+  input?: string | null,
+  options: sanitize.IOptions = {
+    allowedTags: [],
+    allowedAttributes: {},
+  }
+) {
+  return sanitize((input ?? "").trim(), options);
 }
