@@ -1,4 +1,4 @@
-<%- include("_partials/shared_header", { title: "Users - OAI Reverse Proxy Admin" }) %>
+<%- include("partials/shared_header", { title: "Users - OAI Reverse Proxy Admin" }) %>
     <h1>User Token List</h1>
     
     <% if (users.length === 0) { %>
@@ -60,7 +60,7 @@
     </ul>
     
     <p>Showing <%= page * pageSize - pageSize + 1 %> to <%= users.length + page * pageSize - pageSize %> of <%= totalCount %> users.</p>
-    <%- include("_partials/pagination") %>
+    <%- include("partials/shared_pagination") %>
     <% } %>
     
 <script>
@@ -117,4 +117,4 @@
     });
   });
 </script>
-<%- include("_partials/admin-footer") %>
+<%- include("partials/admin-footer") %>

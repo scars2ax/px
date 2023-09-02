@@ -1,0 +1,27 @@
+<p>Next refresh: <time><%- nextQuotaRefresh %></time></p>
+<table>
+  <thead>
+    <tr>
+      <th scope="col">Model</th>
+      <th scope="col">Usage</th>
+      <th scope="col">Limit</th>
+      <th scope="col">Remaining</th>
+      <th scope="col">Refresh Amount</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% Object.entries(quota).forEach(([key, limit]) => { %>
+    <tr>
+      <th scope="row"><%- key %></th>
+      <td><%- prettyTokens(user.tokenCounts[key]) %></td>
+      <% if (!user.tokenLimits[key]) { %>
+      <td colspan="2" style="text-align: center">unlimited</td>
+      <% } else { %>
+      <td><%- prettyTokens(user.tokenLimits[key]) %></td>
+      <td><%- prettyTokens(user.tokenLimits[key] - user.tokenCounts[key]) %></td>
+      <% } %>
+      <td><%- prettyTokens(quota[key]) %></td>
+    </tr>
+    <% }) %>
+  </tbody>
+</table>
