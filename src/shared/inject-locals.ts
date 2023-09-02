@@ -12,6 +12,7 @@ export const injectLocals: RequestHandler = (req, res, next) => {
   res.locals.quota = quota;
   res.locals.nextQuotaRefresh = userStore.getNextQuotaRefresh();
   res.locals.persistenceEnabled = config.gatekeeperStore !== "memory";
+  res.locals.showTokenCosts = config.showTokenCosts;
 
   // flash message
   if (req.query.flash) {

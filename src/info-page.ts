@@ -62,6 +62,11 @@ export const handleInfoPage = (req: Request, res: Response) => {
   res.send(cacheInfoPageHtml(baseUrl));
 };
 
+function getCostString(cost: number) {
+  if (!config.showTokenCosts) return "";
+  return ` ($${cost.toFixed(2)})`;
+}
+
 function cacheInfoPageHtml(baseUrl: string) {
   const keys = keyPool.list();
 
@@ -82,7 +87,9 @@ function cacheInfoPageHtml(baseUrl: string) {
       ...(anthropicKeys ? { anthropic: baseUrl + "/proxy/anthropic" } : {}),
     },
     proompts,
-    tookens: `${prettyTokens(tokens)} ($${tokenCost.toFixed(2)})`,
+    ...(config.showTokenCosts
+      ? { tookens: `${prettyTokens(tokens)}${getCostString(tokenCost)}` }
+      : { tookens: tokens }),
     ...(config.modelRateLimit ? { proomptersNow: getUniqueIps() } : {}),
     openaiKeys,
     anthropicKeys,
@@ -230,7 +237,7 @@ function getOpenAIInfo() {
       const cost = getTokenCostUsd(f, tokens);
 
       info[f] = {
-        usage: `${prettyTokens(tokens)} tokens ($${cost.toFixed(2)})`,
+        usage: `${prettyTokens(tokens)} tokens${getCostString(cost)}`,
         activeKeys: modelStats.get(`${f}__active`) || 0,
         trialKeys: modelStats.get(`${f}__trial`) || 0,
         revokedKeys: modelStats.get(`${f}__revoked`) || 0,
@@ -276,7 +283,7 @@ function getAnthropicInfo() {
 
   return {
     claude: {
-      usage: `${prettyTokens(tokens)} tokens ($${cost.toFixed(2)})`,
+      usage: `${prettyTokens(tokens)} tokens${getCostString(cost)}`,
       ...(unchecked > 0 ? { status: `Checking ${unchecked} keys...` } : {}),
       activeKeys: claudeInfo.active,
       ...(config.checkKeys ? { pozzedKeys: claudeInfo.pozzed } : {}),

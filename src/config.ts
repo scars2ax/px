@@ -97,6 +97,8 @@ type Config = {
   googleSheetsSpreadsheetId?: string;
   /** Whether to periodically check keys for usage and validity. */
   checkKeys?: boolean;
+  /** Whether to show token costs in the UI. */
+  showTokenCosts?: boolean;
   /**
    * Comma-separated list of origins to block. Requests matching any of these
    * origins or referers will be rejected.
@@ -183,6 +185,7 @@ export const config: Config = {
   ),
   logLevel: getEnvWithDefault("LOG_LEVEL", "info"),
   checkKeys: getEnvWithDefault("CHECK_KEYS", !isDev),
+  showTokenCosts: getEnvWithDefault("SHOW_TOKEN_COSTS", false),
   promptLogging: getEnvWithDefault("PROMPT_LOGGING", false),
   promptLoggingBackend: getEnvWithDefault("PROMPT_LOGGING_BACKEND", undefined),
   googleSheetsKey: getEnvWithDefault("GOOGLE_SHEETS_KEY", undefined),
@@ -294,6 +297,7 @@ export const OMITTED_KEYS: (keyof Config)[] = [
   "proxyKey",
   "adminKey",
   "checkKeys",
+  "showTokenCosts",
   "googleSheetsKey",
   "firebaseKey",
   "firebaseRtdbUrl",
