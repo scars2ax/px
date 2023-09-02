@@ -1,4 +1,4 @@
-<%- include("_partials/shared_header", { title: "View User - OAI Reverse Proxy Admin" }) %>
+<%- include("partials/shared_header", { title: "View User - OAI Reverse Proxy Admin" }) %>
 <h1>View User</h1>
 
 <table class="striped">
@@ -28,28 +28,8 @@
       </td>
     </tr>
     <tr>
-      <th scope="row">Prompt Count</th>
+      <th scope="row">Prompts</th>
       <td colspan="2"><%- user.promptCount %></td>
-    </tr>
-    <tr>
-      <th scope="row">Token Counts</th>
-      <td colspan="2">
-        <ul style="padding-left: 1em; margin: 0">
-          <% Object.entries(user.tokenCounts).forEach(([key, count]) => { %>
-          <li><strong><%- key %></strong>: <%- count %></li>
-          <% }) %>
-        </ul>
-      </td>
-    </tr>
-    <tr>
-      <th scope="row">Token Limits</th>
-      <td colspan="2">
-        <ul style="padding-left: 1em; margin: 0">
-          <% Object.entries(user.tokenLimits).forEach(([key, count]) => { %>
-          <li><strong><%- key %></strong>: <%- count %></li>
-          <% }) %>
-        </ul>
-      </td>
     </tr>
     <tr>
       <th scope="row">Created At</th>
@@ -81,6 +61,7 @@
   </tbody>
 </table>
 
+<h3>Quota Information</h3>
 <% if (quotasEnabled) { %>
 <form action="/admin/manage/refresh-user-quota" method="POST">
   <input type="hidden" name="token" value="<%- user.token %>" />
@@ -88,6 +69,8 @@
   <button type="submit" class="btn btn-primary">Refresh Quotas for User</button>
 </form>
 <% } %>
+<%- include("partials/shared_quota-info", { quota, user }) %>
+
 
 <p><a href="/admin/manage/list-users">Back to User List</a></p>
 
@@ -134,4 +117,4 @@
   });
 </script>
 
-<%- include("_partials/admin-footer") %>
+<%- include("partials/admin-footer") %>

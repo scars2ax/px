@@ -1,18 +1,21 @@
-<%- include("_partials/shared_header", { title: "Lookup User Info" }) %>
+<%- include("partials/shared_header", { title: "Lookup User Info" }) %>
 <h1>Lookup User Info</h1>
+<p>Provide your user token to look up your info, see your quota, and modify your nickname.</p>
 <form action="/user/lookup" method="post">
   <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
   <label for="token">User Token</label>
   <input type="password" name="token" value="<%= user?.token %>" />
-  <input type="submit" value="Submit" />
+  <input type="submit" value="Lookup" />
 </form>
 <% if (user) { %>
+<hr />
 <table class="striped">
   <tbody>
     <tr>
-      <th scope="row">Token</th>
-      <td colspan="2"><%- user.token %></td>
+      <th scope="row">User Token</th>
+      <td colspan="2"><code> <%- "..." + user.token.slice(-5) %> </code></td>
     </tr>
+
     <tr>
       <th scope="row">Nickname</th>
       <td><%- user.nickname ?? "none" %></td>
@@ -25,28 +28,8 @@
       <td colspan="2"><%- user.type %></td>
     </tr>
     <tr>
-      <th scope="row">Prompt Count</th>
+      <th scope="row">Prompts</th>
       <td colspan="2"><%- user.promptCount %></td>
-    </tr>
-    <tr>
-      <th scope="row">Token Counts</th>
-      <td colspan="2">
-        <ul style="padding-left: 1em; margin: 0">
-          <% Object.entries(user.tokenCounts).forEach(([key, count]) => { %>
-          <li><strong><%- key %></strong>: <%- count %></li>
-          <% }) %>
-        </ul>
-      </td>
-    </tr>
-    <tr>
-      <th scope="row">Token Limits</th>
-      <td colspan="2">
-        <ul style="padding-left: 1em; margin: 0">
-          <% Object.entries(user.tokenLimits).forEach(([key, count]) => { %>
-          <li><strong><%- key %></strong>: <%- count %></li>
-          <% }) %>
-        </ul>
-      </td>
     </tr>
     <tr>
       <th scope="row">Created At</th>
@@ -58,6 +41,9 @@
     </tr>
   </tbody>
 </table>
+
+<h3>Quota Information</h3>
+<%- include("partials/shared_quota-info", { quota, user }) %>
 
 <form id="edit-nickname-form" style="display: none" action="/user/edit-nickname" method="post">
   <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
@@ -77,4 +63,4 @@
   }
 </script>
 
-<% } %> <%- include("_partials/user_footer") %>
+<% } %> <%- include("partials/user_footer") %>
