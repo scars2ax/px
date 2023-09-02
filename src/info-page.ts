@@ -271,7 +271,8 @@ function getAnthropicInfo() {
   const tokens = modelStats.get("claude__tokens") || 0;
   const cost = getTokenCostUsd("claude", tokens);
 
-  const unchecked = serviceStats.get("anthropicUncheckedKeys") || 0;
+  const unchecked =
+    (config.checkKeys && serviceStats.get("anthropicUncheckedKeys")) || 0;
 
   return {
     claude: {
