@@ -14,10 +14,6 @@ export const authorize: ({ via }: AuthorizeParams) => RequestHandler =
     const token = via === "cookie" ? cookieToken : bearerToken;
     const attempts = failedAttempts.get(req.ip) ?? 0;
 
-    if (!token) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
     if (!ADMIN_KEY) {
       req.log.warn(
         { ip: req.ip },
@@ -34,16 +30,15 @@ export const authorize: ({ via }: AuthorizeParams) => RequestHandler =
       return res.status(401).json({ error: "Too many attempts" });
     }
 
-    if (token !== ADMIN_KEY) {
-      req.log.warn(
-        { ip: req.ip, attempts, token },
-        `Attempted admin request with invalid token`
-      );
-      return handleFailedLogin(req, res);
+    if (token === ADMIN_KEY) {
+      return next();
     }
 
-    req.log.info({ ip: req.ip }, `Admin request authorized`);
-    next();
+    req.log.warn(
+      { ip: req.ip, attempts, invalidToken: String(token) },
+      `Attempted admin request with invalid token`
+    );
+    return handleFailedLogin(req, res);
   };
 
 function handleFailedLogin(req: Request, res: Response) {

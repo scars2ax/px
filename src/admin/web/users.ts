@@ -8,7 +8,7 @@ import { parseSort, sortBy, paginate } from "../../shared/utils";
 import { keyPool } from "../../shared/key-management";
 import { ModelFamily } from "../../shared/models";
 import { getTokenCostUsd, prettyTokens } from "../../shared/stats";
-import { UserSchemaWithToken, UserSchema } from "../../shared/users/schema";
+import { UserPartialSchema, UserSchema } from "../../shared/users/schema";
 
 const router = Router();
 
@@ -62,8 +62,9 @@ router.get("/list-users", (req, res) => {
     .map((user) => {
       const sums = { sumTokens: 0, sumCost: 0, prettyUsage: "" };
       Object.entries(user.tokenCounts).forEach(([model, tokens]) => {
-        sums.sumTokens += tokens;
-        sums.sumCost += getTokenCostUsd(model as ModelFamily, tokens);
+        const coalesced = tokens ?? 0;
+        sums.sumTokens += coalesced;
+        sums.sumCost += getTokenCostUsd(model as ModelFamily, coalesced);
       });
       sums.prettyUsage = `${prettyTokens(
         sums.sumTokens
@@ -90,7 +91,7 @@ router.post("/import-users", upload.single("users"), (req, res) => {
   if (!req.file) throw new HttpError(400, "No file uploaded");
 
   const data = JSON.parse(req.file.buffer.toString());
-  const result = z.array(UserSchemaWithToken).safeParse(data.users);
+  const result = z.array(UserPartialSchema).safeParse(data.users);
   if (!result.success) throw new HttpError(400, result.error.toString());
 
   const upserts = result.data.map((user) => userStore.upsertUser(user));
