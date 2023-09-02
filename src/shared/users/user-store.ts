@@ -21,6 +21,7 @@ const MAX_IPS_PER_USER = config.maxIpsPerUser;
 
 const users: Map<string, User> = new Map();
 const usersToFlush = new Set<string>();
+let quotaRefreshJob: schedule.Job | null = null;
 
 export async function init() {
   log.info({ store: config.gatekeeperStore }, "Initializing user store...");
@@ -28,12 +29,12 @@ export async function init() {
     await initFirebase();
   }
   if (config.quotaRefreshPeriod) {
-    const quotaRefreshJob = schedule.scheduleJob(getRefreshCrontab(), () => {
+    quotaRefreshJob = schedule.scheduleJob(getRefreshCrontab(), () => {
       for (const user of users.values()) {
         refreshQuota(user.token);
       }
       log.info(
-        { users: users.size, nextRefresh: quotaRefreshJob.nextInvocation() },
+        { users: users.size, nextRefresh: quotaRefreshJob!.nextInvocation() },
         "Token quotas refreshed."
       );
     });
@@ -49,6 +50,11 @@ export async function init() {
     );
   }
   log.info("User store initialized.");
+}
+
+export function getNextQuotaRefresh() {
+  if (!quotaRefreshJob) return "manual reset only";
+  return quotaRefreshJob.nextInvocation().getTime();
 }
 
 /** Creates a new user and returns their token. */
