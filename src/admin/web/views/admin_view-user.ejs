@@ -17,19 +17,15 @@
       <th scope="row">Nickname</th>
       <td><%- user.nickname ?? "none" %></td>
       <td class="actions">
-        <a
-          title="Edit"
-          id="edit-nickname"
-          href="#"
-          data-field="nickname"
-          data-token="<%= user.token %>"
-          >✏️</a
-        >
+        <a title="Edit" id="edit-nickname" href="#" data-field="nickname" data-token="<%= user.token %>">✏️</a>
       </td>
     </tr>
     <tr>
       <th scope="row">Type</th>
-      <td colspan="2"><%- user.type %></td>
+      <td><%- user.type %></td>
+      <td class="actions">
+        <a title="Edit" id="edit-type" href="#" data-field="type" data-token="<%= user.token %>">✏️</a>
+      </td>
     </tr>
     <tr>
       <th scope="row">Prompt Count</th>
@@ -107,28 +103,29 @@
       e.preventDefault();
       const token = a.dataset.token;
       const field = a.dataset.field;
-      const value = prompt(`Enter new value for '${field}'':`);
+      let value = prompt(`Enter new value for '${field}'':`);
       if (value !== null) {
+        if (value === "") {
+          value = null;
+        }
         fetch(`/admin/manage/edit-user/${token}`, {
           method: "POST",
           credentials: "same-origin",
           body: JSON.stringify({
             [field]: value,
-            _csrf: document
-              .querySelector("meta[name=csrf-token]")
-              .getAttribute("content"),
+            _csrf: document.querySelector("meta[name=csrf-token]").getAttribute("content"),
           }),
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
         })
-          .then((res) => Promise.all([res.ok, res.text()]))
-          .then(([ok, text]) => {
-            if (!ok) {
-              document.body.innerHTML = text;
-              return;
-            }
+          .then((res) => Promise.all([res.ok, res.json()]))
+          .then(([ok, json]) => {
             const url = new URL(window.location.href);
             const params = new URLSearchParams();
-            params.set("flash", `success: User's ${field} updated.`);
+            if (!ok) {
+              params.set("flash", `error: ${json.error.message}`);
+            } else {
+              params.set("flash", `success: User's ${field} updated.`);
+            }
             url.search = params.toString();
             window.location.assign(url);
           });

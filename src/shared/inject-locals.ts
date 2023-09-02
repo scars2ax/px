@@ -1,4 +1,5 @@
 import { RequestHandler } from "express";
+import sanitize from "sanitize-html";
 import { config } from "../config";
 
 export const injectLocals: RequestHandler = (req, res, next) => {
@@ -9,7 +10,7 @@ export const injectLocals: RequestHandler = (req, res, next) => {
   res.locals.persistenceEnabled = config.gatekeeperStore !== "memory";
 
   if (req.query.flash) {
-    const content = String(req.query.flash)
+    const content = sanitize(String(req.query.flash))
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;");
     const match = content.match(/^([a-z]+):(.*)/);

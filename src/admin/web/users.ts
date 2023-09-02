@@ -8,7 +8,7 @@ import { parseSort, sortBy, paginate } from "../../shared/utils";
 import { keyPool } from "../../shared/key-management";
 import { ModelFamily } from "../../shared/models";
 import { getTokenCostUsd, prettyTokens } from "../../shared/stats";
-import { UserPartialSchema, UserSchema } from "../../shared/users/schema";
+import { UserPartialSchema } from "../../shared/users/schema";
 
 const router = Router();
 
@@ -116,11 +116,19 @@ router.get("/", (_req, res) => {
 });
 
 router.post("/edit-user/:token", (req, res) => {
-  const result = UserSchema.safeParse(req.body);
-  if (!result.success) throw new HttpError(400, result.error.toString());
+  const result = UserPartialSchema.safeParse({
+    ...req.body,
+    token: req.params.token,
+  });
+  if (!result.success) {
+    throw new HttpError(
+      400,
+      result.error.issues.flatMap((issue) => issue.message).join(", ")
+    );
+  }
 
-  userStore.upsertUser({ ...result.data, token: req.params.token });
-  return res.sendStatus(204);
+  userStore.upsertUser(result.data);
+  return res.status(200).json({ success: true });
 });
 
 router.post("/reactivate-user/:token", (req, res) => {

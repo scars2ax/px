@@ -27,14 +27,18 @@ adminRouter.use("/manage", authorize({ via: "cookie" }), webRouter);
 adminRouter.use(
   (
     err: Error,
-    _req: express.Request,
+    req: express.Request,
     res: express.Response,
     _next: express.NextFunction
   ) => {
     const data: any = { message: err.message, stack: err.stack };
     if (err instanceof HttpError) {
       data.status = err.status;
-      return res.status(err.status).render("admin_error", data);
+      res.status(err.status);
+      if (req.accepts(["html", "json"]) === "json") {
+        return res.json({ error: data });
+      }
+      return res.render("admin_error", data);
     } else if (err.name === "ForbiddenError") {
       data.status = 403;
       if (err.message === "invalid csrf token") {
