@@ -1,6 +1,6 @@
-<%- include("partials/shared_header", { title: "Lookup User Info" }) %>
-<h1>Lookup User Info</h1>
-<p>Provide your user token to look up your info, see your quota, and modify your nickname.</p>
+<%- include("partials/shared_header", { title: "User Token Lookup" }) %>
+<h1>User Token Lookup</h1>
+<p>Provide your user token to check your token usage and modify your details.</p>
 <form action="/user/lookup" method="post">
   <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
   <label for="token">User Token</label>

@@ -1,7 +1,7 @@
 import { RequestHandler } from "express";
 import sanitize from "sanitize-html";
 import { config } from "../config";
-import { prettyTokens } from "./stats";
+import { getTokenCostUsd, prettyTokens } from "./stats";
 import * as userStore from "./users/user-store";
 
 export const injectLocals: RequestHandler = (req, res, next) => {
@@ -30,6 +30,7 @@ export const injectLocals: RequestHandler = (req, res, next) => {
 
   // utils
   res.locals.prettyTokens = prettyTokens;
+  res.locals.tokenCost = getTokenCostUsd;
 
   next();
 };

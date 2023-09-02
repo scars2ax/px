@@ -2,13 +2,12 @@ import { Router } from "express";
 import { UserSchema } from "../../shared/users/schema";
 import * as userStore from "../../shared/users/user-store";
 import { UserInputError } from "../../shared/errors";
-import { prettyTokens } from "../../shared/stats";
 import { sanitizeAndTrim } from "../../shared/utils";
 
 const router = Router();
 
 router.get("/", (_req, res) => {
-  res.render("user_index");
+  res.redirect("/");
 });
 
 router.get("/lookup", (req, res) => {

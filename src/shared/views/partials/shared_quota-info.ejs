@@ -2,8 +2,8 @@
 <table>
   <thead>
     <tr>
-      <th scope="col">Model</th>
-      <th scope="col">Usage</th>
+      <th scope="col">Model Family</th>
+      <th scope="col">Usage (USD Cost)</th>
       <th scope="col">Limit</th>
       <th scope="col">Remaining</th>
       <th scope="col">Refresh Amount</th>
@@ -13,7 +13,7 @@
     <% Object.entries(quota).forEach(([key, limit]) => { %>
     <tr>
       <th scope="row"><%- key %></th>
-      <td><%- prettyTokens(user.tokenCounts[key]) %></td>
+      <td><%- prettyTokens(user.tokenCounts[key]) %> ($<%- tokenCost(key, user.tokenCounts[key]).toFixed(2) %>)</td>
       <% if (!user.tokenLimits[key]) { %>
       <td colspan="2" style="text-align: center">unlimited</td>
       <% } else { %>

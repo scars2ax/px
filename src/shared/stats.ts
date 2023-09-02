@@ -18,15 +18,16 @@ export function getTokenCostUsd(model: ModelFamily, tokens: number) {
       cost = 0.00001102;
       break;
   }
-  return cost * tokens;
+  return cost * Math.max(0, tokens);
 }
 
 export function prettyTokens(tokens: number): string {
-  if (tokens < 1000) {
+  const absTokens = Math.abs(tokens);
+  if (absTokens < 1000) {
     return tokens.toString();
-  } else if (tokens < 1000000) {
+  } else if (absTokens < 1000000) {
     return (tokens / 1000).toFixed(1) + "k";
-  } else if (tokens < 1000000000) {
+  } else if (absTokens < 1000000000) {
     return (tokens / 1000000).toFixed(2) + "m";
   } else {
     return (tokens / 1000000000).toFixed(2) + "b";

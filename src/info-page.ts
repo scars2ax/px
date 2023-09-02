@@ -339,8 +339,11 @@ Logs are anonymous and do not contain IP addresses or timestamps. [You can see t
   infoBody += "\n\n" + waits.join(" / ");
 
   if (customGreeting) {
-    infoBody += `\n## Server Greeting\n
-${customGreeting}`;
+    infoBody += `\n## Server Greeting\n${customGreeting}`;
+  }
+
+  if (config.gatekeeper === "user_token") {
+    infoBody += `\n\n---\n\n[User lookup](/user/lookup)`;
   }
   return converter.makeHtml(infoBody);
 }

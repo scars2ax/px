@@ -53,7 +53,7 @@ export async function init() {
 }
 
 export function getNextQuotaRefresh() {
-  if (!quotaRefreshJob) return "manual reset only";
+  if (!quotaRefreshJob) return "never (manual refresh only)";
   return quotaRefreshJob.nextInvocation().getTime();
 }
 
