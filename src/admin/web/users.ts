@@ -8,7 +8,7 @@ import { parseSort, sortBy, paginate } from "../../shared/utils";
 import { keyPool } from "../../shared/key-management";
 import { ModelFamily } from "../../shared/models";
 import { getTokenCostUsd, prettyTokens } from "../../shared/stats";
-import { UserSchema, UserSchemaWithToken } from "../common";
+import { UserSchemaWithToken, UserSchema } from "../../shared/users/schema";
 
 const router = Router();
 

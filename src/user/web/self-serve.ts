@@ -1,7 +1,7 @@
 import { Router } from "express";
 import sanitizeHtml from "sanitize-html";
+import { UserSchema } from "../../shared/users/schema";
 import * as userStore from "../../shared/users/user-store";
-import { UserSchema } from "../../admin/common";
 import { UserInputError } from "../../shared/errors";
 
 const router = Router();

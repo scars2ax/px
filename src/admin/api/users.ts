@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import * as userStore from "../../shared/users/user-store";
 import { parseSort, sortBy } from "../../shared/utils";
-import { UserSchema, UserSchemaWithToken } from "../common";
+import { UserSchema, UserSchemaWithToken } from "../../shared/users/schema";
 
 const router = Router();
 

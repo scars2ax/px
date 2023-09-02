@@ -1,5 +1,45 @@
 import { ZodType, z } from "zod";
-import { UserTokenCounts } from "../shared/users/user-store";
+import type { ModelFamily } from "../models";
+
+export type UserTokenCounts = {
+  [K in Exclude<ModelFamily, "gpt4-32k">]: number;
+} & {
+  [K in "gpt4-32k"]?: number; // Optional because it was added later
+};
+
+export interface User {
+  /** The user's personal access token. */
+  token: string;
+  /** The user's nickname. */
+  nickname?: string;
+  /** The IP addresses the user has connected from. */
+  ip: string[];
+  /** The user's privilege level. */
+  type: UserType;
+  /** The number of prompts the user has made. */
+  promptCount: number;
+  /** @deprecated Use `tokenCounts` instead. */
+  tokenCount?: never;
+  /** The number of tokens the user has consumed, by model family. */
+  tokenCounts: UserTokenCounts;
+  /** The maximum number of tokens the user can consume, by model family. */
+  tokenLimits: UserTokenCounts;
+  /** The time at which the user was created. */
+  createdAt: number;
+  /** The time at which the user last connected. */
+  lastUsedAt?: number;
+  /** The time at which the user was disabled, if applicable. */
+  disabledAt?: number;
+  /** The reason for which the user was disabled, if applicable. */
+  disabledReason?: string;
+}
+
+/**
+ * Possible privilege levels for a user.
+ * - `normal`: Default role. Subject to usual rate limits and quotas.
+ * - `special`: Special role. Higher quotas and exempt from auto-ban/lockout.
+ */
+export type UserType = "normal" | "special";
 
 const tokenCountsSchema: ZodType<UserTokenCounts> = z
   .object({

@@ -56,7 +56,10 @@ export interface User {
  */
 export type UserType = "normal" | "special";
 
-type UserUpdate = Partial<User> & Pick<User, "token">;
+type WithNullableOptionals<T> = {
+  [prop in keyof T]: undefined extends T[prop] ? T[prop] | null : T[prop];
+};
+type UserUpdate = Partial<WithNullableOptionals<User>> & Pick<User, "token">;
 
 const MAX_IPS_PER_USER = config.maxIpsPerUser;
 
@@ -123,7 +126,6 @@ export function getUsers() {
  * user information via JSON. Use other functions for more specific operations.
  */
 export function upsertUser(user: UserUpdate) {
-  // TODO: May need better merging for nested objects
   const existing: User = users.get(user.token) ?? {
     token: user.token,
     ip: [],
@@ -134,10 +136,20 @@ export function upsertUser(user: UserUpdate) {
     createdAt: Date.now(),
   };
 
-  users.set(user.token, {
-    ...existing,
-    ...user,
-  });
+  const updates: Partial<User> = {};
+
+  for (const [key, value] of Object.entries(user)) {
+    if (value === undefined || key === "token") {
+      continue;
+    }
+    if (value === null) {
+      delete existing[key as keyof User];
+    } else {
+      updates[key as keyof User] = value;
+    }
+  }
+
+  users.set(user.token, Object.assign(existing, updates));
   usersToFlush.add(user.token);
 
   // Immediately schedule a flush to the database if we're using Firebase.
