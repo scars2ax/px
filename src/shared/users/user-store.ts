@@ -22,6 +22,7 @@ const MAX_IPS_PER_USER = config.maxIpsPerUser;
 const users: Map<string, User> = new Map();
 const usersToFlush = new Set<string>();
 let quotaRefreshJob: schedule.Job | null = null;
+let userCleanupJob: schedule.Job | null = null;
 
 export async function init() {
   log.info({ store: config.gatekeeperStore }, "Initializing user store...");
@@ -29,16 +30,8 @@ export async function init() {
     await initFirebase();
   }
   if (config.quotaRefreshPeriod) {
-    quotaRefreshJob = schedule.scheduleJob(getRefreshCrontab(), () => {
-      for (const user of users.values()) {
-        refreshQuota(user.token);
-      }
-      log.info(
-        { users: users.size, nextRefresh: quotaRefreshJob!.nextInvocation() },
-        "Token quotas refreshed."
-      );
-    });
-
+    const crontab = getRefreshCrontab();
+    quotaRefreshJob = schedule.scheduleJob(crontab, refreshAllQuotas);
     if (!quotaRefreshJob) {
       throw new Error(
         "Unable to schedule quota refresh. Is QUOTA_REFRESH_PERIOD set correctly?"
@@ -49,25 +42,30 @@ export async function init() {
       "Scheduled token quota refresh."
     );
   }
+
+  userCleanupJob = schedule.scheduleJob("* * * * *", cleanupExpiredTokens);
+
   log.info("User store initialized.");
 }
 
-export function getNextQuotaRefresh() {
-  if (!quotaRefreshJob) return "never (manual refresh only)";
-  return quotaRefreshJob.nextInvocation().getTime();
-}
-
-/** Creates a new user and returns their token. */
-export function createUser() {
+/**
+ * Creates a new user and returns their token. Optionally accepts parameters
+ * for setting an expiry date and/or token limits for temporary users.
+ **/
+export function createUser(expiryOptions?: {
+  expiresAt: number;
+  tokenLimits: User["tokenLimits"];
+}) {
   const token = uuid();
   users.set(token, {
     token,
     ip: [],
-    type: "normal",
+    type: expiryOptions?.expiresAt ? "temporary" : "normal",
     promptCount: 0,
     tokenCounts: { turbo: 0, gpt4: 0, "gpt4-32k": 0, claude: 0 },
     tokenLimits: { ...config.tokenQuota },
     createdAt: Date.now(),
+    ...expiryOptions,
   });
   usersToFlush.add(token);
   return token;
@@ -223,6 +221,48 @@ export function disableUser(token: string, reason?: string) {
   usersToFlush.add(token);
 }
 
+export function getNextQuotaRefresh() {
+  if (!quotaRefreshJob) return "never (manual refresh only)";
+  return quotaRefreshJob.nextInvocation().getTime();
+}
+
+/**
+ * Cleans up expired temporary tokens by disabling tokens past their access
+ * expiry date and permanently deleting tokens one day after their access
+ * expiry date.
+ */
+function cleanupExpiredTokens() {
+  const now = Date.now();
+  let disabled = 0;
+  let deleted = 0;
+  for (const user of users.values()) {
+    if (user.type !== "temporary") continue;
+    if (user.expiresAt && user.expiresAt < now && !user.disabledAt) {
+      disableUser(user.token, "Temporary token expired.");
+      disabled++;
+    }
+    if (user.disabledAt && user.disabledAt + 24 * 60 * 60 * 1000 < now) {
+      users.delete(user.token);
+      usersToFlush.add(user.token);
+      deleted++;
+    }
+  }
+  log.info({ disabled, deleted }, "Expired tokens cleaned up.");
+}
+
+function refreshAllQuotas() {
+  let count = 0;
+  for (const user of users.values()) {
+    if (user.type === "temporary") continue;
+    refreshQuota(user.token);
+    count++;
+  }
+  log.info(
+    { refreshed: count, nextRefresh: quotaRefreshJob!.nextInvocation() },
+    "Token quotas refreshed."
+  );
+}
+
 // TODO: Firebase persistence is pretend right now and just polls the in-memory
 // store to sync it with Firebase when it changes. Will refactor to abstract
 // persistence layer later so we can support multiple stores.
@@ -253,10 +293,12 @@ async function flushUsers() {
   const db = admin.database(app);
   const usersRef = db.ref("users");
   const updates: Record<string, User> = {};
+  const deletions = [];
 
   for (const token of usersToFlush) {
     const user = users.get(token);
     if (!user) {
+      deletions.push(token);
       continue;
     }
     updates[token] = user;
@@ -270,7 +312,11 @@ async function flushUsers() {
   }
 
   await usersRef.update(updates);
-  log.info({ users: Object.keys(updates).length }, "Flushed users to Firebase");
+  await Promise.all(deletions.map((token) => usersRef.child(token).remove()));
+  log.info(
+    { users: Object.keys(updates).length, deletions: deletions.length },
+    "Flushed users to Firebase"
+  );
 }
 
 // TODO: use key-management/models.ts for family mapping

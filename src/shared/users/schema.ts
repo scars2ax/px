@@ -15,11 +15,11 @@ export const tokenCountsSchema: ZodType<UserTokenCounts> = z
 
 export const UserSchema = z
   .object({
-    /** The user's personal access token. */
+    /** User's personal access token. */
     token: z.string(),
-    /** The IP addresses the user has connected from. */
+    /** IP addresses the user has connected from. */
     ip: z.array(z.string()),
-    /** The user's nickname. */
+    /** User's nickname. */
     nickname: z.string().max(80).nullish(),
     /**
      * The user's privilege level.
@@ -27,26 +27,28 @@ export const UserSchema = z
      * - `special`: Special role. Higher quotas and exempt from
      *   auto-ban/lockout.
      **/
-    type: z.enum(["normal", "special"]),
-    /** The number of prompts the user has made. */
+    type: z.enum(["normal", "special", "temporary"]),
+    /** Number of prompts the user has made. */
     promptCount: z.number(),
     /**
      * @deprecated Use `tokenCounts` instead.
      * Never used; retained for backwards compatibility.
      */
     tokenCount: z.any().optional(),
-    /** The number of tokens the user has consumed, by model family. */
+    /** Number of tokens the user has consumed, by model family. */
     tokenCounts: tokenCountsSchema,
-    /** The maximum number of tokens the user can consume, by model family. */
+    /** Maximum number of tokens the user can consume, by model family. */
     tokenLimits: tokenCountsSchema,
-    /** The time at which the user was created. */
+    /** Time at which the user was created. */
     createdAt: z.number(),
-    /** The time at which the user last connected. */
+    /** Time at which the user last connected. */
     lastUsedAt: z.number().nullish(),
-    /** The time at which the user was disabled, if applicable. */
+    /** Time at which the user was disabled, if applicable. */
     disabledAt: z.number().nullish(),
-    /** The reason for which the user was disabled, if applicable. */
+    /** Reason for which the user was disabled, if applicable. */
     disabledReason: z.string().nullish(),
+    /** Time at which the user will expire and be disabled (for temp users). */
+    expiresAt: z.number().nullish(),
   })
   .strict();
 
