@@ -159,7 +159,7 @@ export function authenticate(token: string, ip: string) {
   const ipLimit =
     user.type === "special" || !MAX_IPS_PER_USER ? Infinity : MAX_IPS_PER_USER;
   if (user.ip.length > ipLimit) {
-    disableUser(token, "Too many IP addresses associated with this token.");
+    disableUser(token, "IP address limit exceeded.");
     return;
   }
 

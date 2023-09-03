@@ -31,6 +31,13 @@
 </style>
 
 <h1>Create User Token</h1>
+<p>User token types:</p>
+<ul>
+  <li><strong>Normal</strong> - Standard users.
+  <li><strong>Special</strong> - Exempt from token quotas and <code>MAX_IPS_PER_USER</code> enforcement.</li>
+  <li><strong>Temporary</strong> - Disabled after a specified duration. Quotas never refresh.</li>
+</ul>
+  
 <form action="/admin/manage/create-user" method="post">
   <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
   <label for="type">Type</label>
@@ -47,8 +54,13 @@
         Temporary users will be disabled after the specified duration, and their records will be deleted 24 hours after that. These options apply only to new
         temporary users; existing ones use whatever options were in effect when they were created.
       </p>
-      <label for="temporaryUserDuration" class="full-width">Duration (in minutes)</label>
+      <label for="temporaryUserDuration" class="full-width">Access duration (in minutes)</label>
       <input type="number" name="temporaryUserDuration" id="temporaryUserDuration" value="60" class="full-width" />
+      <!-- convenience calculations -->
+      <span>6 hours:</span><code>360</code>
+      <span>12 hours:</span><code>720</code>
+      <span>1 day:</span><code>1440</code>
+      <span>1 week:</span><code>10080</code>
       <h3 class="full-width">Token Quotas</h3>
       <p class="full-width">Temporary users' quotas are never refreshed.</p>
       <% Object.entries(quota).forEach(function([model, tokens]) { %>
