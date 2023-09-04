@@ -48,7 +48,7 @@ router.post("/edit-nickname", (req, res) => {
   }
 
   const newNickname = result.data.nickname || null;
-  userStore.upsertUser({ ...existing, nickname: newNickname });
+  userStore.upsertUser({ token: existing.token, nickname: newNickname });
   res.render("user_lookup", {
     user: { ...existing, nickname: newNickname },
     flash: { type: "success", message: "Nickname updated" },

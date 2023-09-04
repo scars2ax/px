@@ -8,7 +8,7 @@ import { parseSort, sortBy, paginate } from "../../shared/utils";
 import { keyPool } from "../../shared/key-management";
 import { ModelFamily } from "../../shared/models";
 import { getTokenCostUsd, prettyTokens } from "../../shared/stats";
-import { UserPartialSchema } from "../../shared/users/schema";
+import { User, UserPartialSchema } from "../../shared/users/schema";
 
 const router = Router();
 
@@ -53,22 +53,14 @@ router.get("/view-user/:token", (req, res) => {
 });
 
 router.get("/list-users", (req, res) => {
-  const sort = parseSort(req.query.sort) || ["sumCost", "createdAt"];
+  const sort = parseSort(req.query.sort) || ["sumTokens", "createdAt"];
   const requestedPageSize =
     Number(req.query.perPage) || Number(req.cookies.perPage) || 20;
   const perPage = Math.max(1, Math.min(1000, requestedPageSize));
   const users = userStore
     .getUsers()
     .map((user) => {
-      const sums = { sumTokens: 0, sumCost: 0, prettyUsage: "" };
-      Object.entries(user.tokenCounts).forEach(([model, tokens]) => {
-        const coalesced = tokens ?? 0;
-        sums.sumTokens += coalesced;
-        sums.sumCost += getTokenCostUsd(model as ModelFamily, coalesced);
-      });
-      sums.prettyUsage = `${prettyTokens(
-        sums.sumTokens
-      )} ($${sums.sumCost.toFixed(2)}) `;
+      const sums = getSumsForUser(user);
       return { ...user, ...sums };
     })
     .sort(sortBy(sort, false));
@@ -189,5 +181,79 @@ router.post("/maintenance", (req, res) => {
   }
   return res.redirect(`/admin/manage?flash=${message}`);
 });
+
+router.get("/rentry-stats", (_req, res) => {
+  const users = userStore.getUsers();
+
+  let totalTokens = 0;
+  let totalCost = 0;
+  let totalPrompts = 0;
+  let totalIps = 0;
+
+  const lines = users
+    .map((user) => {
+      const sums = getSumsForUser(user);
+      totalTokens += sums.sumTokens;
+      totalCost += sums.sumCost;
+      totalPrompts += user.promptCount;
+      totalIps += user.ip.length;
+
+      const token = `...${user.token.slice(-5)}`;
+      const name = user.nickname
+        ? `${user.nickname.slice(0, 16).padEnd(16)} ${token}`
+        : `${"Anonymous".padEnd(16)} ${token}`;
+      const strUser = name.padEnd(25);
+      const strPrompts = `${user.promptCount} proompts`.padEnd(14);
+      const strIps = `${user.ip.length} IPs`.padEnd(8);
+      const strTokens = `${sums.prettyUsage} tokens`.padEnd(30);
+
+      return {
+        strUser,
+        strPrompts,
+        strIps,
+        strTokens,
+        sort: user.promptCount,
+      };
+    })
+    .sort((a, b) => b.sort - a.sort)
+    .map(
+      (l) => `${l.strUser} | ${l.strPrompts} | ${l.strIps} | ${l.strTokens}`
+    );
+
+  const strTotalPrompts = `${totalPrompts} proompts`;
+  const strTotalIps = `${totalIps} IPs`;
+  const strTotalTokens = `${prettyTokens(totalTokens)} tokens`;
+  const strTotalCost = `US$${totalCost.toFixed(2)} cost`;
+  let header = `!!!Note ${users.length} users | ${strTotalPrompts} | ${strTotalIps} | ${strTotalTokens}`;
+  header += config.showTokenCosts ? ` | ${strTotalCost}` : "";
+
+  const doc = [];
+  doc.push("# Stats");
+  doc.push(header);
+  doc.push("```");
+  doc.push(lines.join("\n"));
+  doc.push("```");
+  doc.push(` -> *(as of ${new Date().toISOString()})* <-`);
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename=proxy-stats-${new Date().toISOString()}.md`
+  );
+  res.setHeader("Content-Type", "text/markdown");
+  res.send(doc.join("\n"));
+});
+
+function getSumsForUser(user: User) {
+  const sums = { sumTokens: 0, sumCost: 0, prettyUsage: "" };
+  Object.entries(user.tokenCounts).forEach(([model, tokens]) => {
+    const coalesced = tokens ?? 0;
+    sums.sumTokens += coalesced;
+    sums.sumCost += getTokenCostUsd(model as ModelFamily, coalesced);
+  });
+  sums.prettyUsage = `${prettyTokens(sums.sumTokens)}`;
+  if (config.showTokenCosts) {
+    sums.prettyUsage += ` ($${sums.sumCost.toFixed(2)})`;
+  }
+  return sums;
+}
 
 export { router as usersWebRouter };
