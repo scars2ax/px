@@ -270,8 +270,7 @@ router.get("/rentry-stats", (_req, res) => {
   const strTotalIps = `${totalIps} IPs`;
   const strTotalTokens = `${prettyTokens(totalTokens)} tokens`;
   const strTotalCost = `US$${totalCost.toFixed(2)} cost`;
-  let header = `!!!Note ${users.length} users | ${strTotalPrompts} | ${strTotalIps} | ${strTotalTokens}`;
-  header += config.showTokenCosts ? ` | ${strTotalCost}` : "";
+  let header = `!!!Note ${users.length} users | ${strTotalPrompts} | ${strTotalIps} | ${strTotalTokens} | ${strTotalCost}`;
 
   const doc = [];
   doc.push("# Stats");
@@ -295,10 +294,9 @@ function getSumsForUser(user: User) {
     sums.sumTokens += coalesced;
     sums.sumCost += getTokenCostUsd(model as ModelFamily, coalesced);
   });
-  sums.prettyUsage = `${prettyTokens(sums.sumTokens)}`;
-  if (config.showTokenCosts) {
-    sums.prettyUsage += ` ($${sums.sumCost.toFixed(2)})`;
-  }
+  sums.prettyUsage = `${prettyTokens(sums.sumTokens)} ($${sums.sumCost.toFixed(
+    2
+  )})`;
   return sums;
 }
 
