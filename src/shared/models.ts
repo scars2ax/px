@@ -25,3 +25,12 @@ export function getOpenAIModelFamily(model: string): OpenAIModelFamily {
 export function getClaudeModelFamily(_model: string): ModelFamily {
   return "claude";
 }
+
+export function assertIsKnownModelFamily(
+  modelFamily: string
+): asserts modelFamily is ModelFamily {
+  const families: ModelFamily[] = ["turbo", "gpt4", "gpt4-32k", "claude"];
+  if (!families.includes(modelFamily as ModelFamily)) {
+    throw new Error(`Unknown model family: ${modelFamily}`);
+  }
+}
