@@ -52,21 +52,32 @@ export async function init() {
  * Creates a new user and returns their token. Optionally accepts parameters
  * for setting an expiry date and/or token limits for temporary users.
  **/
-export function createUser(expiryOptions?: {
-  expiresAt: number;
-  tokenLimits: User["tokenLimits"];
+export function createUser(createOptions?: {
+  type?: User["type"];
+  expiresAt?: number;
+  tokenLimits?: User["tokenLimits"];
 }) {
   const token = uuid();
-  users.set(token, {
+  const newUser: User = {
     token,
     ip: [],
-    type: expiryOptions?.expiresAt ? "temporary" : "normal",
+    type: "normal",
     promptCount: 0,
     tokenCounts: { turbo: 0, gpt4: 0, "gpt4-32k": 0, claude: 0 },
-    tokenLimits: { ...config.tokenQuota },
+    tokenLimits: createOptions?.tokenLimits ?? { ...config.tokenQuota },
     createdAt: Date.now(),
-    ...expiryOptions,
-  });
+  };
+
+  if (createOptions?.type === "temporary") {
+    Object.assign(newUser, {
+      type: "temporary",
+      expiresAt: createOptions.expiresAt,
+    });
+  } else {
+    Object.assign(newUser, { type: createOptions?.type ?? "normal" });
+  }
+
+  users.set(token, newUser);
   usersToFlush.add(token);
   return token;
 }
