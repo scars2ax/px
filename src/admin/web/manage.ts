@@ -8,7 +8,12 @@ import { parseSort, sortBy, paginate } from "../../shared/utils";
 import { keyPool } from "../../shared/key-management";
 import { ModelFamily } from "../../shared/models";
 import { getTokenCostUsd, prettyTokens } from "../../shared/stats";
-import { User, UserPartialSchema } from "../../shared/users/schema";
+import {
+  User,
+  UserPartialSchema,
+  UserSchema,
+  UserTokenCounts,
+} from "../../shared/users/schema";
 
 const router = Router();
 
@@ -34,8 +39,49 @@ router.get("/create-user", (req, res) => {
   });
 });
 
-router.post("/create-user", (_req, res) => {
-  userStore.createUser();
+router.post("/create-user", (req, res) => {
+  const body = req.body;
+  const models = Object.keys(config.tokenQuota) as ModelFamily[];
+
+  const basicUser = z.object({ type: UserSchema.shape.type.default("normal") });
+  const tempUser = basicUser
+    .extend({
+      temporaryUserDuration: z
+        .number()
+        .int()
+        .min(1)
+        .max(10080 * 4),
+    })
+    .merge(
+      models.reduce((schema, model) => {
+        return schema.extend({
+          [`temporaryUserQuota_${model}`]: z
+            .number()
+            .int()
+            .min(0)
+            .max(999999999),
+        });
+      }, z.object({}))
+    )
+    .transform((data: any) => {
+      const expiresAt = Date.now() + data.temporaryUserDuration * 60 * 1000;
+      const tokenLimits = models.reduce((limits, model) => {
+        limits[model] = data[`temporaryUserQuota_${model}`];
+        return limits;
+      }, {} as UserTokenCounts);
+      return { ...data, expiresAt, tokenLimits };
+    });
+
+  const createSchema = body.type === "temporary" ? tempUser : basicUser;
+  const result = createSchema.safeParse(body);
+  if (!result.success) {
+    throw new HttpError(
+      400,
+      result.error.issues.flatMap((issue) => issue.message).join(", ")
+    );
+  }
+
+  userStore.createUser({ ...result.data });
   return res.redirect(`/admin/manage/create-user?created=true`);
 });
 
