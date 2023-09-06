@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { UserSchema } from "../../shared/users/schema";
+import { UserPartialSchema } from "../../shared/users/schema";
 import * as userStore from "../../shared/users/user-store";
 import { UserInputError } from "../../shared/errors";
 import { sanitizeAndTrim } from "../../shared/utils";
@@ -32,14 +32,11 @@ router.post("/edit-nickname", (req, res) => {
   if (!config.allowNicknameChanges)
     throw new UserInputError("Nickname changes are not allowed.");
 
-  const nicknameUpdateSchema = z
-    .object({
-      token: z.string(),
-      nickname: UserSchema.shape.nickname.transform((v) => sanitizeAndTrim(v)),
-    })
-    .strict();
+  const schema = UserPartialSchema.pick({ token: true, nickname: true })
+    .strict()
+    .transform((v) => ({ ...v, nickname: sanitizeAndTrim(v.nickname) }));
 
-  const result = nicknameUpdateSchema.safeParse(req.body);
+  const result = schema.safeParse(req.body);
   if (!result.success) {
     throw new UserInputError(result.error.message);
   }
