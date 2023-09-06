@@ -26,11 +26,14 @@ export function getClaudeModelFamily(_model: string): ModelFamily {
   return "claude";
 }
 
+export const MODEL_FAMILIES = (<A extends readonly ModelFamily[]>(
+  array: A & ([ModelFamily] extends [A[number]] ? unknown : never)
+) => array)(["turbo", "gpt4", "gpt4-32k", "claude"] as const);
+
 export function assertIsKnownModelFamily(
   modelFamily: string
 ): asserts modelFamily is ModelFamily {
-  const families: ModelFamily[] = ["turbo", "gpt4", "gpt4-32k", "claude"];
-  if (!families.includes(modelFamily as ModelFamily)) {
+  if (!MODEL_FAMILIES.includes(modelFamily as ModelFamily)) {
     throw new Error(`Unknown model family: ${modelFamily}`);
   }
 }

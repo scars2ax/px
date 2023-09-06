@@ -12,7 +12,7 @@ router.get("/", (_req, res) => {
   res.redirect("/");
 });
 
-router.get("/lookup", (req, res) => {
+router.get("/lookup", (_req, res) => {
   res.render("user_lookup", { user: null });
 });
 

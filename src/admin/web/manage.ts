@@ -6,7 +6,7 @@ import { HttpError } from "../../shared/errors";
 import * as userStore from "../../shared/users/user-store";
 import { parseSort, sortBy, paginate } from "../../shared/utils";
 import { keyPool } from "../../shared/key-management";
-import { ModelFamily } from "../../shared/models";
+import { MODEL_FAMILIES } from "../../shared/models";
 import { getTokenCostUsd, prettyTokens } from "../../shared/stats";
 import {
   User,
@@ -41,7 +41,7 @@ router.get("/create-user", (req, res) => {
 
 router.post("/create-user", (req, res) => {
   const body = req.body;
-  const models = Object.keys(config.tokenQuota) as ModelFamily[];
+  const models = MODEL_FAMILIES;
 
   const basicUser = z.object({ type: UserSchema.shape.type.default("normal") });
   const tempUser = basicUser
@@ -288,12 +288,15 @@ router.get("/rentry-stats", (_req, res) => {
 });
 
 function getSumsForUser(user: User) {
-  const sums = { sumTokens: 0, sumCost: 0, prettyUsage: "" };
-  Object.entries(user.tokenCounts).forEach(([model, tokens]) => {
-    const coalesced = tokens ?? 0;
-    sums.sumTokens += coalesced;
-    sums.sumCost += getTokenCostUsd(model as ModelFamily, coalesced);
-  });
+  const sums = MODEL_FAMILIES.reduce(
+    (s, model) => {
+      const tokens = user.tokenCounts[model] ?? 0;
+      s.sumTokens += tokens;
+      s.sumCost += getTokenCostUsd(model, tokens);
+      return s;
+    },
+    { sumTokens: 0, sumCost: 0, prettyUsage: "" }
+  );
   sums.prettyUsage = `${prettyTokens(sums.sumTokens)} ($${sums.sumCost.toFixed(
     2
   )})`;
