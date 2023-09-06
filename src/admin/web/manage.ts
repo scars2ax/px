@@ -41,10 +41,9 @@ router.get("/create-user", (req, res) => {
 
 router.post("/create-user", (req, res) => {
   const body = req.body;
-  const models = MODEL_FAMILIES;
 
-  const basicUser = z.object({ type: UserSchema.shape.type.default("normal") });
-  const tempUser = basicUser
+  const base = z.object({ type: UserSchema.shape.type.default("normal") });
+  const tempUser = base
     .extend({
       temporaryUserDuration: z
         .number()
@@ -53,26 +52,22 @@ router.post("/create-user", (req, res) => {
         .max(10080 * 4),
     })
     .merge(
-      models.reduce((schema, model) => {
+      MODEL_FAMILIES.reduce((schema, model) => {
         return schema.extend({
-          [`temporaryUserQuota_${model}`]: z
-            .number()
-            .int()
-            .min(0)
-            .max(999999999),
+          [`temporaryUserQuota_${model}`]: z.number().int().min(0),
         });
       }, z.object({}))
     )
     .transform((data: any) => {
       const expiresAt = Date.now() + data.temporaryUserDuration * 60 * 1000;
-      const tokenLimits = models.reduce((limits, model) => {
+      const tokenLimits = MODEL_FAMILIES.reduce((limits, model) => {
         limits[model] = data[`temporaryUserQuota_${model}`];
         return limits;
       }, {} as UserTokenCounts);
       return { ...data, expiresAt, tokenLimits };
     });
 
-  const createSchema = body.type === "temporary" ? tempUser : basicUser;
+  const createSchema = body.type === "temporary" ? tempUser : base;
   const result = createSchema.safeParse(body);
   if (!result.success) {
     throw new HttpError(

@@ -1,5 +1,6 @@
 import { ZodType, z } from "zod";
 import type { ModelFamily } from "../models";
+import { makeOptionalPropsNullable } from "../utils";
 
 export const tokenCountsSchema: ZodType<UserTokenCounts> = z
   .object({
@@ -20,7 +21,7 @@ export const UserSchema = z
     /** IP addresses the user has connected from. */
     ip: z.array(z.string()),
     /** User's nickname. */
-    nickname: z.string().max(80).nullish(),
+    nickname: z.string().max(80).optional(),
     /**
      * The user's privilege level.
      * - `normal`: Default role. Subject to usual rate limits and quotas.
@@ -42,19 +43,24 @@ export const UserSchema = z
     /** Time at which the user was created. */
     createdAt: z.number(),
     /** Time at which the user last connected. */
-    lastUsedAt: z.number().nullish(),
+    lastUsedAt: z.number().optional(),
     /** Time at which the user was disabled, if applicable. */
-    disabledAt: z.number().nullish(),
+    disabledAt: z.number().optional(),
     /** Reason for which the user was disabled, if applicable. */
-    disabledReason: z.string().nullish(),
+    disabledReason: z.string().optional(),
     /** Time at which the user will expire and be disabled (for temp users). */
-    expiresAt: z.number().nullish(),
+    expiresAt: z.number().optional(),
   })
   .strict();
 
-export const UserPartialSchema = UserSchema.partial().extend({
-  token: z.string(),
-});
+/**
+ * Variant of `UserSchema` which allows for partial updates, and makes any
+ * optional properties on the base schema nullable. Null values are used to
+ * indicate that the property should be deleted from the user object.
+ */
+export const UserPartialSchema = makeOptionalPropsNullable(UserSchema)
+  .partial()
+  .extend({ token: z.string() });
 
 // gpt4-32k was added after the initial release, so this tries to allow for
 // data imported from older versions of the app which may be missing the
