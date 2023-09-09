@@ -25,6 +25,56 @@ export class KeyPool {
     }
   }
   
+  public getKeysSafely() {
+
+	const openaiKeys = this.keyProviders[0].getAllKeys();
+	const anthropipcKeys = this.keyProviders[1].getAllKeys();
+
+	const combinedKeys = Array.prototype.concat.call(openaiKeys, anthropipcKeys);
+	return combinedKeys;
+  }
+  
+  public addKey(key: string) {
+	  const openaiProvider = this.keyProviders[0]
+	  const anthropicProvider = this.keyProviders[1]
+	  let val = false
+	  if (key.includes("sk-ant-api")) {
+		val = anthropicProvider.addKey(key);
+	  } else if (key.includes("sk-")) {
+		val = openaiProvider.addKey(key);
+	  }
+	  return val;
+	  
+  }
+  
+  public deleteKeyByHash(keyHash: string) {
+	const openaiProvider = this.keyProviders[0]
+	const anthropicProvider = this.keyProviders[1]
+	const prefix = keyHash.substring(0, 3);
+	if (prefix === 'oai') {
+		openaiProvider.deleteKeyByHash(keyHash);
+		return true 
+	} else if (prefix === 'ant') { 
+    	anthropicProvider.deleteKeyByHash(keyHash);
+		return true 
+	} else {
+		// Nothing invalid key, shouldn't be possible (Maybe in future handle error)
+		return false
+	}
+  }
+  
+  
+  public getHashes() {
+	const combinedHashes: string[] = [];
+	this.keyProviders.forEach((provider) => {
+		const hashes = provider.getHashes();
+		combinedHashes.push(...hashes);
+	})
+	
+	return combinedHashes;
+  }
+  
+  
   public recheck() {
 	this.keyProviders.forEach((provider) => {
 		provider.recheck();

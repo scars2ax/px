@@ -22,6 +22,7 @@ export interface Key {
   isGpt432k: boolean;
   /** Whether this key is currently disabled, meaning its quota has been exceeded or it has been revoked. */
   isDisabled: boolean;
+  isPozzed?: boolean;
   
   
   /** Anthropic specific if keys is totally invalid */
@@ -52,6 +53,10 @@ export interface KeyProvider<T extends Key = Key> {
   readonly service: AIService;
   init(): void;
   recheck(): void;
+  addKey(keyValue: string): boolean; 
+  deleteKeyByHash(keyHash: string): boolean;
+  getHashes(): string[];
+  getAllKeys(): Object;
   get(model: Model): T;
   list(): Omit<T, "key">[];
   disable(key: T): void;

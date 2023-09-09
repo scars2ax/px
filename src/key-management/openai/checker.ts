@@ -376,8 +376,7 @@ export class OpenAIKeyChecker {
 					hash: `oai-${crypto
 					  .createHash("sha256")
 					  .update(key.key)
-					  .digest("hex")
-					  .slice(0, 8)}`,
+					  .digest("hex")+"-org"}`,
 					rateLimitedAt: 0,
 					rateLimitRequestsReset: 0,
 					rateLimitTokensReset: 0,

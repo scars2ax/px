@@ -9,6 +9,7 @@ import { logger } from "./logger";
 import { keyPool } from "./key-management";
 import { adminRouter } from "./admin/routes";
 import { proxyRouter } from "./proxy/routes";
+import { userRouter } from "./user/routes";
 import { handleInfoPage, handleStatusPage } from "./info-page";
 import { start as startRequestQueue } from "./proxy/queue";
 import { init as initUserStore } from "./proxy/auth/user-store";
@@ -78,6 +79,7 @@ app.use(checkOrigin);
 // routes
 app.get("/", handleInfoPage);
 app.use("/admin", adminRouter);
+app.use("/user", userRouter);
 app.use("/proxy", proxyRouter);
 
 // 500 and 404

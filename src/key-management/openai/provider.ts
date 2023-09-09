@@ -97,9 +97,8 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
 		// Changing hash to uid sorry but annoying to work with if one key can have multiple profiles 
         hash: `oai-${crypto
           .createHash("sha256")
-          .update(k+uuid())
-          .digest("hex")
-          .slice(0, 8)}`,
+          .update(k)
+          .digest("hex")}`,
         rateLimitedAt: 0,
         rateLimitRequestsReset: 0,
         rateLimitTokensReset: 0,
@@ -108,6 +107,50 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
       this.keys.push(newKey);
     }
     this.log.info({ keyCount: this.keys.length }, "Loaded OpenAI keys.");
+  }
+  
+  public getHashes() {
+	  this.checker = new OpenAIKeyChecker(this.keys, this.update.bind(this), this.createKey.bind(this));
+	  let x: string[] = [];
+	  this.keys.forEach((key) => {
+			x.push(key.hash);
+	   });
+	  return x 
+  }
+  
+  public addKey(keyValue: string) {
+	  const isDuplicate = this.keys.some((key) => key.key === keyValue);
+	  if (isDuplicate) {
+		return false;
+	  }
+	  const newKey = {
+        key: keyValue,
+		org: "default",
+        service: "openai" as const,
+        isGpt4: true,
+		isGpt432k: false,
+        isTrial: false,
+        isDisabled: false,
+        isRevoked: false,
+        isOverQuota: false,
+        softLimit: 0,
+        hardLimit: 0,
+        systemHardLimit: 0,
+        usage: 0,
+        lastUsed: 0,
+        lastChecked: 0,
+        promptCount: 0,
+        hash: `oai-${crypto
+          .createHash("sha256")
+          .update(keyValue)
+          .digest("hex")}`,
+        rateLimitedAt: 0,
+        rateLimitRequestsReset: 0,
+        rateLimitTokensReset: 0,
+		organizations: {},
+      };
+      this.keys.push(newKey);
+	  return true 
   }
   
   public recheck() {
@@ -120,6 +163,12 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
 	   });
       this.checker.start();
   }
+  
+  public getAllKeys() {
+	  const safeKeyList = this.keys 
+	  return safeKeyList
+  }
+  
 
   public init() {
     if (config.checkKeys) {
@@ -213,6 +262,15 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
     selectedKey.rateLimitedAt = now;
     selectedKey.rateLimitRequestsReset = 1000;
     return { ...selectedKey };
+  }
+  
+  public deleteKeyByHash(keyHash: string) {
+	  const keyIndex = this.keys.findIndex((key) => key.hash === keyHash);
+	  if (keyIndex === -1) {
+		return false; // Key Not found 
+	  }
+	  this.keys.splice(keyIndex, 1);
+	  return true; // Key successfully deleted
   }
 
   public createKey(key: any) {

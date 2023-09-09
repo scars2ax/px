@@ -15,10 +15,8 @@ type Config = {
   /** Custom Accept Reject Responses */
   responseOnUnauthorized: string;
   
-
   page_body?: string;
   promptInjections?: object;
-  aliases?: string;
   /** The port the proxy server will listen on. */
   port: number;
   /** Comma-delimited list of OpenAI API keys. */
@@ -149,8 +147,7 @@ export const config: Config = {
   port: getEnvWithDefault("PORT", 7860),
   responseOnUnauthorized: getEnvWithDefault("RESPONSE_ON_UNAUTHORIZED", "Unauthorized Access"),
   openaiKey: getEnvWithDefault("OPENAI_KEY", ""),
-  page_body: atob(getEnvWithDefault("PAGE_BODY", "YDwhRE9DVFlQRSBodG1sPgo8aHRtbCBsYW5nPSJlbiI+CiAgPGhlYWQ+CiAgICA8bWV0YSBjaGFyc2V0PSJ1dGYtOCIgLz4KICAgIDxtZXRhIG5hbWU9InJvYm90cyIgY29udGVudD0ibm9pbmRleCIgLz4KICAgIDx0aXRsZT57dGl0bGV9PC90aXRsZT4KICA8L2hlYWQ+CiAgPGJvZHkgc3R5bGU9ImZvbnQtZmFtaWx5OiBzYW5zLXNlcmlmOyBiYWNrZ3JvdW5kLWNvbG9yOiAjZjBmMGYwOyBwYWRkaW5nOiAxZW07Ij4KICAgIHtoZWFkZXJIdG1sfQogICAgPGhyIC8+CiAgICA8aDI+U2VydmljZSBJbmZvPC9oMj4KICAgIDxwcmU+e0pTT059PC9wcmU+CiAgPC9ib2R5Pgo8L2h0bWw+YA==")),
-  aliases: atob(getEnvWithDefault("ALIASES", "e30=")),
+  page_body: atob(getEnvWithDefault("PAGE_BODY", "YDwhRE9DVFlQRSBodG1sPgo8aHRtbCBsYW5nPSJlbiI+CiAgPGhlYWQ+CiAgICA8bWV0YSBjaGFyc2V0PSJ1dGYtOCIgLz4KICAgIDxtZXRhIG5hbWU9InJvYm90cyIgY29udGVudD0ibm9pbmRleCIgLz4KICAgIDx0aXRsZT57dGl0bGV9PC90aXRsZT4KICA8L2hlYWQ+CiAgPGJvZHkgc3R5bGU9ImZvbnQtZmFtaWx5OiBzYW5zLXNlcmlmOyBiYWNrZ3JvdW5kLWNvbG9yOiAjZjBmMGYwOyBwYWRkaW5nOiAxZW07Ij4KICAgIHtoZWFkZXJIdG1sfQogICAgPGhyIC8+CiAgICA8aDI+U2VydmljZSBJbmZvPC9oMj4KICAgIDxwcmU+e0pTT059PC9wcmU+CiAgPC9ib2R5PgogIDxiIGlkPSJ1YyI+CiAgPGEgaHJlZj0iL3VzZXIvbG9naW4iIHN0eWxlPSJiYWNrZ3JvdW5kLWNvbG9yOiAjNENBRjUwO2JvcmRlcjogbm9uZTtjb2xvcjogd2hpdGU7cGFkZGluZzogMTVweCAzMnB4O3RleHQtYWxpZ246IGNlbnRlcjt0ZXh0LWRlY29yYXRpb246IG5vbmU7ZGlzcGxheTogaW5saW5lLWJsb2NrO2ZvbnQtc2l6ZTogMTZweDttYXJnaW46IDRweCAycHg7Y3Vyc29yOiBwb2ludGVyOyIgaGlkZGVuPkNoZWNrIHVzZXJfdG9rZW48L2E+CiAgPC9iPgogIDxzY3JpcHQ+CiAgbGV0IGdhdGVrZWVwZXIgPSB7Y29uZmlnOmdhdGVrZWVwZXJ9CiAgaWYgKGdhdGVrZWVwZXIgPT0gInVzZXJfdG9rZW4iKSB7CiAgICBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgidWMiKS5oaWRkZW4gPSBmYWxzZTsKICB9CiAgPC9zY3JpcHQ+CjwvaHRtbD5gCg==")),
   promptInjections: JSON.parse(atob(getEnvWithDefault("PROMPT_INJECTIONS", "e30="))),
   anthropicKey: getEnvWithDefault("ANTHROPIC_KEY", ""),
   proxyKey: getEnvWithDefault("PROXY_KEY", ""),

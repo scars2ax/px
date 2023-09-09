@@ -6,7 +6,7 @@ import { keyPool } from "../../key-management";
 import * as userStore from "../../proxy/auth/user-store";
 import {
   UserSchemaWithToken,
-  parseSort,
+  parseSort, parseHide, 
   sortBy,
   paginate,
   UserSchema,
@@ -51,10 +51,6 @@ router.post("/update-page", (_req, res) => {
   return res.redirect(`/admin`);
 });
 
-router.post("/update-aliases", (_req, res) => {
-  config.aliases = atob(_req.body.base64_aliases);
-  return res.redirect(`/admin`);
-});
 
 router.post("/update-promptinjections", (_req, res) => {
   config.promptInjections = JSON.parse(atob(_req.body.base64_pinject));
@@ -68,10 +64,73 @@ router.post("/update-unauthresponse", (_req, res) => {
 
 router.post("/recheck-keys", (_req, res) => {
   keyPool.recheck();
+  
+  // Replace redirect with notification 
   return res.redirect(`/admin`);
 });
 
+router.post("/add-keys", (_req, res) => {
+  const keys = _req.body.keyInput.trim().replace(/[\n\r]/g, '')
+  let keyArray: string[];
+  let addedAmount = 0
+  if (keys.includes(',')) {
+    keyArray = keys.split(',');
+  } else {
+    keyArray = [keys];
+  }
+  for (const key of keyArray) {
+     if (keyPool.addKey(key)) {
+		 addedAmount+=1;
+	 }
+  }
+  keyPool.recheck();
+  return res.redirect(`/admin/manage/key-manager?addedKeys=`+addedAmount);
+});
 
+
+router.post("/delete-revoked-keys", (req, res) => {
+  const keys = Object.values(keyPool.getKeysSafely());
+  const revokedKeys = keys.filter(key => key.isRevoked === true);
+  const revokedKeyHashes = revokedKeys.map(key => key.hash);
+  let amountDeleted = 0
+  for (const hash of revokedKeyHashes) {
+	  keyPool.deleteKeyByHash(hash);
+	  amountDeleted++;
+  }
+  return res.redirect(`/admin/manage/key-manager?deletedRevoked=`+amountDeleted);
+});
+
+router.post("/delete-outofquota-keys", (req, res) => {
+  const keys = Object.values(keyPool.getKeysSafely());
+  const overQuotaKeys = keys.filter(key => key.isOverQuota === true);
+  const overQuotaHashes = overQuotaKeys.map(key => key.hash);
+  let amountDeleted = 0
+  for (const hash of overQuotaHashes) {
+	  keyPool.deleteKeyByHash(hash);
+	  amountDeleted++;
+  }
+  return res.redirect(`/admin/manage/key-manager?deletedRevoked=`+amountDeleted);
+});
+
+
+
+
+router.post("/delete-key/:key", (req, res) => {
+  const keyHash = req.params.key;
+  keyPool.deleteKeyByHash(keyHash)
+  return res.redirect(`/admin/manage/key-manager?deleted=`+keyHash);
+});
+
+router.post("/export-keys-hashes", (_req, res) => {
+  res.setHeader("Content-Disposition", "attachment; filename=keys-hashes.txt");
+  res.setHeader("Content-Type", "application/text");
+  
+  
+  const hashes = keyPool.getHashes();
+  const text = hashes.join("\n");
+  res.send(text);
+
+});
 
 
 router.get("/view-user/:token", (req, res) => {
@@ -84,6 +143,8 @@ router.get("/view-user/:token", (req, res) => {
 
 router.get("/list-users", (req, res) => {
   const sort = parseSort(req.query.sort) || ["promptGptCount", "lastUsedAt"];
+  
+  
   const requestedPageSize =
     Number(req.query.perPage) || Number(req.cookies.perPage) || 20;
   const perPage = Math.max(1, Math.min(1000, requestedPageSize));
@@ -98,6 +159,40 @@ router.get("/list-users", (req, res) => {
     ...pagination,
   });
 });
+
+function sortByKey(fields: string[], asc = true) {
+  return (a: any, b: any) => {
+    for (const field of fields) {
+      const fieldParts = field.split('.'); // Split the field into nested property parts
+
+      let valA = a;
+      let valB = b;
+      for (const part of fieldParts) {
+        valA = valA[part];
+        valB = valB[part];
+      }
+
+      if (valA !== valB) {
+        // Always sort nulls to the end
+        if (valA == null) return 1;
+        if (valB == null) return -1;
+
+        const result = valA < valB ? -1 : 1;
+        return asc ? result : -result;
+      }
+    }
+    return 0;
+  };
+}
+
+router.get("/key-manager", (req, res) => {
+  const sort = parseSort(req.query.sort) || ["org", "isGpt4", "isGpt432k", "isOverQuota","isRevoked"];
+  const hide = parseHide(req.query.sort) || ["org", "isGpt4", "isGpt432k", "isOverQuota","isRevoked"];
+  
+  const keys = Object.values(keyPool.getKeysSafely()).sort(sortBy(sort, false));
+  return res.render("admin/key-manager", { keys, });
+});
+
 
 router.get("/import-users", (req, res) => {
   const imported = Number(req.query.imported) || 0;
@@ -133,9 +228,10 @@ router.get("/other", (_req, res) => {
 
 router.get("/export-users.json", (_req, res) => {
   const users = userStore.getUsers();
+  const usersWithoutIPs = users.map(({ ip, ...rest }) => rest);
   res.setHeader("Content-Disposition", "attachment; filename=users.json");
   res.setHeader("Content-Type", "application/json");
-  res.send(JSON.stringify({ users }, null, 2));
+  res.send(JSON.stringify({ users: usersWithoutIPs }, null, 2));
 });
 
 router.get("/", (_req, res) => {

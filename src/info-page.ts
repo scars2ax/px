@@ -4,7 +4,7 @@ import showdown from "showdown";
 import { config, listConfig } from "./config";
 import { OpenAIKey, keyPool } from "./key-management";
 import { getUniqueIps } from "./proxy/rate-limit";
-import { getPublicUsers } from "./proxy/auth/user-store"; 
+import { getPublicUsers, getGlobalTokenCount, getClaudeTokenCount, getOpenaiTokenCount } from "./proxy/auth/user-store"; 
 import {
   QueuePartition,
   getEstimatedWaitTime,
@@ -66,7 +66,6 @@ function cacheInfoPageHtml(baseUrl: string) {
   // For Json info 
   delete temp_info.config.page_body
   delete temp_info.config.responseOnUnauthorized
-  delete temp_info.config.aliases
   delete temp_info.config.promptInjections
   
   const openai_info = getOpenAIInfo()
@@ -77,7 +76,6 @@ function cacheInfoPageHtml(baseUrl: string) {
 
   infoPageHtml = info.config.page_body
 		.replaceAll("{headerHtml}", headerHtml)
-		.replaceAll("{user:aliases}", (substring: string) => info.config.aliases.toString() ?? "{}")
 		.replaceAll("{user:data}", JSON.stringify(public_user_info).toString())
 		.replaceAll("{title}", title)
 		.replaceAll("{JSON}", JSON.stringify(temp_info, null, 2))
@@ -104,7 +102,9 @@ function cacheInfoPageHtml(baseUrl: string) {
 		 .replaceAll("{gpt432k:revokedKeys}",(substring: string) => openai_info.gpt4_32k?.revokedKeys?.toString() ?? "0")
 		 .replaceAll("{gpt432k:proomptersInQueue}",(substring: string) => openai_info.gpt4_32k?.proomptersInQueue?.toString() ?? "0")
 		 .replaceAll("{gpt432k:estimatedQueueTime}",(substring: string) => openai_info.gpt4_32k?.estimatedQueueTime?.toString() ?? "0")
-		 
+		 .replaceAll("{globalTokenCount}",(substring: string) => getGlobalTokenCount().toString())
+		 .replaceAll("{openaiTokenCount}",(substring: string) => getOpenaiTokenCount().toString())
+		 .replaceAll("{anthropicTokenCount}",(substring: string) => getClaudeTokenCount().toString())
 		 .replaceAll("{config:gatekeeper}",(substring: string) => info.config.gatekeeper).replace("{config:modelRateLimit}", (substring: string) => info.config.modelRateLimit?.toString())
 		 .replaceAll("{config:maxOutputTokensOpenAI}",(substring: string) => info.config.maxOutputTokensOpenAI.toString())
 		 .replaceAll("{config:promptLogging}",(substring: string) => info.config.promptLogging)
@@ -113,6 +113,7 @@ function cacheInfoPageHtml(baseUrl: string) {
      .replaceAll('{anthropic:activeKeys}', (substring: string) => anthropic_info.claude?.activeKeys?.toString() ?? "0")
 	 .replaceAll('{anthropic:revokedKeys}', (substring: string) => anthropic_info.claude?.revokedKeys?.toString() ?? "0")
 	 .replaceAll('{anthropic:disabledKeys}', (substring: string) => anthropic_info.claude?.disabledKeys?.toString() ?? "0")
+	 .replaceAll('{anthropic:pozzedKeys}', (substring: string) => anthropic_info.claude?.pozzedKeys?.toString() ?? "0")
      .replaceAll('{anthropic:proomptersInQueue}', (substring: string) => anthropic_info.claude?.proomptersInQueue?.toString() ?? "0")
      .replaceAll('{anthropic:estimatedQueueTime}', (substring: string) => anthropic_info.claude?.estimatedQueueTime?.toString() ?? "No wait");
   infoPageLastUpdated = Date.now();
@@ -154,6 +155,7 @@ type ServiceInfo = {
   disabledKeys: number;
   // activeLimit: string;
   revokedKeys?: number;
+  pozzedKeys?: number;
   overQuotaKeys?: number;
   proomptersInQueue: number;
   estimatedQueueTime: string;
@@ -268,6 +270,7 @@ function getAnthropicInfo() {
   const claudeInfo: Partial<ServiceInfo> = {};
   const keys = keyPool.list().filter((k) => k.service === "anthropic");
   claudeInfo.activeKeys = keys.filter((k) => !k.isDisabled && !k.isRevoked).length;
+  claudeInfo.pozzedKeys = keys.filter((k) => k.isPozzed).length;
   claudeInfo.revokedKeys = keys.filter((k) => k.isRevoked).length;
   claudeInfo.disabledKeys = keys.filter((k) => k.isDisabled).length;
   if (config.queueMode !== "none") {

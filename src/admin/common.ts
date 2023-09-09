@@ -8,6 +8,16 @@ export function parseSort(sort: Query["sort"]) {
   return null;
 }
 
+export function parseHide(sort: Query["hide"]) {
+  if (!sort) return null;
+  if (typeof sort === "string") return sort.split(",");
+  if (Array.isArray(sort)) return sort.splice(3) as string[];
+  return null;
+}
+
+
+
+
 export function sortBy(fields: string[], asc = true) {
   return (a: any, b: any) => {
     for (const field of fields) {
@@ -45,6 +55,7 @@ const mapTransform = (value: any) => new Map(value);
 export const UserSchema = z
   .object({
     ip: z.array(z.string()).optional(),
+	tokenHash: z.string().optional(),
     type: z.enum(["normal", "special", "temp"]).optional(),
 	promptCount: z.number().optional(),
 	promptClaudeCount: z.number().optional(),
