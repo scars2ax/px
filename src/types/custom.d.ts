@@ -32,5 +32,6 @@ declare module "express-session" {
   interface SessionData {
     adminToken?: string;
     csrf?: string;
+    flash?: { type: string; message: string };
   }
 }

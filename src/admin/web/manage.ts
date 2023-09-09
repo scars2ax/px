@@ -45,7 +45,7 @@ router.post("/create-user", (req, res) => {
   const base = z.object({ type: UserSchema.shape.type.default("normal") });
   const tempUser = base
     .extend({
-      temporaryUserDuration: z
+      temporaryUserDuration: z.coerce
         .number()
         .int()
         .min(1)
@@ -54,7 +54,7 @@ router.post("/create-user", (req, res) => {
     .merge(
       MODEL_FAMILIES.reduce((schema, model) => {
         return schema.extend({
-          [`temporaryUserQuota_${model}`]: z.number().int().min(0),
+          [`temporaryUserQuota_${model}`]: z.coerce.number().int().min(0),
         });
       }, z.object({}))
     )
@@ -83,13 +83,6 @@ router.post("/create-user", (req, res) => {
 router.get("/view-user/:token", (req, res) => {
   const user = userStore.getUser(req.params.token);
   if (!user) throw new HttpError(404, "User not found");
-
-  if (req.query.refreshed) {
-    res.locals.flash = {
-      type: "success",
-      message: "User's quota was refreshed",
-    };
-  }
   res.render("admin_view-user", { user });
 });
 
@@ -128,9 +121,11 @@ router.post("/import-users", upload.single("users"), (req, res) => {
   if (!result.success) throw new HttpError(400, result.error.toString());
 
   const upserts = result.data.map((user) => userStore.upsertUser(user));
-  res.render("admin_import-users", {
-    flash: { type: "success", message: `${upserts.length} users imported` },
-  });
+  req.session.flash = {
+    type: "success",
+    message: `${upserts.length} users imported`,
+  };
+  res.redirect("/admin/manage/import-users");
 });
 
 router.get("/export-users", (_req, res) => {
@@ -188,39 +183,49 @@ router.post("/refresh-user-quota", (req, res) => {
   const user = userStore.getUser(req.body.token);
   if (!user) throw new HttpError(404, "User not found");
 
-  userStore.refreshQuota(req.body.token);
-  return res.redirect(`/admin/manage/view-user/${req.body.token}?refreshed=1`);
+  userStore.refreshQuota(user.token);
+  req.session.flash = {
+    type: "success",
+    message: "User's quota was refreshed",
+  };
+  return res.redirect(`/admin/manage/view-user/${user.token}`);
 });
 
 router.post("/maintenance", (req, res) => {
   const action = req.body.action;
-  let message = "";
+  let flash = { type: "", message: "" };
   switch (action) {
     case "recheck": {
       keyPool.recheck("openai");
       keyPool.recheck("anthropic");
       const size = keyPool.list().length;
-      message = `success: Scheduled recheck of ${size} keys.`;
+      flash.type = "success";
+      flash.message = `Scheduled recheck of ${size} keys.`;
       break;
     }
     case "resetQuotas": {
       const users = userStore.getUsers();
       users.forEach((user) => userStore.refreshQuota(user.token));
       const { claude, gpt4, turbo } = config.tokenQuota;
-      message = `success: All users' token quotas reset to ${turbo} (Turbo), ${gpt4} (GPT-4), ${claude} (Claude).`;
+      flash.type = "success";
+      flash.message = `All users' token quotas reset to ${turbo} (Turbo), ${gpt4} (GPT-4), ${claude} (Claude).`;
       break;
     }
     case "resetCounts": {
       const users = userStore.getUsers();
       users.forEach((user) => userStore.resetUsage(user.token));
-      message = `success: All users' token usage records reset.`;
+      flash.type = "success";
+      flash.message = `All users' token usage records reset.`;
       break;
     }
     default: {
       throw new HttpError(400, "Invalid action");
     }
   }
-  return res.redirect(`/admin/manage?flash=${message}`);
+
+  req.session.flash = flash;
+
+  return res.redirect(`/admin/manage`);
 });
 
 router.get("/rentry-stats", (_req, res) => {

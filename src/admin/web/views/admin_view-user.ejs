@@ -58,6 +58,12 @@
         </ol>
       </td>
     </tr>
+    <% if (user.type === "temporary") { %>
+    <tr>
+      <th scope="row">Expires At</th>
+      <td colspan="2"><%- user.expiresAt %></td>
+    </tr>
+    <% } %>
   </tbody>
 </table>
 
