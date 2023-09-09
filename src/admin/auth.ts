@@ -49,9 +49,6 @@ function handleFailedLogin(req: Request, res: Response) {
     return res.status(401).json({ error: "Unauthorized" });
   }
   delete req.session.adminToken;
-  req.session.flash = {
-    type: "error",
-    message: `Invalid admin key provided.`,
-  };
+  req.session.flash = { type: "error", message: `Invalid admin key.` };
   return res.redirect("/admin/login");
 }

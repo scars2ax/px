@@ -123,6 +123,14 @@ export function upsertUser(user: UserUpdate) {
     }
   }
 
+  // TODO: Write firebase migration to backfill gpt4-32k token counts
+  if (updates.tokenCounts) {
+    updates.tokenCounts["gpt4-32k"] ??= 0;
+  }
+  if (updates.tokenLimits) {
+    updates.tokenLimits["gpt4-32k"] ??= 0;
+  }
+
   users.set(user.token, Object.assign(existing, updates));
   usersToFlush.add(user.token);
 

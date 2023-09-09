@@ -12,6 +12,7 @@ export const injectLocals: RequestHandler = (req, res, next) => {
   res.locals.nextQuotaRefresh = userStore.getNextQuotaRefresh();
   res.locals.persistenceEnabled = config.gatekeeperStore !== "memory";
   res.locals.showTokenCosts = config.showTokenCosts;
+  res.locals.maxIps = config.maxIpsPerUser;
 
   // flash messages
   if (req.session.flash) {
