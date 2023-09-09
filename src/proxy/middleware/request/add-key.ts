@@ -62,7 +62,7 @@ export const addKey: ProxyRequestMiddleware = (proxyReq, req) => {
   } else {
     proxyReq.setHeader("Authorization", `Bearer ${assignedKey.key}`);
 	if (assignedKey.org != "default") {
-    const encodedOrg = encodeURIComponent(assignedKey.org);
+		const encodedOrg = encodeURIComponent(assignedKey.org);
 		proxyReq.setHeader("OpenAI-Organization", `${encodedOrg}`);
 	}
   }

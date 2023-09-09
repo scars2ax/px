@@ -1,6 +1,35 @@
+
+
 <%- include("../_partials/admin-header", { title: "Users - OAI Reverse Proxy Admin" }) %>
     <h1>User Token List</h1>
-    
+    <style>
+		th {
+		background-color:#301934;
+	}
+
+	tr td:first-child {
+	  background-color:#2b2b2b;
+	}
+
+	th.active {
+		background-color:#301934;
+	}
+
+	a:link {
+	  color: purple;
+	  text-decoration: none;
+	}
+
+	a:visited {
+	  color: pink;
+	  text-decoration: none;
+	}
+	th a:visited {
+	  color: white;
+	  text-decoration: none;
+	}
+
+	</style>
     <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
     
     <% if (users.length === 0) { %>
@@ -10,9 +39,9 @@
       <thead>
         <tr>
           <th>Token</th>
-          <th <% if (sort.includes("ip")) { %>class="active"<% } %> ><a href="/admin/manage/list-users?sort=ip">IPs</a></th>
+          <th <% if (sort.includes("ip")) { %>class="active"<% } %> ><a href="/admin/manage/list-users?sort=ip">Unique IPs this session</a></th>
           <th <% if (sort.includes("promptCount")) { %>class="active"<% } %> ><a href="/admin/manage/list-users?sort=promptCount">Prompts</a></th>
-		  <th <% if (sort.includes("tokenCount")) { %>class="active"<% } %> ><a href="/admin/manage/list-users?sort=tokenCount">Tokens</a></th>
+		  <th <% if (sort.includes("tokenCount")) { %>class="active"<% } %> ><a href="/admin/manage/list-users?sort=tokenCount">Total Tokens</a></th>
           <th>Type</th>
           <th <% if (sort.includes("createdAt")) { %>class="active"<% } %> ><a href="/admin/manage/list-users?sort=createdAt">Created (UTC)</a></th>
           <th <% if (sort.includes("lastUsedAt")) { %>class="active"<% } %> ><a href="/admin/manage/list-users?sort=lastUsedAt">Last Used (UTC)</a></th>
@@ -26,7 +55,7 @@
 				<td>
 				  <code><a href="/admin/manage/view-user/<%= user.token %>"><%= user.token %></a></code>
 				</td>
-				<td><%= user.ip.length %></td>
+				<td><%= user.ipPromptCount.length | 0 %></td>
 				<td><%= user.promptCount %></td>
 				<td><%= user.tokenClaudeCount+user.tokenGptCount %></td>
 				<td><%= user.type %></td>
@@ -41,7 +70,7 @@
 				</td>
 				<td><%= user.disabledAt ? "Yes" : "No" %> <%= user.disabledReason ? `(${user.disabledReason})` : "" %></td>
 				<td class="action_delete">
-					<a title="Delete" href="#" class="del" data-del-token="<%= user.token %>">X</a>
+					<a title="Delete" href="#" class="del" data-del-token="<%= user.token %>">&#10060;</a>
 				</td>
 			  </tr>
 		<% }); %>

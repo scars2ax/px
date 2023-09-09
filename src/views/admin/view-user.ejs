@@ -1,6 +1,28 @@
 <%- include("../_partials/admin-header", { title: "View User - OAI Reverse Proxy Admin" }) %>
 <h1>View User</h1>
+<style>
+  th:nth-child(n+1) {
+        background-color:#0a0a0a;
+    }
 
+	th.active {
+		background-color:#301934;
+	}
+
+	a:link {
+	  color: purple;
+	  text-decoration: none;
+	}
+
+	a:visited {
+	  color: pink;
+	  text-decoration: none;
+	}
+	th a:visited {
+	  color: white;
+	  text-decoration: none;
+	}
+	</style>
 <table class="table table-striped">
   <thead>
     <tr>
@@ -72,6 +94,18 @@
 	  <% }) %>
 	</ol>
   </td>
+  <tr>
+      <th scope="row">Prompt Limit</th>
+      <td><%- user.promptLimit %></td>
+    </tr>
+	<tr>
+      <th scope="row">Time Limit</th>
+      <td><%- user.timeLimit %></td>
+    </tr>
+	<tr>
+      <th scope="row">End Time Limit</th>
+      <td><%- user.endTimeLimit %></td>
+    </tr>
 </tr>
 	
   </tbody>

@@ -11,10 +11,13 @@ import admin from "firebase-admin";
 import { v4 as uuid } from "uuid";
 import { config, getFirebaseApp } from "../../config";
 import { logger } from "../../logger";
+import crypto from "crypto";
 
 export interface User {
   /** The user's personal access token. */
   token: string;
+  tokenHash?: string; 
+  alias?: string;
   /** The IP addresses the user has connected from. */
   ip: string[];
   ipPromptCount: Map<string, number>; 
@@ -84,6 +87,8 @@ export function createUser(rLimit: any, pLimit: any) {
   const token = uuid();
   users.set(token, {
     token,
+	tokenHash: `${crypto.createHash("sha256").update(token).digest("hex")}`,
+	alias: "Degenerate",
     ip: [],
 	ipPromptCount: new Map(),
     type: "normal",
@@ -119,6 +124,8 @@ export function createTempUser(pLimit: any, tLimit: any, rLimit: any) {
   const token = "temp-"+generateTempString();
   users.set(token, {
     token,
+	alias: "Degenerate",
+	tokenHash: `${crypto.createHash("sha256").update(token).digest("hex")}`,
     ip: [],
 	ipPromptCount: new Map(),
     type: "temp",
@@ -153,6 +160,13 @@ export function deleteUser(user: User): boolean {
 export function getUser(token: string) {
   return users.get(token);
 }
+/** Edits alias of user  */
+export function editAlias(token: string, name: string) {
+  const user = users.get(token);
+  if (!user) return false;
+  user.alias = name;
+  return true
+}
 
 /** Returns a list of all users. */
 export function getUsers() {
@@ -168,11 +182,12 @@ export function getPublicUsers() {
 		const updatedUser = {
 		  createdAt: user[1].createdAt,
 		  lastUsedAt: user[1].lastUsedAt,
-		  token: index,
+		  token: user[1].tokenHash,
 		  type: user[1].type,
 		  promptLimit: user[1].promptLimit,
 		  timeLimit: user[1].timeLimit,
 		  endTimeLimit: user[1].endTimeLimit,
+		  alias: user[1].alias, 
 		  promptCount: user[1].promptCount,
 		  promptClaudeCount: user[1].promptClaudeCount,
 		  promptGptCount: user[1].promptGptCount,
@@ -302,7 +317,27 @@ export function incrementTokenCount(token: string, amount = 1, service: string) 
   usersToFlush.add(token);
 }
 
+// Very very dirty ^^ 
+let globalTokenCountOpenai = 0;
+let globalTokenCountAnthropic = 0 
 
+export function incrementGlobalTokenCount(amount = 1, model = "") {
+  if (model == "openai") {
+	  globalTokenCountOpenai+=amount;
+  } else if (model == "anthropic") {
+	  globalTokenCountAnthropic+=amount;
+  }
+}
+
+export function getGlobalTokenCount() {
+  return globalTokenCountOpenai+globalTokenCountAnthropic;
+}
+export function getClaudeTokenCount() {
+  return globalTokenCountAnthropic;
+}
+export function getOpenaiTokenCount() {
+  return globalTokenCountOpenai;
+}
 
 
 /**

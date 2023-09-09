@@ -1,0 +1,284 @@
+<%- include("../_partials/admin-header", { title: "Users - OAI Reverse Proxy Admin" }) %>
+
+<% let countRevoked = 0; %>
+<% let countOverQuota = 0; %>
+<% let countUniqueOrgs = 0; %>
+<% let countGpt4 = 0; %>
+<% let countGpt432k = 0; %>
+<% let countGpt3 = 0; %>
+
+<% keys.forEach(function(user) { %>
+  <% if (user.isRevoked) { %>
+    <% countRevoked++; %>
+  <% } %>
+  <% if (user.isOverQuota) { %>
+    <% countOverQuota++; %>
+  <% } %>
+  <% if (user.org != "default") { %>
+    <% countUniqueOrgs++; %>
+  <% } %>
+  <% if (user.isGpt4 && user.isOverQuota == false && user.isRevoked == false) { %>
+    <% countGpt4++; %>
+  <% } %>
+  <% if (user.isGpt432k && user.isOverQuota == false && user.isRevoked == false) { %>
+    <% countGpt432k++; %>
+  <% } %>
+  <% if (user.isGpt432k == false && user.isGpt4 == false && user.isOverQuota == false && user.isRevoked == false) { %>
+    <% countGpt3++; %>
+  <% } %>
+<% }); %>
+
+
+
+<hr>
+<center><h1>Key Manager</h1></center>
+<hr>
+<center><h2>Filtering</h2></center>
+<center>
+<form action="/">
+<input type="checkbox" id="onRevoked" name="revoked" checked>
+<label for="onValid">Show Revoked keys</label>
+<input type="checkbox" id="onOverQuota" name="OverQuota" checked>
+<label for="onValid">Show Over Quota keys</label>
+<input type="checkbox" id="onGpt4Keys" name="Gpt4Keys" checked>
+<label for="onValid">GPT-4 Keys</label>
+<input type="checkbox" id="onGpt432kKeys" name="Gpt432kKeys" checked>
+<label for="onValid">GPT-4-32K Keys</label>
+<input type="checkbox" id="onDefaultOrgs" name="DefaultOrgs" checked>
+<label for="onValid">Default Orgs</label>
+</form>
+</center>
+
+<hr>
+<center><h2>Key Statistics</h2></center>
+<center>
+Active GPT-3 Keys: <span style="color: <%= countGpt3 > 0 ? 'green' : 'red' %>"><%= countGpt3 %></span>
+Active GPT-4 Keys: <span style="color: <%= countGpt4 > 0 ? 'green' : 'red' %>"><%= countGpt4 %></span>
+Active GPT-4-32K Keys: <span style="color: <%= countGpt432k > 0 ? 'green' : 'red' %>"><%= countGpt432k %></span><br>
+Number of revoked keys: <span style="color: <%= countRevoked > 0 ? 'green' : 'red' %>"><%= countRevoked %></span> Number of Over Quota keys: <span style="color: <%= countOverQuota > 0 ? 'green' : 'red' %>"><%= countOverQuota %></span><br>
+Number of Unique Organization Keys: <span style="color: <%= countUniqueOrgs > 0 ? 'green' : 'red' %>"><%= countUniqueOrgs %></span>
+</center>
+<br>
+<hr>
+<center><h2>Actions</h2></center>
+<center>
+<style>
+    .inline-form {
+        display: inline-block;
+    }
+</style>
+
+<div class="inline-form">
+<form action="/admin/manage/export-keys-hashes" method="POST"><input type="hidden" name="_csrf" value="<%= csrfToken %>" /><button type="submit">Export All Sha256 to .txt</button></form>
+
+<script>
+function askForKeys() {
+	var userInput = prompt("Please enter the key/s (Multiple ones separated by ',')"); 
+	if (userInput !== null) {
+	  var hiddenInput = document.createElement("input");
+	  hiddenInput.setAttribute("type", "hidden");
+	  hiddenInput.setAttribute("name", "keyInput");
+	  hiddenInput.setAttribute("value", userInput);
+	  var form = document.getElementById("addKeys");
+	  form.appendChild(hiddenInput);
+	  form.submit();
+	}
+}
+</script>
+<form id="addKeys" action="/admin/manage/add-keys" method="POST"><input type="hidden" name="_csrf" value="<%= csrfToken %>" /><button type="button" onclick="askForKeys()">Add Key/s</button></form>
+
+
+
+<form action="/admin/manage/recheck-keys" method="POST"><input type="hidden" name="_csrf" value="<%= csrfToken %>" /><button type="submit">Force Recheck Keys</button></form>
+
+<form action="/admin/manage/delete-revoked-keys" method="POST">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+  <button type="submit" onclick="return confirm('Are you sure you want to remove all <%= countRevoked %> revoked keys?')">Remove All Revoked Keys</button>
+</form>
+
+<form action="/admin/manage/delete-outofquota-keys" method="POST">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+  <button type="submit" onclick="return confirm('Are you sure you want to remove all <%= countOverQuota %> out of quota keys?')">Remove All Out of Quota Keys</button>
+</form>
+
+
+</body>
+</center>
+</div>
+<br>
+
+
+<input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+
+<center>
+<% if (keys.length === 0) { %>
+  <p>No Gpt keys found.</p>
+<% } else { %>
+  <table>
+    <thead>
+      <tr>
+        <th>Key</th>
+		<th colspan="1">
+          <a href="?sort=org">ORG</a>
+        </th>
+        <th colspan="1">
+          <a href="?sort=isGpt4">GPT-4</a>
+        </th>
+        <th colspan="1">
+          <a href="?sort=isGpt432k">GPT-4-32K</a>
+        </th>
+        <th colspan="1">
+          <a href="?sort=isOverQuota">Is Over Quota</a>
+        </th>
+        <th colspan="1">
+          <a href="?sort=isRevoked">Is Revoked</a>
+        </th>
+        <th colspan="1">Remove</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% keys.forEach(function(user) { %>
+        <tr>
+          <td>
+            <code><a href="/admin/manage/view-user/<%= user.hash %>"><%= user.hash %></a></code>
+          </td>
+		  <td><%= user.org %></td>
+          <td style="color: <%= user.isGpt4 ? 'green' : 'red' %>"><%= user.isGpt4 %></td>
+          <td style="color: <%= user.isGpt432k ? 'green' : 'red' %>"><%= user.isGpt432k %></td>
+          <td style="color: <%= user.isOverQuota ? 'green' : 'red' %>"><%= user.isOverQuota %></td>
+          <td style="color: <%= user.isRevoked ? 'green' : 'red' %>"><%= user.isRevoked %></td>
+		  <td>
+			<form id="deleteForm-<%= user.hash %>" action="/admin/manage/delete-key/<%= user.hash %>" method="POST">
+			<input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+          <button type="button" onclick="confirmDeletion('<%= user.hash %>')">X</button>
+        </form>
+        <script>
+          function confirmDeletion(hash) {
+            var confirmation = confirm("Are you sure you want to delete the key with hash: " + hash + "?");
+            if (confirmation) {
+              document.getElementById("deleteForm-" + hash).submit();
+            }
+          }
+        </script>
+		  </td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+<% } %>
+</center>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+  
+	
+  
+    // Function to update the table based on the checkbox state
+    function updateTable() {
+      const rows = document.querySelectorAll('tbody tr');
+      const hiddenRows = [];
+      rows.forEach(row => {
+        const gpt4Cell = row.querySelector('td:nth-child(3)');
+        const gpt432kCell = row.querySelector('td:nth-child(4)');
+        const defaultOrgCell = row.querySelector('td:nth-child(2)');
+        const overQuotaCell = row.querySelector('td:nth-child(5)');
+        const revokedCell = row.querySelector('td:nth-child(6)');
+        const isHiddenGpt4 = !document.getElementById('onGpt4Keys').checked && gpt4Cell.textContent === 'true';
+        const isHiddenGpt432k = !document.getElementById('onGpt432kKeys').checked && gpt432kCell.textContent === 'true';
+        const isHiddenDefaultOrg = !document.getElementById('onDefaultOrgs').checked && defaultOrgCell.textContent === 'default';
+        const isHiddenOverQuota = !document.getElementById('onOverQuota').checked && overQuotaCell.textContent === 'true';
+        const isHiddenRevoked = !document.getElementById('onRevoked').checked && revokedCell.textContent === 'true';
+        const isHidden = isHiddenGpt4 || isHiddenGpt432k || isHiddenDefaultOrg || isHiddenOverQuota || isHiddenRevoked;
+        row.style.display = isHidden ? 'none' : '';
+        if (isHidden) {
+          hiddenRows.push(row.getAttribute('data-row-id'));
+        }
+      });
+
+      // Store the hidden row IDs in local storage
+      localStorage.setItem('hiddenRows', JSON.stringify(hiddenRows));
+    }
+
+    // Retrieve the hidden row IDs from local storage and hide them
+    const hiddenRows = JSON.parse(localStorage.getItem('hiddenRows'));
+    if (hiddenRows) {
+      const rows = document.querySelectorAll('tbody tr');
+      rows.forEach(row => {
+        const rowId = row.getAttribute('data-row-id');
+        if (hiddenRows.includes(rowId)) {
+          row.style.display = 'none';
+        }
+      });
+    }
+
+    // Check if the URL contains the 'hide' parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const hideParam = urlParams.get('hide');
+    if (hideParam) {
+      const hideValues = hideParam.split(',');
+      const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+      checkboxes.forEach(checkbox => {
+        const checkboxName = checkbox.getAttribute('name');
+        checkbox.checked = !hideValues.includes(checkboxName) && !hideValues.includes(`${checkboxName}=true`);
+      });
+    }
+
+    // Function to update the URL based on the checkbox state
+    function updateURL() {
+      const url = new URL(window.location.href);
+      const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+      let paramNames = "";
+      checkboxes.forEach((checkbox, index) => {
+        if (!checkbox.checked) {
+          paramNames += checkbox.getAttribute('name');
+          if (index < checkboxes.length - 1) {
+            paramNames += ",";
+          }
+        }
+      });
+      url.searchParams.set("hide", paramNames);
+      history.replaceState(null, '', url.toString());
+
+      // Call the function to update the table based on the checkbox state
+      updateTable();
+    }
+
+    const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+    checkboxes.forEach(checkbox => {
+      checkbox.addEventListener('click', updateURL);
+    });
+
+    // Call the function initially to hide the rows based on the checkbox state
+    updateTable();
+	
+	
+	function preventDefaultLinkBehavior(event) {
+    event.preventDefault();
+	  }
+
+	  // Attach the preventDefaultLinkBehavior function to the click event of table rows
+	  const tableRows = document.querySelectorAll('table tbody tr');
+	  tableRows.forEach(row => {
+		row.addEventListener('click', preventDefaultLinkBehavior);
+	  });
+	
+	
+  });
+
+const urlParams = new URLSearchParams(window.location.search);
+const addedKeys = urlParams.get('addedKeys');
+if (addedKeys !== null) {
+alert(`Added ${addedKeys} keys`);
+const newUrl = window.location.pathname;
+history.replaceState({}, document.title, newUrl);
+}
+const deleted = urlParams.get('deleted');
+if (deleted !== null) {
+alert(`Deleted ${deleted} keys`);
+const newUrl = window.location.pathname;
+history.replaceState({}, document.title, newUrl);
+}
+
+</script>
+
+<%- include("../_partials/admin-footer") %>

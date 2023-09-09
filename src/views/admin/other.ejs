@@ -1,12 +1,4 @@
 <%- include("../_partials/admin-header", { title: "View User - OAI Reverse Proxy Admin" }) %>
-<h1>Additional Options</h1>
-<body>
-  <form action="/admin/manage/recheck-keys" method="POST">
-     <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
-    <button type="submit">Force Recheck Keys</button>
-  </form>
-</body>
-
 <h2>Temporary Updates</h2>
 
 <a>Page:</a>
@@ -14,14 +6,6 @@
   <form action="/admin/manage/update-page" method="POST">
      <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
     <input type="text" name="base64_page" placeholder="Enter base64 for page...">
-    <button type="submit">Update</button>
-  </form>
-</body>
-<a>Aliases:</a>
-<body>
-  <form action="/admin/manage/update-aliases" method="POST">
-    <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
-    <input type="text" name="base64_aliases" placeholder="Enter base64 for aliases...">
     <button type="submit">Update</button>
   </form>
 </body>

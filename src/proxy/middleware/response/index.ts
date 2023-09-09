@@ -7,7 +7,7 @@ import { config } from "../../../config";
 import { logger } from "../../../logger";
 import { keyPool } from "../../../key-management";
 import { enqueue, trackWaitTime } from "../../queue";
-import { incrementPromptCount, incrementTokenCount } from "../../auth/user-store";
+import { incrementPromptCount, incrementTokenCount, incrementGlobalTokenCount } from "../../auth/user-store";
 import { isCompletionRequest, writeErrorResponse } from "../common";
 import { handleStreamedResponse } from "./handle-streamed-response";
 import { OpenAIPromptMessage, countTokens } from "../../../tokenization";
@@ -241,44 +241,51 @@ export const CountTokenPrompt: ProxyResHandlerWithBody = async (
   responseBody
 ) => {
 
-  if (req.user == undefined) {
-	return;
-  };
   if (typeof responseBody !== "object") {
     throw new Error("Expected body to be an object");
   }
   if (!isCompletionRequest(req)) {
     return;
   }
-  
-  if (config.gatekeeper === "user_token") { // Disable token counting for proxy_key ;v claude doesn't work with it >_<
+  // Disable token counting for proxy_key ;v claude doesn't work with it >_<
   // idc if it's not tottaly accurate roughlt it's right... 
-	  if (req.outboundApi == "openai") {
-		  const promptPayload: OpenAIPromptMessage[] = Array.isArray(getPromptForRequest(req))
-		  ? (getPromptForRequest(req) as OaiMessage[]).map((message: OaiMessage) => ({ content: message.content, role: message.role || "user" }))
-		  : [{ content: getPromptForRequest(req) as string, role: "user" }];
+  if (req.outboundApi == "openai") {
+	  const promptPayload: OpenAIPromptMessage[] = Array.isArray(getPromptForRequest(req))
+	  ? (getPromptForRequest(req) as OaiMessage[]).map((message: OaiMessage) => ({ content: message.content, role: message.role || "user" }))
+	  : [{ content: getPromptForRequest(req) as string, role: "user" }];
 
-		  const request: TokenCountRequest = {
-			  req: req,
-			  prompt: promptPayload,
-			  service: "openai"
-			};
-		  const tokenCount = await countTokens(request);
-		  incrementTokenCount(req.user.token,tokenCount.token_count,"openai");
-	  } else if (req.outboundApi == "anthropic") {
-		 const promptPayload= getPromptForRequest(req);
-		 const promptString = Array.isArray(promptPayload) ? promptPayload.map(message => message.content).join(" ") : promptPayload;
-		 const request: TokenCountRequest = {
-			  req: req,
-			  prompt: promptString,
-			  service: "anthropic"
-			};
-			
-		  const tokenCount = await countTokens(request);
-		  incrementTokenCount(req.user.token,tokenCount.token_count,"anthropic");
+	  const request: TokenCountRequest = {
+		  req: req,
+		  prompt: promptPayload,
+		  service: "openai"
+		};
+	  const tokenCount = await countTokens(request);
+	  
+	  if (config.gatekeeper == "proxy_key") {
+		  incrementGlobalTokenCount(tokenCount.token_count,"openai")
+	  } else if (config.gatekeeper == "user_token") {
+		  if (req.user !== undefined) {
+	         incrementTokenCount(req.user.token,tokenCount.token_count,"openai");
+		  }
 	  }
-  } else {
-	return; // 
+  } else if (req.outboundApi == "anthropic") {
+	 const promptPayload= getPromptForRequest(req);
+	 const promptString = Array.isArray(promptPayload) ? promptPayload.map(message => message.content).join(" ") : promptPayload;
+	 const request: TokenCountRequest = {
+		  req: req,
+		  prompt: promptString,
+		  service: "anthropic"
+		};
+	  const tokenCount = await countTokens(request);
+	  if (config.gatekeeper == "proxy_key") {
+		  incrementGlobalTokenCount(tokenCount.token_count,"anthropic")
+	  } else if (config.gatekeeper == "user_token") {
+		  if (req.user !== undefined) {
+				incrementTokenCount(req.user.token,tokenCount.token_count,"anthropic");
+		  }
+	  }
+	  
+  
   }
   
 };
