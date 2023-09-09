@@ -9,9 +9,8 @@ const router = Router();
 
 router.use((req, res, next) => {
   if (req.session.userToken) {
-    res.locals.currentSelfServiceUser = userStore.getUser(
-      req.session.userToken ?? null
-    );
+    res.locals.currentSelfServiceUser =
+      userStore.getUser(req.session.userToken) || null;
   }
   next();
 });
@@ -37,9 +36,8 @@ router.post("/lookup", (req, res) => {
 
 router.post("/edit-nickname", (req, res) => {
   const existing = res.locals.currentSelfServiceUser;
-  const token = res.locals.currentSelfServiceUser?.token;
 
-  if (!token) {
+  if (!existing) {
     throw new ForbiddenError("Not logged in.");
   } else if (!config.allowNicknameChanges || existing.disabledAt) {
     throw new ForbiddenError("Nickname changes are not allowed.");
