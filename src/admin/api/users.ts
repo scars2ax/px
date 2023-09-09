@@ -49,7 +49,7 @@ router.post("/", (req, res) => {
     })
     .required();
 
-  const schema = z.discriminatedUnion("type", [base, tempUser]);
+  const schema = z.union([base, tempUser]);
   const result = schema.safeParse(body);
   if (!result.success) {
     return res.status(400).json({ error: result.error });
