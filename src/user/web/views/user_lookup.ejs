@@ -12,7 +12,7 @@
 <% if (user.type === "temporary" && Boolean(user.disabledAt)) { %>
 <%- include("partials/shared_flash", { flashData: {
       type: "info",
-      message: "This temporary user token has expired and is no longer usable. It will be deleted in 24 hours.",
+      message: "This temporary user token has expired and is no longer usable. These records will be deleted soon.",
     } }) %>
 <% } else if (user.disabledAt) { %>
 <%- include("partials/shared_flash", { flashData: {

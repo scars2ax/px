@@ -247,7 +247,7 @@ export function getNextQuotaRefresh() {
 
 /**
  * Cleans up expired temporary tokens by disabling tokens past their access
- * expiry date and permanently deleting tokens one day after their access
+ * expiry date and permanently deleting tokens three days after their access
  * expiry date.
  */
 function cleanupExpiredTokens() {
@@ -260,7 +260,7 @@ function cleanupExpiredTokens() {
       disableUser(user.token, "Temporary token expired.");
       disabled++;
     }
-    if (user.disabledAt && user.disabledAt + 24 * 60 * 60 * 1000 < now) {
+    if (user.disabledAt && user.disabledAt + 72 * 60 * 60 * 1000 < now) {
       users.delete(user.token);
       usersToFlush.add(user.token);
       deleted++;
