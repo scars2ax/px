@@ -266,7 +266,7 @@ function cleanupExpiredTokens() {
       deleted++;
     }
   }
-  log.info({ disabled, deleted }, "Expired tokens cleaned up.");
+  log.debug({ disabled, deleted }, "Expired tokens cleaned up.");
 }
 
 function refreshAllQuotas() {
@@ -325,7 +325,7 @@ async function flushUsers() {
 
   usersToFlush.clear();
 
-  const numUpdates = Object.keys(updates).length;
+  const numUpdates = Object.keys(updates).length + deletions.length;
   if (numUpdates === 0) {
     return;
   }
@@ -334,7 +334,7 @@ async function flushUsers() {
   await Promise.all(deletions.map((token) => usersRef.child(token).remove()));
   log.info(
     { users: Object.keys(updates).length, deletions: deletions.length },
-    "Flushed users to Firebase"
+    "Flushed changes to Firebase"
   );
 }
 
