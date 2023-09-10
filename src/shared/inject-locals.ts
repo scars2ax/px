@@ -11,7 +11,7 @@ export const injectLocals: RequestHandler = (req, res, next) => {
     quota.turbo > 0 || quota.gpt4 > 0 || quota.claude > 0;
   res.locals.quota = quota;
   res.locals.nextQuotaRefresh = userStore.getNextQuotaRefresh();
-  res.locals.persistenceEnabled = config.gatekeeperStore !== "memory";
+  res.locals.persistenceEnabled = config.persistenceProvider !== "memory";
   res.locals.showTokenCosts = config.showTokenCosts;
   res.locals.maxIps = config.maxIpsPerUser;
 

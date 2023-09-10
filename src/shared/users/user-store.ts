@@ -32,8 +32,8 @@ let quotaRefreshJob: schedule.Job | null = null;
 let userCleanupJob: schedule.Job | null = null;
 
 export async function init() {
-  log.info({ store: config.gatekeeperStore }, "Initializing user store...");
-  if (config.gatekeeperStore === "firebase_rtdb") {
+  log.info({ store: config.persistenceProvider }, "Initializing user store...");
+  if (config.persistenceProvider === "firebase_rtdb") {
     await initFirebase();
   }
   if (config.quotaRefreshPeriod) {
@@ -146,7 +146,7 @@ export function upsertUser(user: UserUpdate) {
   usersToFlush.add(user.token);
 
   // Immediately schedule a flush to the database if we're using Firebase.
-  if (config.gatekeeperStore === "firebase_rtdb") {
+  if (config.persistenceProvider === "firebase_rtdb") {
     setImmediate(flushUsers);
   }
 

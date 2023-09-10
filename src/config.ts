@@ -50,12 +50,12 @@ type Config = {
    */
   gatekeeper: "none" | "proxy_key" | "user_token";
   /**
-   * Persistence layer to use for user management.
-   * - `memory`: Users are stored in memory and are lost on restart (default)
-   * - `firebase_rtdb`: Users are stored in a Firebase Realtime Database;
-   *   requires `firebaseKey` and `firebaseRtdbUrl` to be set.
+   * Persistence layer to use for user and key management.
+   * - `memory`: Data is stored in memory and lost on restart (default)
+   * - `firebase_rtdb`: Data is stored in Firebase Realtime Database; requires
+   *   `firebaseKey` and `firebaseRtdbUrl` to be set.
    */
-  gatekeeperStore: "memory" | "firebase_rtdb";
+  persistenceProvider: "memory" | "firebase_rtdb";
   /** URL of the Firebase Realtime Database if using the Firebase RTDB store. */
   firebaseRtdbUrl?: string;
   /**
@@ -165,7 +165,7 @@ export const config: Config = {
   proxyKey: getEnvWithDefault("PROXY_KEY", ""),
   adminKey: getEnvWithDefault("ADMIN_KEY", ""),
   gatekeeper: getEnvWithDefault("GATEKEEPER", "none"),
-  gatekeeperStore: getEnvWithDefault("GATEKEEPER_STORE", "memory"),
+  persistenceProvider: getEnvWithDefault("PERSISTENCE_PROVIDER", "memory"),
   maxIpsPerUser: getEnvWithDefault("MAX_IPS_PER_USER", 0),
   firebaseRtdbUrl: getEnvWithDefault("FIREBASE_RTDB_URL", undefined),
   firebaseKey: getEnvWithDefault("FIREBASE_KEY", undefined),
@@ -247,6 +247,13 @@ export async function assertConfigIsValid() {
     );
   }
 
+  if (!!process.env.GATEKEEPER_STORE) {
+    startupLogger.warn(
+      "GATEKEEPER_STORE is deprecated. Use PERSISTENCE_PROVIDER instead. Configuration will be migrated."
+    );
+    config.persistenceProvider = process.env.GATEKEEPER_STORE as any;
+  }
+
   if (!["none", "proxy_key", "user_token"].includes(config.gatekeeper)) {
     throw new Error(
       `Invalid gatekeeper mode: ${config.gatekeeper}. Must be one of: none, proxy_key, user_token.`
@@ -272,11 +279,11 @@ export async function assertConfigIsValid() {
   }
 
   if (
-    config.gatekeeperStore === "firebase_rtdb" &&
+    config.persistenceProvider === "firebase_rtdb" &&
     (!config.firebaseKey || !config.firebaseRtdbUrl)
   ) {
     throw new Error(
-      "Firebase RTDB store requires `FIREBASE_KEY` and `FIREBASE_RTDB_URL` to be set."
+      "Firebase RTDB persistence requires `FIREBASE_KEY` and `FIREBASE_RTDB_URL` to be set."
     );
   }
 
@@ -318,9 +325,9 @@ export const OMITTED_KEYS: (keyof Config)[] = [
   "checkKeys",
   "showTokenCosts",
   "googleSheetsKey",
+  "persistenceProvider",
   "firebaseKey",
   "firebaseRtdbUrl",
-  "gatekeeperStore",
   "maxIpsPerUser",
   "blockedOrigins",
   "blockMessage",
@@ -393,7 +400,7 @@ function getEnvWithDefault<T>(env: string | string[], defaultValue: T): T {
 let firebaseApp: firebase.app.App | undefined;
 
 async function maybeInitializeFirebase() {
-  if (!config.gatekeeperStore.startsWith("firebase")) {
+  if (!config.persistenceProvider.startsWith("firebase")) {
     return;
   }
 
