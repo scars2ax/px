@@ -15,6 +15,16 @@ export const ANTHROPIC_SUPPORTED_MODELS = [
 ] as const;
 export type AnthropicModel = (typeof ANTHROPIC_SUPPORTED_MODELS)[number];
 
+type AnthropicKeyUsage = {
+  [K in AnthropicModelFamily as `${K}Tokens`]: number;
+};
+
+const SERIALIZABLE_FIELDS = ["key", "service", "hash", "claudeTokens"] as const;
+type SerializableAnthropicKey = Partial<
+  Pick<AnthropicKey, (typeof SERIALIZABLE_FIELDS)[number]>
+> &
+  Pick<AnthropicKey, "key">;
+
 export type AnthropicKeyUpdate = Omit<
   Partial<AnthropicKey>,
   | "key"
@@ -24,10 +34,6 @@ export type AnthropicKeyUpdate = Omit<
   | "rateLimitedAt"
   | "rateLimitedUntil"
 >;
-
-type AnthropicKeyUsage = {
-  [K in AnthropicModelFamily as `${K}Tokens`]: number;
-};
 
 export interface AnthropicKey extends Key, AnthropicKeyUsage {
   readonly service: "anthropic";
@@ -81,27 +87,7 @@ export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
     let bareKeys: string[];
     bareKeys = [...new Set(keyConfig.split(",").map((k) => k.trim()))];
     for (const key of bareKeys) {
-      const newKey: AnthropicKey = {
-        key,
-        service: this.service,
-        modelFamilies: ["claude"],
-        isDisabled: false,
-        isRevoked: false,
-        isPozzed: false,
-        promptCount: 0,
-        lastUsed: 0,
-        rateLimitedAt: 0,
-        rateLimitedUntil: 0,
-        requiresPreamble: false,
-        hash: `ant-${crypto
-          .createHash("sha256")
-          .update(key)
-          .digest("hex")
-          .slice(0, 8)}`,
-        lastChecked: 0,
-        claudeTokens: 0,
-      };
-      this.keys.push(newKey);
+      this.keys.push(AnthropicKeyProvider.deserialize({ key }));
     }
     this.log.info({ keyCount: this.keys.length }, "Loaded Anthropic keys.");
   }
@@ -225,5 +211,29 @@ export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
       });
     });
     this.checker?.scheduleNextCheck();
+  }
+
+  static deserialize({ key, ...rest }: SerializableAnthropicKey): AnthropicKey {
+    return {
+      key,
+      service: "anthropic" as const,
+      modelFamilies: ["claude" as const],
+      isTrial: false,
+      isDisabled: false,
+      isPozzed: false,
+      promptCount: 0,
+      lastUsed: 0,
+      rateLimitedAt: 0,
+      rateLimitedUntil: 0,
+      requiresPreamble: false,
+      hash: `ant-${crypto
+        .createHash("sha256")
+        .update(key)
+        .digest("hex")
+        .slice(0, 8)}`,
+      lastChecked: 0,
+      claudeTokens: 0,
+      ...rest,
+    };
   }
 }

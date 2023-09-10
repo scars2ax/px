@@ -109,8 +109,7 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
     bareKeys = keyString.split(",").map((k) => k.trim());
     bareKeys = [...new Set(bareKeys)];
     for (const k of bareKeys) {
-      const newKey = OpenAIKeyProvider.deserialize({ key: k });
-      this.keys.push(newKey);
+      this.keys.push(OpenAIKeyProvider.deserialize({ key: k }));
     }
     this.log.info({ keyCount: this.keys.length }, "Loaded OpenAI keys.");
   }
