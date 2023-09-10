@@ -66,6 +66,20 @@ export interface OpenAIKey extends Key, OpenAIKeyUsage {
   rateLimitTokensReset: number;
 }
 
+const SERIALIZABLE_FIELDS = [
+  "key",
+  "service",
+  "hash",
+  "organizationId",
+  "gpt4Tokens",
+  "gpt4-32kTokens",
+  "turboTokens",
+] as const;
+type SerializableOpenAIKey = Partial<
+  Pick<OpenAIKey, (typeof SERIALIZABLE_FIELDS)[number]>
+> &
+  Pick<OpenAIKey, "key">;
+
 export type OpenAIKeyUpdate = Omit<
   Partial<OpenAIKey>,
   "key" | "hash" | "promptCount"
@@ -81,7 +95,7 @@ const KEY_REUSE_DELAY = 1000;
 export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
   readonly service = "openai" as const;
 
-  private keys: OpenAIKey[] = [];
+  private readonly keys: OpenAIKey[] = [];
   private checker?: OpenAIKeyChecker;
   private log = logger.child({ module: "key-provider", service: this.service });
 
@@ -95,35 +109,13 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
     bareKeys = keyString.split(",").map((k) => k.trim());
     bareKeys = [...new Set(bareKeys)];
     for (const k of bareKeys) {
-      const newKey: OpenAIKey = {
-        key: k,
-        service: "openai" as const,
-        modelFamilies: ["turbo" as const, "gpt4" as const],
-        isTrial: false,
-        isDisabled: false,
-        isRevoked: false,
-        isOverQuota: false,
-        lastUsed: 0,
-        lastChecked: 0,
-        promptCount: 0,
-        hash: `oai-${crypto
-          .createHash("sha256")
-          .update(k)
-          .digest("hex")
-          .slice(0, 8)}`,
-        rateLimitedAt: 0,
-        rateLimitRequestsReset: 0,
-        rateLimitTokensReset: 0,
-        turboTokens: 0,
-        gpt4Tokens: 0,
-        "gpt4-32kTokens": 0,
-      };
+      const newKey = OpenAIKeyProvider.deserialize({ key: k });
       this.keys.push(newKey);
     }
     this.log.info({ keyCount: this.keys.length }, "Loaded OpenAI keys.");
   }
 
-  public init() {
+  public async init() {
     if (config.checkKeys) {
       const cloneFn = this.clone.bind(this);
       const updateFn = this.update.bind(this);
@@ -137,12 +129,7 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
    * Don't mutate returned keys, use a KeyPool method instead.
    **/
   public list() {
-    return this.keys.map((key) => {
-      return Object.freeze({
-        ...key,
-        key: undefined,
-      });
-    });
+    return this.keys.map((key) => Object.freeze({ ...key, key: undefined }));
   }
 
   public get(model: Model) {
@@ -383,20 +370,32 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
     this.checker?.scheduleNextCheck();
   }
 
-  /** Writes key status to disk. */
-  // public writeKeyStatus() {
-  //   const keys = this.keys.map((key) => ({
-  //     key: key.key,
-  //     isGpt4: key.isGpt4,
-  //     usage: key.usage,
-  //     hardLimit: key.hardLimit,
-  //     isDisabled: key.isDisabled,
-  //   }));
-  //   fs.writeFileSync(
-  //     path.join(__dirname, "..", "keys.json"),
-  //     JSON.stringify(keys, null, 2)
-  //   );
-  // }
+  static deserialize({ key, ...rest }: SerializableOpenAIKey): OpenAIKey {
+    return {
+      key,
+      service: "openai" as const,
+      modelFamilies: ["turbo" as const, "gpt4" as const],
+      isTrial: false,
+      isDisabled: false,
+      isRevoked: false,
+      isOverQuota: false,
+      lastUsed: 0,
+      lastChecked: 0,
+      promptCount: 0,
+      hash: `oai-${crypto
+        .createHash("sha256")
+        .update(key)
+        .digest("hex")
+        .slice(0, 8)}`,
+      rateLimitedAt: 0,
+      rateLimitRequestsReset: 0,
+      rateLimitTokensReset: 0,
+      turboTokens: 0,
+      gpt4Tokens: 0,
+      "gpt4-32kTokens": 0,
+      ...rest,
+    };
+  }
 }
 
 /**

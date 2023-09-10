@@ -92,7 +92,8 @@ async function start() {
   logger.info("Checking configs and external dependencies...");
   await assertConfigIsValid();
 
-  keyPool.init();
+  logger.info("Starting key pool...");
+  await keyPool.init();
 
   await initTokenizers();
 

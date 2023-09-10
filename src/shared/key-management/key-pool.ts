@@ -9,6 +9,7 @@ import { AnthropicKeyProvider, AnthropicKeyUpdate } from "./anthropic/provider";
 import { OpenAIKeyProvider, OpenAIKeyUpdate } from "./openai/provider";
 import { GooglePalmKeyProvider } from "./palm/provider";
 import { AwsBedrockKeyProvider } from "./aws/provider";
+import { MemoryKeyStore } from "./stores/memory";
 
 type AllowedPartial = OpenAIKeyUpdate | AnthropicKeyUpdate;
 
@@ -25,8 +26,10 @@ export class KeyPool {
     this.keyProviders.push(new AwsBedrockKeyProvider());
   }
 
-  public init() {
-    this.keyProviders.forEach((provider) => provider.init());
+  public async init() {
+    const KeyStore = MemoryKeyStore; // TODO: select based on config
+    await Promise.all(this.keyProviders.map((p) => p.init(new KeyStore())));
+
     const availableKeys = this.available("all");
     if (availableKeys === 0) {
       throw new Error(

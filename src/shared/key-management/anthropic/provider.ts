@@ -106,7 +106,7 @@ export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
     this.log.info({ keyCount: this.keys.length }, "Loaded Anthropic keys.");
   }
 
-  public init() {
+  public async init() {
     if (config.checkKeys) {
       this.checker = new AnthropicKeyChecker(this.keys, this.update.bind(this));
       this.checker.start();

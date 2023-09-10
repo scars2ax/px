@@ -53,7 +53,7 @@ for service-agnostic functionality.
 
 export interface KeyProvider<T extends Key = Key> {
   readonly service: LLMService;
-  init(): void;
+  init(store: KeyStore<T>): Promise<void>;
   get(model: Model): T;
   list(): Omit<T, "key">[];
   disable(key: T): void;
@@ -63,6 +63,12 @@ export interface KeyProvider<T extends Key = Key> {
   getLockoutPeriod(model: Model): number;
   markRateLimited(hash: string): void;
   recheck(): void;
+}
+
+export interface KeyStore<T extends Pick<Key, "key">> {
+  load(): Promise<T[]>;
+  add(key: T): void;
+  update(key: T): void;
 }
 
 export const keyPool = new KeyPool();
