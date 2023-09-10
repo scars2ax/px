@@ -1,6 +1,5 @@
 import crypto from "crypto";
-import { Key, KeyProvider } from "..";
-import { config } from "../../../config";
+import { Key, KeyProvider, KeyStore } from "..";
 import { logger } from "../../../logger";
 import type { GooglePalmModelFamily } from "../../models";
 
@@ -34,6 +33,17 @@ export interface GooglePalmKey extends Key, GooglePalmKeyUsage {
   rateLimitedUntil: number;
 }
 
+const SERIALIZABLE_FIELDS: (keyof GooglePalmKey)[] = [
+  "key",
+  "service",
+  "hash",
+  "bisonTokens",
+];
+type SerializableGooglePalmKey = Partial<
+  Pick<GooglePalmKey, (typeof SERIALIZABLE_FIELDS)[number]>
+> &
+  Pick<GooglePalmKey, "key">;
+
 /**
  * Upon being rate limited, a key will be locked out for this many milliseconds
  * while we wait for other concurrent requests to finish.
@@ -50,43 +60,31 @@ export class GooglePalmKeyProvider implements KeyProvider<GooglePalmKey> {
   readonly service = "google-palm";
 
   private keys: GooglePalmKey[] = [];
+  private store: KeyStore<SerializableGooglePalmKey>;
   private log = logger.child({ module: "key-provider", service: this.service });
 
-  constructor() {
-    const keyConfig = config.googlePalmKey?.trim();
-    if (!keyConfig) {
+  constructor(store: KeyStore<SerializableGooglePalmKey>) {
+    this.store = store;
+  }
+
+  public async init() {
+    const storeName = this.store.constructor.name;
+    const serializedKeys = await this.store.load();
+
+    if (serializedKeys.length === 0) {
       this.log.warn(
-        "GOOGLE_PALM_KEY is not set. PaLM API will not be available."
+        { via: storeName },
+        "No PaLM keys found. PaLM API will not be available."
       );
       return;
     }
-    let bareKeys: string[];
-    bareKeys = [...new Set(keyConfig.split(",").map((k) => k.trim()))];
-    for (const key of bareKeys) {
-      const newKey: GooglePalmKey = {
-        key,
-        service: this.service,
-        modelFamilies: ["bison"],
-        isDisabled: false,
-        isRevoked: false,
-        promptCount: 0,
-        lastUsed: 0,
-        rateLimitedAt: 0,
-        rateLimitedUntil: 0,
-        hash: `plm-${crypto
-          .createHash("sha256")
-          .update(key)
-          .digest("hex")
-          .slice(0, 8)}`,
-        lastChecked: 0,
-        bisonTokens: 0,
-      };
-      this.keys.push(newKey);
-    }
-    this.log.info({ keyCount: this.keys.length }, "Loaded PaLM keys.");
-  }
 
-  public init() {}
+    this.keys.push(...serializedKeys.map(GooglePalmKeyProvider.deserialize));
+    this.log.info(
+      { keyCount: this.keys.length, via: storeName },
+      "Loaded PaLM keys."
+    );
+  }
 
   public list() {
     return this.keys.map((k) => Object.freeze({ ...k, key: undefined }));
@@ -186,4 +184,27 @@ export class GooglePalmKeyProvider implements KeyProvider<GooglePalmKey> {
   }
 
   public recheck() {}
+
+  static deserialize(serializedKey: SerializableGooglePalmKey): GooglePalmKey {
+    const { key, ...rest } = serializedKey;
+    return {
+      key,
+      service: "google-palm",
+      modelFamilies: ["bison"],
+      isTrial: false,
+      isDisabled: false,
+      promptCount: 0,
+      lastUsed: 0,
+      rateLimitedAt: 0,
+      rateLimitedUntil: 0,
+      hash: `plm-${crypto
+        .createHash("sha256")
+        .update(key)
+        .digest("hex")
+        .slice(0, 8)}`,
+      lastChecked: 0,
+      bisonTokens: 0,
+      ...rest,
+    };
+  }
 }

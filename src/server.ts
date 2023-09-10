@@ -5,16 +5,16 @@ import cors from "cors";
 import path from "path";
 import pinoHttp from "pino-http";
 import childProcess from "child_process";
-import { logger } from "./logger";
-import { keyPool } from "./shared/key-management";
-import { adminRouter } from "./admin/routes";
-import { proxyRouter } from "./proxy/routes";
 import { handleInfoPage } from "./info-page";
-import { logQueue } from "./shared/prompt-logging";
-import { start as startRequestQueue } from "./proxy/queue";
-import { init as initUserStore } from "./shared/users/user-store";
-import { init as initTokenizers } from "./shared/tokenization";
+import { logger } from "./logger";
+import { adminRouter } from "./admin/routes";
 import { checkOrigin } from "./proxy/check-origin";
+import { start as startRequestQueue } from "./proxy/queue";
+import { proxyRouter } from "./proxy/routes";
+import { init as initKeyPool } from "./shared/key-management";
+import { logQueue } from "./shared/prompt-logging";
+import { init as initTokenizers } from "./shared/tokenization";
+import { init as initUserStore } from "./shared/users/user-store";
 import { userRouter } from "./user/routes";
 
 const PORT = config.port;
@@ -93,7 +93,7 @@ async function start() {
   await assertConfigIsValid();
 
   logger.info("Starting key pool...");
-  await keyPool.init();
+  await initKeyPool();
 
   await initTokenizers();
 

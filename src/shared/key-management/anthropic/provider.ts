@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { Key, KeyProvider } from "..";
+import { Key, KeyProvider, KeyStore } from "..";
 import { config } from "../../../config";
 import { logger } from "../../../logger";
 import type { AnthropicModelFamily } from "../../models";
@@ -70,29 +70,35 @@ const RATE_LIMIT_LOCKOUT = 2000;
 const KEY_REUSE_DELAY = 500;
 
 export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
-  readonly service = "anthropic";
+  readonly service = "anthropic" as const;
 
-  private keys: AnthropicKey[] = [];
+  private readonly keys: AnthropicKey[] = [];
+  private store: KeyStore<SerializableAnthropicKey>;
   private checker?: AnthropicKeyChecker;
   private log = logger.child({ module: "key-provider", service: this.service });
 
-  constructor() {
-    const keyConfig = config.anthropicKey?.trim();
-    if (!keyConfig) {
-      this.log.warn(
-        "ANTHROPIC_KEY is not set. Anthropic API will not be available."
-      );
-      return;
-    }
-    let bareKeys: string[];
-    bareKeys = [...new Set(keyConfig.split(",").map((k) => k.trim()))];
-    for (const key of bareKeys) {
-      this.keys.push(AnthropicKeyProvider.deserialize({ key }));
-    }
-    this.log.info({ keyCount: this.keys.length }, "Loaded Anthropic keys.");
+  constructor(store: KeyStore<SerializableAnthropicKey>) {
+    this.store = store;
   }
 
   public async init() {
+    const storeName = this.store.constructor.name;
+    const serializedKeys = await this.store.load();
+
+    if (serializedKeys.length === 0) {
+      this.log.warn(
+        { via: storeName },
+        "No Anthropic keys found. Anthropic API will not be available."
+      );
+      return;
+    }
+
+    this.keys.push(...serializedKeys.map(AnthropicKeyProvider.deserialize));
+    this.log.info(
+      { count: this.keys.length, via: storeName },
+      "Loaded Anthropic keys."
+    );
+
     if (config.checkKeys) {
       this.checker = new AnthropicKeyChecker(this.keys, this.update.bind(this));
       this.checker.start();

@@ -3,7 +3,7 @@ round-robin access to keys. Keys are stored in the OPENAI_KEY environment
 variable as a comma-separated list of keys. */
 import crypto from "crypto";
 import http from "http";
-import { Key, KeyProvider, Model } from "../index";
+import { Key, KeyProvider, Model, KeyStore } from "../index";
 import { config } from "../../../config";
 import { logger } from "../../../logger";
 import { OpenAIKeyChecker } from "./checker";
@@ -66,7 +66,7 @@ export interface OpenAIKey extends Key, OpenAIKeyUsage {
   rateLimitTokensReset: number;
 }
 
-const SERIALIZABLE_FIELDS = [
+const SERIALIZABLE_FIELDS: (keyof OpenAIKey)[] = [
   "key",
   "service",
   "hash",
@@ -74,7 +74,7 @@ const SERIALIZABLE_FIELDS = [
   "gpt4Tokens",
   "gpt4-32kTokens",
   "turboTokens",
-] as const;
+];
 type SerializableOpenAIKey = Partial<
   Pick<OpenAIKey, (typeof SERIALIZABLE_FIELDS)[number]>
 > &
@@ -96,25 +96,38 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
   readonly service = "openai" as const;
 
   private readonly keys: OpenAIKey[] = [];
+  private store: KeyStore<SerializableOpenAIKey>;
   private checker?: OpenAIKeyChecker;
   private log = logger.child({ module: "key-provider", service: this.service });
 
-  constructor() {
-    const keyString = config.openaiKey?.trim();
-    if (!keyString) {
-      this.log.warn("OPENAI_KEY is not set. OpenAI API will not be available.");
-      return;
-    }
-    let bareKeys: string[];
-    bareKeys = keyString.split(",").map((k) => k.trim());
-    bareKeys = [...new Set(bareKeys)];
-    for (const k of bareKeys) {
-      this.keys.push(OpenAIKeyProvider.deserialize({ key: k }));
-    }
-    this.log.info({ keyCount: this.keys.length }, "Loaded OpenAI keys.");
+  constructor(store: KeyStore<SerializableOpenAIKey>) {
+    this.store = store;
   }
 
   public async init() {
+    const storeName = this.store.constructor.name;
+    const serializedKeys = await this.store.load();
+
+    // TODO: If keystore is unavailable or returns no keys, instantiate a
+    // MemoryKeyStore and use the keys from process.env. Migrate them to the
+    // keystore when it becomes available.
+    // TODO: after key management UI, keychecker should always be enabled
+    // because keys may be added after initialization.
+
+    if (serializedKeys.length === 0) {
+      this.log.warn(
+        { via: storeName },
+        "No OpenAI keys found. OpenAI API will not be available."
+      );
+      return;
+    }
+
+    this.keys.push(...serializedKeys.map(OpenAIKeyProvider.deserialize));
+    this.log.info(
+      { count: this.keys.length, via: storeName },
+      "Loaded OpenAI keys."
+    );
+
     if (config.checkKeys) {
       const cloneFn = this.clone.bind(this);
       const updateFn = this.update.bind(this);
@@ -372,7 +385,7 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
   static deserialize({ key, ...rest }: SerializableOpenAIKey): OpenAIKey {
     return {
       key,
-      service: "openai" as const,
+      service: "openai",
       modelFamilies: ["turbo" as const, "gpt4" as const],
       isTrial: false,
       isDisabled: false,

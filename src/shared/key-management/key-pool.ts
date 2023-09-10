@@ -5,11 +5,12 @@ import schedule from "node-schedule";
 import { config } from "../../config";
 import { logger } from "../../logger";
 import { Key, Model, KeyProvider, LLMService } from "./index";
+import { GooglePalmKeyProvider } from "./palm/provider";
+import { FirebaseKeyStore, MemoryKeyStore } from "./stores";
 import { AnthropicKeyProvider, AnthropicKeyUpdate } from "./anthropic/provider";
 import { OpenAIKeyProvider, OpenAIKeyUpdate } from "./openai/provider";
 import { GooglePalmKeyProvider } from "./palm/provider";
 import { AwsBedrockKeyProvider } from "./aws/provider";
-import { MemoryKeyStore } from "./stores/memory";
 
 type AllowedPartial = OpenAIKeyUpdate | AnthropicKeyUpdate;
 
@@ -20,21 +21,22 @@ export class KeyPool {
   };
 
   constructor() {
-    this.keyProviders.push(new OpenAIKeyProvider());
-    this.keyProviders.push(new AnthropicKeyProvider());
-    this.keyProviders.push(new GooglePalmKeyProvider());
-    this.keyProviders.push(new AwsBedrockKeyProvider());
+    this.keyProviders.push(new OpenAIKeyProvider(createKeyStore("openai")));
+    this.keyProviders.push(
+      new AnthropicKeyProvider(createKeyStore("anthropic"))
+    );
+    this.keyProviders.push(
+      new GooglePalmKeyProvider(createKeyStore("google-palm"))
+    );
+    // this.keyProviders.push(new AwsBedrockKeyProvider());
   }
 
   public async init() {
-    const KeyStore = MemoryKeyStore; // TODO: select based on config
-    await Promise.all(this.keyProviders.map((p) => p.init(new KeyStore())));
+    await Promise.all(this.keyProviders.map((p) => p.init()));
 
     const availableKeys = this.available("all");
     if (availableKeys === 0) {
-      throw new Error(
-        "No keys loaded. Ensure that at least one key is configured."
-      );
+      throw new Error("No keys loaded, the application cannot start.");
     }
     this.scheduleRecheck();
   }
@@ -152,5 +154,16 @@ export class KeyPool {
       "Scheduled periodic key recheck job"
     );
     this.recheckJobs.openai = job;
+  }
+}
+
+function createKeyStore(service: LLMService) {
+  switch (config.persistenceProvider) {
+    case "memory":
+      return new MemoryKeyStore(service);
+    case "firebase_rtdb":
+      return new FirebaseKeyStore(service);
+    default:
+      throw new Error(`Unknown store type: ${config.persistenceProvider}`);
   }
 }

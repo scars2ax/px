@@ -1,5 +1,5 @@
 import type firebase from "firebase-admin";
-import { Key, KeyStore } from "..";
+import { AIService, Key, KeyStore } from "..";
 import { getFirebaseApp } from "../../../config";
 
 export class FirebaseKeyStore<K extends Pick<Key, "key">>
@@ -7,7 +7,7 @@ export class FirebaseKeyStore<K extends Pick<Key, "key">>
 {
   private db: firebase.database.Database;
 
-  constructor(app = getFirebaseApp()) {
+  constructor(service: AIService, app = getFirebaseApp()) {
     this.db = app.database();
   }
 

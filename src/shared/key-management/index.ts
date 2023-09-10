@@ -53,7 +53,7 @@ for service-agnostic functionality.
 
 export interface KeyProvider<T extends Key = Key> {
   readonly service: LLMService;
-  init(store: KeyStore<T>): Promise<void>;
+  init(): Promise<void>;
   get(model: Model): T;
   list(): Omit<T, "key">[];
   disable(key: T): void;
@@ -71,7 +71,12 @@ export interface KeyStore<T extends Pick<Key, "key">> {
   update(key: T): void;
 }
 
-export const keyPool = new KeyPool();
+export let keyPool: KeyPool;
+export async function init() {
+  keyPool = new KeyPool();
+  await keyPool.init();
+}
+
 export const SUPPORTED_MODELS = [
   ...OPENAI_SUPPORTED_MODELS,
   ...ANTHROPIC_SUPPORTED_MODELS,
