@@ -1,8 +1,9 @@
 import crypto from "crypto";
-import { Key, KeyProvider, KeyStore } from "..";
+import { Key, KeyProvider } from "..";
 import { config } from "../../../config";
 import { logger } from "../../../logger";
 import type { AnthropicModelFamily } from "../../models";
+import { KeyStore } from "../stores";
 import { AnthropicKeyChecker } from "./checker";
 
 // https://docs.anthropic.com/claude/reference/selecting-a-model

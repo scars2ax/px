@@ -1,5 +1,6 @@
 import type firebase from "firebase-admin";
-import { AIService, Key, KeyStore } from "..";
+import { KeyStore } from ".";
+import { AIService, Key } from "..";
 import { getFirebaseApp } from "../../../config";
 
 export class FirebaseKeyStore<K extends Pick<Key, "key">>

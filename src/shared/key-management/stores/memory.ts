@@ -1,4 +1,5 @@
-import { APIFormat, Key, KeyStore } from "..";
+import { KeyStore } from ".";
+import { APIFormat, Key } from "..";
 
 export class MemoryKeyStore<K extends Pick<Key, "key">> implements KeyStore<K> {
   private env: string;
@@ -26,7 +27,7 @@ export class MemoryKeyStore<K extends Pick<Key, "key">> implements KeyStore<K> {
     bareKeys = [
       ...new Set(process.env[this.env]?.split(",").map((k) => k.trim())),
     ];
-    return bareKeys.map((key) => ({ key } as K));
+    return bareKeys.map((key) => ({ key } as K)); // TODO: remove assertion
   }
 
   public add(_key: K) {}

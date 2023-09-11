@@ -3,10 +3,11 @@ round-robin access to keys. Keys are stored in the OPENAI_KEY environment
 variable as a comma-separated list of keys. */
 import crypto from "crypto";
 import http from "http";
-import { Key, KeyProvider, Model, KeyStore } from "../index";
+import { Key, KeyProvider, Model } from "../index";
 import { config } from "../../../config";
 import { logger } from "../../../logger";
 import { OpenAIKeyChecker } from "./checker";
+import { KeyStore } from "../stores";
 import { getOpenAIModelFamily, OpenAIModelFamily } from "../../models";
 
 export type OpenAIModel =

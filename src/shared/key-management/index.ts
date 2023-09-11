@@ -65,12 +65,6 @@ export interface KeyProvider<T extends Key = Key> {
   recheck(): void;
 }
 
-export interface KeyStore<T extends Pick<Key, "key">> {
-  load(): Promise<T[]>;
-  add(key: T): void;
-  update(key: T): void;
-}
-
 export let keyPool: KeyPool;
 export async function init() {
   keyPool = new KeyPool();
