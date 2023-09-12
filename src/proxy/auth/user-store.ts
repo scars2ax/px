@@ -210,6 +210,7 @@ export function getPublicUsers() {
 export function upsertUser(user: UserUpdate) {
   const existing: User = users.get(user.token) ?? {
     token: user.token,
+	alias: "Degenerate",
     ip: [],
     type: "normal",
     promptCount: 0,

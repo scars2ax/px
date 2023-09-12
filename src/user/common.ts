@@ -55,6 +55,7 @@ const mapTransform = (value: any) => new Map(value);
 export const UserSchema = z
   .object({
     ip: z.array(z.string()).optional(),
+	alias: z.string().optional(), 
 	tokenHash: z.string().optional(),
     type: z.enum(["normal", "special", "temp"]).optional(),
 	promptCount: z.number().optional(),
