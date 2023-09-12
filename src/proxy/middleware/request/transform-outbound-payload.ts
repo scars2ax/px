@@ -119,7 +119,7 @@ async function openaiToAnthropic(body: any, req: Request) {
   // request the older version for now. 2023-01-01 will be removed in September.
   // https://docs.anthropic.com/claude/reference/versioning
   req.headers["anthropic-version"] = "2023-01-01";
-
+  
   const { messages, ...rest } = result.data;
   const prompt = openAIMessagesToClaudePrompt(messages);
 
