@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { Key, KeyProvider } from "..";
+import { BaseSerializableKey, Key, KeyProvider } from "..";
 import { config } from "../../../config";
 import { logger } from "../../../logger";
 import type { AnthropicModelFamily } from "../../models";
@@ -21,10 +21,8 @@ type AnthropicKeyUsage = {
 };
 
 const SERIALIZABLE_FIELDS = ["key", "service", "hash", "claudeTokens"] as const;
-type SerializableAnthropicKey = Partial<
-  Pick<AnthropicKey, (typeof SERIALIZABLE_FIELDS)[number]>
-> &
-  Pick<AnthropicKey, "key">;
+type SerializableAnthropicKey = BaseSerializableKey &
+  Partial<Pick<AnthropicKey, (typeof SERIALIZABLE_FIELDS)[number]>>;
 
 export type AnthropicKeyUpdate = Omit<
   Partial<AnthropicKey>,

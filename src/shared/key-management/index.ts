@@ -39,6 +39,10 @@ export interface Key {
   hash: string;
 }
 
+export interface BaseSerializableKey {
+  key: string;
+}
+
 /*
 KeyPool and KeyProvider's similarities are a relic of the old design where
 there was only a single KeyPool for OpenAI keys. Now that there are multiple

@@ -1,8 +1,11 @@
-import { KeyStore } from ".";
-import { APIFormat, Key } from "..";
+import { KeyDeserializer, KeyStore, getDeserializer } from ".";
+import { APIFormat, BaseSerializableKey } from "..";
 
-export class MemoryKeyStore<K extends Pick<Key, "key">> implements KeyStore<K> {
+export class MemoryKeyStore<K extends BaseSerializableKey>
+  implements KeyStore<K>
+{
   private env: string;
+  private deserializer: KeyDeserializer;
 
   constructor(service: APIFormat) {
     switch (service) {
@@ -20,6 +23,7 @@ export class MemoryKeyStore<K extends Pick<Key, "key">> implements KeyStore<K> {
         const never: never = service;
         throw new Error(`Unknown service: ${never}`);
     }
+    this.deserializer = getDeserializer(service);
   }
 
   public async load() {
@@ -27,7 +31,7 @@ export class MemoryKeyStore<K extends Pick<Key, "key">> implements KeyStore<K> {
     bareKeys = [
       ...new Set(process.env[this.env]?.split(",").map((k) => k.trim())),
     ];
-    return bareKeys.map((key) => ({ key } as K)); // TODO: remove assertion
+    return bareKeys.map((key) => this.deserializer({ key }));
   }
 
   public add(_key: K) {}
