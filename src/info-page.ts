@@ -2,7 +2,12 @@ import fs from "fs";
 import { Request, Response } from "express";
 import showdown from "showdown";
 import { config, listConfig } from "./config";
-import { AnthropicKey, OpenAIKey, keyPool } from "./shared/key-management";
+import {
+  AnthropicKey,
+  GooglePalmKey,
+  OpenAIKey,
+  keyPool,
+} from "./shared/key-management";
 import { ModelFamily, OpenAIModelFamily } from "./shared/models";
 import { getUniqueIps } from "./proxy/rate-limit";
 import { getEstimatedWaitTime, getQueueLength } from "./proxy/queue";
@@ -18,6 +23,8 @@ const keyIsOpenAIKey = (k: KeyPoolKey): k is OpenAIKey =>
   k.service === "openai";
 const keyIsAnthropicKey = (k: KeyPoolKey): k is AnthropicKey =>
   k.service === "anthropic";
+const keyIsGooglePalmKey = (k: KeyPoolKey): k is GooglePalmKey =>
+  k.service === "google-palm";
 
 type ModelAggregates = {
   active: number;

@@ -13,6 +13,7 @@ export class KeyPool {
   private recheckJobs: Record<AIService, schedule.Job | null> = {
     openai: null,
     anthropic: null,
+    "google-palm": null,
   };
 
   constructor() {
@@ -25,7 +26,7 @@ export class KeyPool {
     const availableKeys = this.available("all");
     if (availableKeys === 0) {
       throw new Error(
-        "No keys loaded. Ensure either OPENAI_KEY or ANTHROPIC_KEY is set."
+        "No keys loaded. Ensure OPENAI_KEY, ANTHROPIC_KEY, and GOOGLE_PALM_KEY are set."
       );
     }
     this.scheduleMonthlyRecheck();
@@ -106,6 +107,9 @@ export class KeyPool {
     } else if (model.startsWith("claude-")) {
       // https://console.anthropic.com/docs/api/reference#parameters
       return "anthropic";
+    } else if (model.match(/^\w+-bison-\d{3}$/)) {
+      // https://developers.generativeai.google.com/models/language
+      return "google-palm";
     }
     throw new Error(`Unknown service for model '${model}'`);
   }
