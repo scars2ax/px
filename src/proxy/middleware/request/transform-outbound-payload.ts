@@ -69,14 +69,14 @@ const OpenAIV1ChatCompletionSchema = z.object({
 // https://developers.generativeai.google/api/rest/generativelanguage/models/generateText
 const PalmV1GenerateTextSchema = z.object({
   model: z.string().regex(/^\w+-bison-\d{3}$/),
-  prompt: z.string(),
+  prompt: z.object({ text: z.string() }),
   temperature: z.number().optional(),
   maxOutputTokens: z.coerce
-  .number()
-  .int()
-  .optional()
-  .default(16)
-  .transform((v) => Math.min(v, 1024)), // TODO: Add config
+    .number()
+    .int()
+    .optional()
+    .default(16)
+    .transform((v) => Math.min(v, 1024)), // TODO: Add config
   candidateCount: z.literal(1).optional(),
   topP: z.number().optional(),
   topK: z.number().optional(),
@@ -172,7 +172,10 @@ function openaiToAnthropic(body: any, req: Request) {
   };
 }
 
-function openaiToPalm(body: any, req: Request): z.infer<typeof PalmV1GenerateTextSchema> {
+function openaiToPalm(
+  body: any,
+  req: Request
+): z.infer<typeof PalmV1GenerateTextSchema> {
   const result = OpenAIV1ChatCompletionSchema.safeParse(body);
   if (!result.success) {
     req.log.error(
@@ -191,9 +194,13 @@ function openaiToPalm(body: any, req: Request): z.infer<typeof PalmV1GenerateTex
       : [rest.stop]
     : [];
 
+  stops.push("\n\nUser:");
+  stops = [...new Set(stops)];
+
+  z.array(z.string()).max(5).parse(stops);
+
   return {
-    ...rest,
-    prompt: prompt,
+    prompt: { text: prompt },
     maxOutputTokens: rest.max_tokens,
     stopSequences: stops,
     model: "text-bison-001",
@@ -234,6 +241,19 @@ export function openAIMessagesToClaudePrompt(messages: OpenAIPromptMessage[]) {
 }
 
 function openAIMessagesToPalmPrompt(messages: OpenAIPromptMessage[]) {
-  throw new Error("Not yet implemented");
-  return "";
+  return (
+    messages
+      .map((m) => {
+        let role: string = m.role;
+        if (role === "assistant") {
+          role = "Assistant";
+        } else if (role === "system") {
+          role = "System";
+        } else if (role === "user") {
+          role = "User";
+        }
+        return `\n\n${role}: ${m.content}`;
+      })
+      .join("") + "\n\nAssistant:"
+  );
 }
