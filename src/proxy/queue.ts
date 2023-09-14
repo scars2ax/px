@@ -197,10 +197,12 @@ function processQueue() {
   // the others, because we only track one rate limit per key.
 
   // TODO: `getLockoutPeriod` uses model names instead of model families
+  // TODO: genericize this
   const gpt432kLockout = keyPool.getLockoutPeriod("gpt-4-32k");
   const gpt4Lockout = keyPool.getLockoutPeriod("gpt-4");
   const turboLockout = keyPool.getLockoutPeriod("gpt-3.5-turbo");
   const claudeLockout = keyPool.getLockoutPeriod("claude-v1");
+  const palmLockout = keyPool.getLockoutPeriod("text-bison-001");
 
   const reqs: (Request | undefined)[] = [];
   if (gpt432kLockout === 0) {
@@ -214,6 +216,9 @@ function processQueue() {
   }
   if (claudeLockout === 0) {
     reqs.push(dequeue("claude"));
+  }
+  if (palmLockout === 0) {
+    reqs.push(dequeue("bison"));
   }
 
   reqs.filter(Boolean).forEach((req) => {
