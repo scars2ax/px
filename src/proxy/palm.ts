@@ -72,10 +72,11 @@ const rewritePalmRequest = (
   // The chat api (generateMessage) is not very useful at this time as it has
   // few params and no adjustable safety settings.
 
-  proxyReq.path = proxyReq.path.replace(
-    `^/v1/chat/completions`,
+  const newProxyReqPath = proxyReq.path.replace(
+    /^\/v1\/chat\/completions/,
     `/v1beta2/models/${req.body.model}:generateText`
   );
+  proxyReq.path = newProxyReqPath;
 
   const rewriterPipeline = [
     applyQuotaLimits,
@@ -122,6 +123,10 @@ const palmResponseHandler: ProxyResHandlerWithBody = async (
     body.proxy_tokenizer_debug_info = req.debug;
   }
 
+  // TODO: PaLM has no streaming capability which will pose a problem here if
+  // requests wait in the queue for too long.  Probably need to fake streaming
+  // and return the entire completion in one stream event using the other
+  // response handler.
   res.status(200).json(body);
 };
 
