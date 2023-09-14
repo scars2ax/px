@@ -107,7 +107,7 @@ export class KeyPool {
     } else if (model.startsWith("claude-")) {
       // https://console.anthropic.com/docs/api/reference#parameters
       return "anthropic";
-    } else if (model.match(/^\w+-bison-\d{3}$/)) {
+    } else if (model.includes("bison")) {
       // https://developers.generativeai.google.com/models/language
       return "google-palm";
     }
