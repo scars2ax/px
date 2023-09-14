@@ -98,6 +98,11 @@ export const transformOutboundPayload: RequestPreprocessor = async (req) => {
     return;
   }
 
+  if (req.inboundApi === "openai" && req.outboundApi === "google-palm") {
+    // TODO: Implement
+    throw new Error(`Not yet implemented`);
+  }
+
   throw new Error(
     `'${req.inboundApi}' -> '${req.outboundApi}' request proxying is not supported. Make sure your client is configured to use the correct API.`
   );

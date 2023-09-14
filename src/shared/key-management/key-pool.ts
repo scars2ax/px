@@ -26,7 +26,7 @@ export class KeyPool {
     const availableKeys = this.available("all");
     if (availableKeys === 0) {
       throw new Error(
-        "No keys loaded. Ensure OPENAI_KEY, ANTHROPIC_KEY, and GOOGLE_PALM_KEY are set."
+        "No keys loaded. Ensure OPENAI_KEY, ANTHROPIC_KEY, or GOOGLE_PALM_KEY are set."
       );
     }
     this.scheduleMonthlyRecheck();

@@ -25,6 +25,7 @@ import {
 import { logger } from "../logger";
 import { AGNAI_DOT_CHAT_IP } from "./rate-limit";
 import { buildFakeSseMessage } from "./middleware/common";
+import { assertNever } from "../shared/utils";
 
 const queue: Request[] = [];
 const log = logger.child({ module: "request-queue" });
@@ -133,20 +134,19 @@ export function enqueue(req: Request) {
 }
 
 function getPartitionForRequest(req: Request): ModelFamily {
-  // There is a single request queue, but it is partitioned by model and API
-  // provider.
-  // - claude: requests for the Anthropic API, regardless of model
-  // - gpt-4: requests for the OpenAI API, specifically for GPT-4 models
-  // - turbo: effectively, all other requests
+  // There is a single request queue, but it is partitioned by model family.
+  // Model families are typically separated on cost/rate limit boundaries so
+  // they should be treated as separate queues.
   const provider = req.outboundApi;
   const model = (req.body.model as SupportedModel) ?? "gpt-3.5-turbo";
-  if (provider === "anthropic") {
-    return getClaudeModelFamily(model);
+  switch (provider) {
+    case "anthropic":
+      return getClaudeModelFamily(model);
+    case "openai":
+      return getOpenAIModelFamily(model);
+    default:
+      assertNever(provider);
   }
-  if (provider === "openai") {
-    return getOpenAIModelFamily(model);
-  }
-  return "turbo";
 }
 
 function getQueueForPartition(partition: ModelFamily): Request[] {

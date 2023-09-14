@@ -1,6 +1,7 @@
 import { Request } from "express";
 import { config } from "../../../config";
 import { logger } from "../../../logger";
+import { assertNever } from "../../../shared/utils";
 import { isCompletionRequest } from "../common";
 import { ProxyRequestMiddleware } from ".";
 
@@ -42,10 +43,11 @@ function getPromptFromRequest(req: Request) {
     case "anthropic":
       return body.prompt;
     case "openai":
+    case "google-palm":
       return body.messages
         .map((m: { content: string }) => m.content)
         .join("\n");
     default:
-      throw new Error(`Unknown service: ${service}`);
+      assertNever(service);
   }
 }

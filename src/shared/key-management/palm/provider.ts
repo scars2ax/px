@@ -53,10 +53,10 @@ export class GooglePalmKeyProvider implements KeyProvider<GooglePalmKey> {
   private log = logger.child({ module: "key-provider", service: this.service });
 
   constructor() {
-    const keyConfig = config.anthropicKey?.trim();
+    const keyConfig = config.googlePalmKey?.trim();
     if (!keyConfig) {
       this.log.warn(
-        "ANTHROPIC_KEY is not set. Anthropic API will not be available."
+        "GOOGLE_PALM_KEY is not set. PaLM API will not be available."
       );
       return;
     }

@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import httpProxy from "http-proxy";
 import { ZodError } from "zod";
 import { AIService } from "../../shared/key-management";
+import { assertNever } from "../../shared/utils";
 import { QuotaExceededError } from "./request/apply-quota-limits";
 
 const OPENAI_CHAT_COMPLETION_ENDPOINT = "/v1/chat/completions";
@@ -125,29 +126,34 @@ export function buildFakeSseMessage(
     ? `\`\`\`\n[${type}: ${string}]\n\`\`\`\n`
     : `[${type}: ${string}]`;
 
-  if (req.inboundApi === "anthropic") {
-    fakeEvent = {
-      completion: msgContent,
-      stop_reason: type,
-      truncated: false, // I've never seen this be true
-      stop: null,
-      model: req.body?.model,
-      log_id: "proxy-req-" + req.id,
-    };
-  } else {
-    fakeEvent = {
-      id: "chatcmpl-" + req.id,
-      object: "chat.completion.chunk",
-      created: Date.now(),
-      model: req.body?.model,
-      choices: [
-        {
-          delta: { content: msgContent },
-          index: 0,
-          finish_reason: type,
-        },
-      ],
-    };
+  switch (req.inboundApi) {
+    case "openai":
+      fakeEvent = {
+        id: "chatcmpl-" + req.id,
+        object: "chat.completion.chunk",
+        created: Date.now(),
+        model: req.body?.model,
+        choices: [
+          {
+            delta: { content: msgContent },
+            index: 0,
+            finish_reason: type,
+          },
+        ],
+      };
+      break;
+    case "anthropic":
+      fakeEvent = {
+        completion: msgContent,
+        stop_reason: type,
+        truncated: false, // I've never seen this be true
+        stop: null,
+        model: req.body?.model,
+        log_id: "proxy-req-" + req.id,
+      };
+      break;
+    default:
+      assertNever(req.inboundApi);
   }
   return `data: ${JSON.stringify(fakeEvent)}\n\n`;
 }
@@ -159,9 +165,12 @@ export function getCompletionForService({
   service: AIService;
   body: Record<string, any>;
 }): { completion: string; model: string } {
-  if (service === "anthropic") {
-    return { completion: body.completion.trim(), model: body.model };
-  } else {
-    return { completion: body.choices[0].message.content, model: body.model };
+  switch (service) {
+    case "openai":
+      return { completion: body.choices[0].message.content, model: body.model };
+    case "anthropic":
+      return { completion: body.completion.trim(), model: body.model };
+    default:
+      assertNever(service);
   }
 }

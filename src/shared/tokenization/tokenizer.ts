@@ -24,11 +24,18 @@ type TokenCountResult = {
   tokenizer: string;
   tokenization_duration_ms: number;
 };
-type TokenCountRequest = { req: Request } & (
+type TokenCountRequest = { req: Request } & ( // Incoming prompts
   | { prompt: OpenAIPromptMessage[]; completion?: never; service: "openai" }
   | { prompt: string; completion?: never; service: "anthropic" }
+  | {
+      prompt: OpenAIPromptMessage[];
+      completion?: never;
+      service: "google-palm";
+    }
+  // Returned completions
   | { prompt?: never; completion: string; service: "openai" }
   | { prompt?: never; completion: string; service: "anthropic" }
+  | { prompt?: never; completion: string; service: "google-palm" }
 );
 export async function countTokens({
   req,
@@ -44,6 +51,13 @@ export async function countTokens({
         tokenization_duration_ms: getElapsedMs(time),
       };
     case "openai":
+      return {
+        ...getOpenAITokenCount(prompt ?? completion, req.body.model),
+        tokenization_duration_ms: getElapsedMs(time),
+      };
+    case "google-palm":
+      // TODO: Can't find a tokenization library for PaLM. There is an API
+      // endpoint for it but it adds significant latency to the request.
       return {
         ...getOpenAITokenCount(prompt ?? completion, req.body.model),
         tokenization_duration_ms: getElapsedMs(time),

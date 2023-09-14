@@ -3,6 +3,7 @@ import { z } from "zod";
 import { config } from "../../../config";
 import { OpenAIPromptMessage, countTokens } from "../../../shared/tokenization";
 import { RequestPreprocessor } from ".";
+import { assertNever } from "../../../shared/utils";
 
 const CLAUDE_MAX_CONTEXT = config.maxContextTokensAnthropic;
 const OPENAI_MAX_CONTEXT = config.maxContextTokensOpenAI;
@@ -32,7 +33,7 @@ export const checkContextSize: RequestPreprocessor = async (req) => {
       break;
     }
     default:
-      throw new Error(`Unknown outbound API: ${req.outboundApi}`);
+      assertNever(service);
   }
 
   req.promptTokens = result.token_count;
@@ -42,7 +43,7 @@ export const checkContextSize: RequestPreprocessor = async (req) => {
   req.debug = req.debug ?? {};
   req.debug = { ...req.debug, ...result };
 
-  maybeReassignModel(req);
+  maybeTranslateOpenAIModel(req);
   validateContextSize(req);
 };
 
@@ -115,7 +116,7 @@ function assertRequestHasTokenCounts(
  * the `transformOutboundPayload` preprocessor, but we don't have the context
  * size at that point (and need a transformed body to calculate it).
  */
-function maybeReassignModel(req: Request) {
+function maybeTranslateOpenAIModel(req: Request) {
   if (req.inboundApi !== "openai" || req.outboundApi !== "anthropic") {
     return;
   }

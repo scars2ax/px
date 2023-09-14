@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import * as http from "http";
 import { buildFakeSseMessage } from "../common";
 import { RawResponseBodyHandler, decodeResponseBody } from ".";
+import { assertNever } from "../../../shared/utils";
 
 type OpenAiChatCompletionResponse = {
   id: string;
@@ -179,6 +180,11 @@ function transformEvent({
     throw new Error(`Anthropic -> OpenAI streaming not implemented.`);
   }
 
+  if (requestApi === "openai" && responseApi === "google-palm") {
+    assertNever(true); // TODO: Implement
+    throw new Error(`OpenAI -> Google PaLM streaming not yet implemented.`);
+  }
+
   // Anthropic sends the full completion so far with each event whereas OpenAI
   // only sends the delta. To make the SSE events compatible, we remove
   // everything before `lastPosition` from the completion.
@@ -234,60 +240,65 @@ function copyHeaders(proxyRes: http.IncomingMessage, res: Response) {
  * Events are expected to be in the format they were received from the API.
  */
 function convertEventsToFinalResponse(events: string[], req: Request) {
-  if (req.outboundApi === "openai") {
-    let response: OpenAiChatCompletionResponse = {
-      id: "",
-      object: "",
-      created: 0,
-      model: "",
-      choices: [],
-    };
-    response = events.reduce((acc, event, i) => {
-      if (!event.startsWith("data: ")) {
+  switch (req.outboundApi) {
+    case "openai": {
+      let response: OpenAiChatCompletionResponse = {
+        id: "",
+        object: "",
+        created: 0,
+        model: "",
+        choices: [],
+      };
+      response = events.reduce((acc, event, i) => {
+        if (!event.startsWith("data: ")) {
+          return acc;
+        }
+
+        if (event === "data: [DONE]") {
+          return acc;
+        }
+
+        const data = JSON.parse(event.slice("data: ".length));
+        if (i === 0) {
+          return {
+            id: data.id,
+            object: data.object,
+            created: data.created,
+            model: data.model,
+            choices: [
+              {
+                message: { role: data.choices[0].delta.role, content: "" },
+                index: 0,
+                finish_reason: null,
+              },
+            ],
+          };
+        }
+
+        if (data.choices[0].delta.content) {
+          acc.choices[0].message.content += data.choices[0].delta.content;
+        }
+        acc.choices[0].finish_reason = data.choices[0].finish_reason;
         return acc;
-      }
-
-      if (event === "data: [DONE]") {
-        return acc;
-      }
-
-      const data = JSON.parse(event.slice("data: ".length));
-      if (i === 0) {
-        return {
-          id: data.id,
-          object: data.object,
-          created: data.created,
-          model: data.model,
-          choices: [
-            {
-              message: { role: data.choices[0].delta.role, content: "" },
-              index: 0,
-              finish_reason: null,
-            },
-          ],
-        };
-      }
-
-      if (data.choices[0].delta.content) {
-        acc.choices[0].message.content += data.choices[0].delta.content;
-      }
-      acc.choices[0].finish_reason = data.choices[0].finish_reason;
-      return acc;
-    }, response);
-    return response;
+      }, response);
+      return response;
+    }
+    case "anthropic": {
+      /*
+       * Full complete responses from Anthropic are conveniently just the same as
+       * the final SSE event before the "DONE" event, so we can reuse that
+       */
+      const lastEvent = events[events.length - 2].toString();
+      const data = JSON.parse(
+        lastEvent.slice(lastEvent.indexOf("data: ") + "data: ".length)
+      );
+      const response: AnthropicCompletionResponse = {
+        ...data,
+        log_id: req.id,
+      };
+      return response;
+    }
+    default:
+      assertNever(req.outboundApi);
   }
-  if (req.outboundApi === "anthropic") {
-    /*
-     * Full complete responses from Anthropic are conveniently just the same as
-     * the final SSE event before the "DONE" event, so we can reuse that
-     */
-    const lastEvent = events[events.length - 2].toString();
-    const data = JSON.parse(lastEvent.slice(lastEvent.indexOf("data: ") + "data: ".length));
-    const response: AnthropicCompletionResponse = {
-      ...data,
-      log_id: req.id,
-    };
-    return response;
-  }
-  throw new Error("If you get this, something is fucked");
 }
