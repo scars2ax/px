@@ -31,7 +31,7 @@ const getModelsResponse = () => {
 
   if (!config.googlePalmKey) return { object: "list", data: [] };
 
-  const bisonVariants = ["chat-bison-001"];
+  const bisonVariants = ["text-bison-001"];
 
   const models = bisonVariants.map((id) => ({
     id,
@@ -64,6 +64,9 @@ const rewritePalmRequest = (
 
   // POST https://generativelanguage.googleapis.com/v1beta2/{model=models/*}:generateText
   // POST https://generativelanguage.googleapis.com/v1beta2/{model=models/*}:generateMessage
+
+  // The chat api (generateMessage) is not very useful at this time as it has
+  // few params and no adjustable safety settings.
 
   proxyReq.path = proxyReq.path.replace(
     `^/v1/chat/completions`,

@@ -19,6 +19,7 @@ import type { Handler, Request } from "express";
 import { keyPool, SupportedModel } from "../shared/key-management";
 import {
   getClaudeModelFamily,
+  getGooglePalmModelFamily,
   getOpenAIModelFamily,
   ModelFamily,
 } from "../shared/models";
@@ -144,6 +145,8 @@ function getPartitionForRequest(req: Request): ModelFamily {
       return getClaudeModelFamily(model);
     case "openai":
       return getOpenAIModelFamily(model);
+    case "google-palm":
+      return getGooglePalmModelFamily(model);
     default:
       assertNever(provider);
   }

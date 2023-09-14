@@ -157,34 +157,37 @@ export const handleStreamedResponse: RawResponseBodyHandler = async (
   });
 };
 
-/**
- * Transforms SSE events from the given response API into events compatible with
- * the API requested by the client.
- */
-function transformEvent({
-  data,
-  requestApi,
-  responseApi,
-  lastPosition,
-}: {
+type SSETransformationArgs = {
   data: string;
   requestApi: string;
   responseApi: string;
   lastPosition: number;
-}) {
+};
+
+/**
+ * Transforms SSE events from the given response API into events compatible with
+ * the API requested by the client.
+ */
+function transformEvent(params: SSETransformationArgs) {
+  const { data, requestApi, responseApi } = params;
   if (requestApi === responseApi) {
     return { position: -1, event: data };
   }
 
-  if (requestApi === "anthropic" && responseApi === "openai") {
-    throw new Error(`Anthropic -> OpenAI streaming not implemented.`);
+  const trans = `${requestApi}->${responseApi}`;
+  switch (trans) {
+    case "openai->anthropic":
+      // TODO: handle new anthropic streaming format
+      return transformV1AnthropicEventToOpenAI(params);
+    case "openai->google-palm":
+      return transformPalmEventToOpenAI(params);
+    default:
+      throw new Error(`Unsupported streaming API transformation. ${trans}`);
   }
+}
 
-  if (requestApi === "openai" && responseApi === "google-palm") {
-    assertNever(true); // TODO: Implement
-    throw new Error(`OpenAI -> Google PaLM streaming not yet implemented.`);
-  }
-
+function transformV1AnthropicEventToOpenAI(params: SSETransformationArgs) {
+  const { data, lastPosition } = params;
   // Anthropic sends the full completion so far with each event whereas OpenAI
   // only sends the delta. To make the SSE events compatible, we remove
   // everything before `lastPosition` from the completion.
@@ -214,6 +217,11 @@ function transformEvent({
     position: event.completion.length,
     event: `data: ${JSON.stringify(newEvent)}`,
   };
+}
+
+function transformPalmEventToOpenAI({ data }: SSETransformationArgs) {
+  throw new Error("PaLM streaming not yet supported.");
+  return { position: -1, event: data };
 }
 
 /** Copy headers, excluding ones we're already setting for the SSE response. */
@@ -297,6 +305,9 @@ function convertEventsToFinalResponse(events: string[], req: Request) {
         log_id: req.id,
       };
       return response;
+    }
+    case "google-palm": {
+      throw new Error("PaLM streaming not yet supported.");
     }
     default:
       assertNever(req.outboundApi);

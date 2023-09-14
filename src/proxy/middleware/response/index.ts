@@ -301,6 +301,7 @@ const handleUpstreamErrors: ProxyResHandlerWithBody = async (
         handleAnthropicRateLimitError(req, errorPayload);
         break;
       case "google-palm":
+        throw new Error("Rate limit handling not implemented for PaLM");
       default:
         assertNever(req.outboundApi);
     }

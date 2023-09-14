@@ -7,7 +7,7 @@ import type { GooglePalmModelFamily } from "../../models";
 // https://developers.generativeai.google.com/models/language
 export const GOOGLE_PALM_SUPPORTED_MODELS = [
   "text-bison-001",
-  "chat-bison-001",
+  "chat-bison-001", // no adjustable safety settings, so it's useless
 ] as const;
 export type GooglePalmModel = (typeof GOOGLE_PALM_SUPPORTED_MODELS)[number];
 

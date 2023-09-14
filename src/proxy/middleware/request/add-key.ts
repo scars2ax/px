@@ -45,7 +45,7 @@ export const addKey: ProxyRequestMiddleware = (proxyReq, req) => {
         assignedKey = keyPool.get("claude-v1");
         break;
       case "google-palm":
-        assignedKey = keyPool.get("chat-bison-001");
+        assignedKey = keyPool.get("text-bison-001");
         break;
       case "openai":
         throw new Error("OpenAI as an API translation target is not supported");
