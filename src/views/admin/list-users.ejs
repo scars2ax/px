@@ -1,5 +1,4 @@
 
-
 <%- include("../_partials/admin-header", { title: "Users - OAI Reverse Proxy Admin" }) %>
     <h1>User Token List</h1>
     <style>
@@ -55,7 +54,7 @@
 				<td>
 				  <code><a href="/admin/manage/view-user/<%= user.token %>"><%= user.token %></a></code>
 				</td>
-				<td><%= user.ipPromptCount.length | 0 %></td>
+				<td><%= user.ipPromptCount.size | 0 %></td>
 				<td><%= user.promptCount %></td>
 				<td><%= user.tokenClaudeCount+user.tokenGptCount %></td>
 				<td><%= user.type %></td>
