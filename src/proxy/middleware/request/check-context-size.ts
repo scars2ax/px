@@ -7,6 +7,7 @@ import { assertNever } from "../../../shared/utils";
 
 const CLAUDE_MAX_CONTEXT = config.maxContextTokensAnthropic;
 const OPENAI_MAX_CONTEXT = config.maxContextTokensOpenAI;
+const BISON_MAX_CONTEXT = 8100;
 
 /**
  * Assigns `req.promptTokens` and `req.outputTokens` based on the request body
@@ -32,6 +33,12 @@ export const checkContextSize: RequestPreprocessor = async (req) => {
       result = await countTokens({ req, prompt, service });
       break;
     }
+    case "google-palm": {
+      req.outputTokens = req.body.maxOutputTokens;
+      const prompt: string = req.body.prompt.text;
+      result = await countTokens({ req, prompt, service });
+      break;
+    }
     default:
       assertNever(service);
   }
@@ -54,11 +61,26 @@ function validateContextSize(req: Request) {
   const contextTokens = promptTokens + outputTokens;
   const model = req.body.model;
 
-  const proxyMax =
-    (req.outboundApi === "openai" ? OPENAI_MAX_CONTEXT : CLAUDE_MAX_CONTEXT) ||
-    Number.MAX_SAFE_INTEGER;
-  let modelMax = 0;
+  // const proxyMax =
+  //   (req.outboundApi === "openai" ? OPENAI_MAX_CONTEXT : CLAUDE_MAX_CONTEXT) ||
+  //   Number.MAX_SAFE_INTEGER;
+  let proxyMax = 0;
+  switch (req.outboundApi) {
+    case "openai":
+      proxyMax = OPENAI_MAX_CONTEXT;
+      break;
+    case "anthropic":
+      proxyMax = CLAUDE_MAX_CONTEXT;
+      break;
+    case "google-palm":
+      proxyMax = BISON_MAX_CONTEXT;
+      break;
+    default:
+      assertNever(req.outboundApi);
+  }
+  proxyMax ??= Number.MAX_SAFE_INTEGER;
 
+  let modelMax = 0;
   if (model.match(/gpt-3.5-turbo-16k/)) {
     modelMax = 16384;
   } else if (model.match(/gpt-3.5-turbo/)) {
@@ -73,6 +95,8 @@ function validateContextSize(req: Request) {
     modelMax = 9000;
   } else if (model.match(/claude-2/)) {
     modelMax = 100000;
+  } else if (model.match(/^text-bison-\d{3}$/)) {
+    modelMax = BISON_MAX_CONTEXT;
   } else {
     // Don't really want to throw here because I don't want to have to update
     // this ASAP every time a new model is released.

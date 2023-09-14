@@ -27,11 +27,7 @@ type TokenCountResult = {
 type TokenCountRequest = { req: Request } & ( // Incoming prompts
   | { prompt: OpenAIPromptMessage[]; completion?: never; service: "openai" }
   | { prompt: string; completion?: never; service: "anthropic" }
-  | {
-      prompt: OpenAIPromptMessage[];
-      completion?: never;
-      service: "google-palm";
-    }
+  | { prompt: string; completion?: never; service: "google-palm" }
   // Returned completions
   | { prompt?: never; completion: string; service: "openai" }
   | { prompt?: never; completion: string; service: "anthropic" }
