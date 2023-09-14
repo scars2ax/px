@@ -1,10 +1,11 @@
 import type * as http from "http";
 import schedule from "node-schedule";
-import { AnthropicKeyProvider, AnthropicKeyUpdate } from "./anthropic/provider";
-import { Key, Model, KeyProvider, AIService } from "./index";
-import { OpenAIKeyProvider, OpenAIKeyUpdate } from "./openai/provider";
 import { config } from "../../config";
 import { logger } from "../../logger";
+import { Key, Model, KeyProvider, AIService } from "./index";
+import { AnthropicKeyProvider, AnthropicKeyUpdate } from "./anthropic/provider";
+import { OpenAIKeyProvider, OpenAIKeyUpdate } from "./openai/provider";
+import { GooglePalmKeyProvider } from "./palm/provider";
 
 type AllowedPartial = OpenAIKeyUpdate | AnthropicKeyUpdate;
 
@@ -19,6 +20,7 @@ export class KeyPool {
   constructor() {
     this.keyProviders.push(new OpenAIKeyProvider());
     this.keyProviders.push(new AnthropicKeyProvider());
+    this.keyProviders.push(new GooglePalmKeyProvider());
   }
 
   public init() {
