@@ -35,16 +35,23 @@ export const addKey: ProxyRequestMiddleware = (proxyReq, req) => {
   req.isStreaming = req.body.stream === true || req.body.stream === "true";
   req.body.stream = req.isStreaming;
 
-  // Anthropic support has a special endpoint that accepts OpenAI-formatted
-  // requests and translates them into Anthropic requests.  On this endpoint,
-  // the requested model is an OpenAI one even though we're actually sending
-  // an Anthropic request.
-  // For such cases, ignore the requested model entirely.
-  if (req.inboundApi === "openai" && req.outboundApi === "anthropic") {
-    req.log.debug("Using an Anthropic key for an OpenAI-compatible request");
-    assignedKey = keyPool.get("claude-v1");
-  } else {
+  if (req.inboundApi === req.outboundApi) {
     assignedKey = keyPool.get(req.body.model);
+  } else {
+    switch (req.outboundApi) {
+      // If we are translating between API formats we need to select a model
+      // for the user because the provided model is for the inbound API.
+      case "anthropic":
+        assignedKey = keyPool.get("claude-v1");
+        break;
+      case "google-palm":
+        assignedKey = keyPool.get("chat-bison-001");
+        break;
+      case "openai":
+        throw new Error("OpenAI as an API translation target is not supported");
+      default:
+        assertNever(req.outboundApi);
+    }
   }
 
   req.key = assignedKey;
@@ -69,6 +76,13 @@ export const addKey: ProxyRequestMiddleware = (proxyReq, req) => {
         proxyReq.setHeader("OpenAI-Organization", key.organizationId);
       }
       proxyReq.setHeader("Authorization", `Bearer ${assignedKey.key}`);
+      break;
+    case "google-palm":
+      const originalPath = proxyReq.path;
+      proxyReq.path = originalPath.replace(
+        /(\?.*)?$/,
+        `?key=${assignedKey.key}`
+      );
       break;
     default:
       assertNever(assignedKey.service);
