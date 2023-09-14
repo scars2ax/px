@@ -14,7 +14,7 @@ export async function init() {
   if (config.anthropicKey) {
     initClaude();
   }
-  if (config.openaiKey) {
+  if (config.openaiKey || config.googlePalmKey) {
     initOpenAi();
   }
 }
