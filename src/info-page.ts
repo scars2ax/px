@@ -104,7 +104,7 @@ function cacheInfoPageHtml(baseUrl: string) {
     palmKeys,
     ...(openaiKeys ? getOpenAIInfo() : {}),
     ...(anthropicKeys ? getAnthropicInfo() : {}),
-    ...(palmKeys ? { "google-palm": {} } : {}),
+    ...(palmKeys ? { "palm-bison": getPalmInfo() } : {}),
     config: listConfig(),
     build: process.env.BUILD_INFO || "dev",
   };
@@ -312,6 +312,26 @@ function getAnthropicInfo() {
       proomptersInQueue: claudeInfo.queued,
       estimatedQueueTime: claudeInfo.queueTime,
     },
+  };
+}
+
+function getPalmInfo() {
+  const bisonInfo: Partial<ModelAggregates> = {
+    active: modelStats.get("bison__active") || 0,
+  };
+
+  const queue = getQueueInformation("bison");
+  bisonInfo.queued = queue.proomptersInQueue;
+  bisonInfo.queueTime = queue.estimatedQueueTime;
+
+  const tokens = modelStats.get("bison__tokens") || 0;
+  const cost = getTokenCostUsd("bison", tokens);
+
+  return {
+    usage: `${prettyTokens(tokens)} tokens${getCostString(cost)}`,
+    activeKeys: bisonInfo.active,
+    proomptersInQueue: bisonInfo.queued,
+    estimatedQueueTime: bisonInfo.queueTime,
   };
 }
 
