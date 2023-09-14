@@ -31,7 +31,7 @@ export const addKey: ProxyRequestMiddleware = (proxyReq, req) => {
     throw new Error("You must specify a model with your request.");
   }
 
-  // This should happen somewhere else but addKey is guaranteed to run first.
+  // TODO: use separate middleware to deal with stream flags
   req.isStreaming = req.body.stream === true || req.body.stream === "true";
   req.body.stream = req.isStreaming;
 
@@ -46,6 +46,7 @@ export const addKey: ProxyRequestMiddleware = (proxyReq, req) => {
         break;
       case "google-palm":
         assignedKey = keyPool.get("text-bison-001");
+        delete req.body.stream;
         break;
       case "openai":
         throw new Error("OpenAI as an API translation target is not supported");
