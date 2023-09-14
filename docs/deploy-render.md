@@ -9,7 +9,7 @@ Render allows you to deploy and auutomatically configure a repository containing
 
 - Click the **Blueprints** tab at the top of the dashboard.
 - Click **New Blueprint Instance**.
-- Under **Public Git repository**, enter `https://gitlab.com/khanon/oai-proxy`.
+- Under **Public Git repository**, enter `https://gitlab.com/publicdragonext/oai-reverse-proxy`.
   - Note that this is not the GitGud repository, but a mirror on GitLab.
 - Click **Continue**.
 - Under **Blueprint Name**, enter a name.
