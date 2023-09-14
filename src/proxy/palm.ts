@@ -58,6 +58,10 @@ const rewritePalmRequest = (
   req: Request,
   res: http.ServerResponse
 ) => {
+  if (req.body.stream) {
+    throw new Error("Google PaLM API doesn't support streaming requests");
+  }
+
   // PaLM API specifies the model in the URL path, not the request body. This
   // doesn't work well with our rewriter architecture, so we need to manually
   // fix it here.
@@ -146,7 +150,7 @@ function transformPalmResponse(
       {
         message: {
           role: "assistant",
-          content: palmRespBody.candidates[0].content,
+          content: palmRespBody.candidates[0].output,
         },
         finish_reason: null, // palm doesn't return this
         index: 0,

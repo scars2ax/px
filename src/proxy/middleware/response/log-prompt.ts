@@ -54,6 +54,7 @@ const getPromptForRequest = (req: Request): string | OaiMessage[] => {
     case "anthropic":
       return req.body.prompt;
     case "google-palm":
+      return req.body.prompt.text;
     default:
       assertNever(req.outboundApi);
   }

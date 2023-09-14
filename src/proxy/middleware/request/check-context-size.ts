@@ -61,9 +61,6 @@ function validateContextSize(req: Request) {
   const contextTokens = promptTokens + outputTokens;
   const model = req.body.model;
 
-  // const proxyMax =
-  //   (req.outboundApi === "openai" ? OPENAI_MAX_CONTEXT : CLAUDE_MAX_CONTEXT) ||
-  //   Number.MAX_SAFE_INTEGER;
   let proxyMax = 0;
   switch (req.outboundApi) {
     case "openai":

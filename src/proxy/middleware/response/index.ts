@@ -457,7 +457,7 @@ const countResponseTokens: ProxyResHandlerWithBody = async (
     }
 
     const service = req.outboundApi;
-    const { completion } = getCompletionForService({ service, body });
+    const { completion } = getCompletionForService({ req, service, body });
     const tokens = await countTokens({ req, completion, service });
 
     req.log.debug(

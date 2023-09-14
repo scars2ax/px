@@ -152,6 +152,9 @@ export function buildFakeSseMessage(
         log_id: "proxy-req-" + req.id,
       };
       break;
+    case "google-palm":
+    case "kobold": // TODO: remove kobold
+      throw new Error("PaLM not supported as an inbound API format");
     default:
       assertNever(req.inboundApi);
   }
@@ -161,15 +164,19 @@ export function buildFakeSseMessage(
 export function getCompletionForService({
   service,
   body,
+  req,
 }: {
   service: AIService;
   body: Record<string, any>;
+  req?: Request;
 }): { completion: string; model: string } {
   switch (service) {
     case "openai":
       return { completion: body.choices[0].message.content, model: body.model };
     case "anthropic":
       return { completion: body.completion.trim(), model: body.model };
+    case "google-palm":
+      return { completion: body.candidates[0].output, model: req?.body.model };
     default:
       assertNever(service);
   }
