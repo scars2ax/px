@@ -188,6 +188,8 @@ function openaiToPalm(
   const { messages, ...rest } = result.data;
   const prompt = openAIMessagesToPalmPrompt(messages);
 
+  console.log(prompt);
+
   let stops = rest.stop
     ? Array.isArray(rest.stop)
       ? rest.stop
@@ -241,19 +243,38 @@ export function openAIMessagesToClaudePrompt(messages: OpenAIPromptMessage[]) {
 }
 
 function openAIMessagesToPalmPrompt(messages: OpenAIPromptMessage[]) {
-  return (
-    messages
-      .map((m) => {
-        let role: string = m.role;
-        if (role === "assistant") {
-          role = "Assistant";
-        } else if (role === "system") {
-          role = "System";
-        } else if (role === "user") {
-          role = "User";
-        }
-        return `\n\n${role}: ${m.content}`;
-      })
-      .join("") + "\n\nAssistant:"
-  );
+  // Temporary to allow experimenting with prompt strategies
+  const PROMPT_VERSION: number = 2;
+  switch (PROMPT_VERSION) {
+    case 1:
+      return (
+        messages
+          .map((m) => {
+            // Claude-style human/assistant turns
+            let role: string = m.role;
+            if (role === "assistant") {
+              role = "Assistant";
+            } else if (role === "system") {
+              role = "System";
+            } else if (role === "user") {
+              role = "User";
+            }
+            return `\n\n${role}: ${m.content}`;
+          })
+          .join("") + "\n\nAssistant:"
+      );
+    case 2:
+      return messages
+        .map((m) => {
+          // Claude without prefixes (except system) and no Assistant priming
+          let role: string = "";
+          if (role === "system") {
+            role = "System: ";
+          }
+          return `\n\n${role}${m.content}`;
+        })
+        .join("");
+    default:
+      throw new Error(`Unknown prompt version: ${PROMPT_VERSION}`);
+  }
 }
