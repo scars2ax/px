@@ -188,7 +188,7 @@ function openaiToPalm(
   const { messages, ...rest } = result.data;
   const prompt = openAIMessagesToPalmPrompt(messages);
 
-  console.log(prompt);
+  // console.log(prompt);
 
   let stops = rest.stop
     ? Array.isArray(rest.stop)
