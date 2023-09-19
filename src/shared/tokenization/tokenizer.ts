@@ -1,5 +1,6 @@
 import { Request } from "express";
 import { config } from "../../config";
+import { assertNever } from "../utils";
 import {
   init as initClaude,
   getTokenCount as getClaudeTokenCount,
@@ -52,6 +53,7 @@ export async function countTokens({
         tokenization_duration_ms: getElapsedMs(time),
       };
     case "openai":
+    case "openai-text":
       return {
         ...getOpenAITokenCount(prompt ?? completion, req.body.model),
         tokenization_duration_ms: getElapsedMs(time),
@@ -64,7 +66,7 @@ export async function countTokens({
         tokenization_duration_ms: getElapsedMs(time),
       };
     default:
-      throw new Error(`Unknown service: ${service}`);
+      assertNever(service);
   }
 }
 

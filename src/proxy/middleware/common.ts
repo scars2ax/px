@@ -6,15 +6,19 @@ import { assertNever } from "../../shared/utils";
 import { QuotaExceededError } from "./request/apply-quota-limits";
 
 const OPENAI_CHAT_COMPLETION_ENDPOINT = "/v1/chat/completions";
+const OPENAI_TEXT_COMPLETION_ENDPOINT = "/v1/completions";
 const ANTHROPIC_COMPLETION_ENDPOINT = "/v1/complete";
 
 /** Returns true if we're making a request to a completion endpoint. */
 export function isCompletionRequest(req: Request) {
+  // 99% sure this function is not needed anymore
   return (
     req.method === "POST" &&
-    [OPENAI_CHAT_COMPLETION_ENDPOINT, ANTHROPIC_COMPLETION_ENDPOINT].some(
-      (endpoint) => req.path.startsWith(endpoint)
-    )
+    [
+      OPENAI_CHAT_COMPLETION_ENDPOINT,
+      OPENAI_TEXT_COMPLETION_ENDPOINT,
+      ANTHROPIC_COMPLETION_ENDPOINT,
+    ].some((endpoint) => req.path.startsWith(endpoint))
   );
 }
 

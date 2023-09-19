@@ -67,7 +67,7 @@ function validateContextSize(req: Request) {
   const contextTokens = promptTokens + outputTokens;
   const model = req.body.model;
 
-  let proxyMax = 0;
+  let proxyMax: number;
   switch (req.outboundApi) {
     case "openai":
     case "openai-text":
@@ -82,7 +82,7 @@ function validateContextSize(req: Request) {
     default:
       assertNever(req.outboundApi);
   }
-  proxyMax ??= Number.MAX_SAFE_INTEGER;
+  proxyMax ||= Number.MAX_SAFE_INTEGER;
 
   let modelMax = 0;
   if (model.match(/gpt-3.5-turbo-16k/)) {

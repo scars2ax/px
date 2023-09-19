@@ -100,6 +100,7 @@ export const handleStreamedResponse: RawResponseBodyHandler = async (
     const originalEvents: string[] = [];
     let partialMessage = "";
     let lastPosition = 0;
+    let eventCount = 0;
 
     type ProxyResHandler<T extends unknown> = (...args: T[]) => void;
     function withErrorHandling<T extends unknown>(fn: ProxyResHandler<T>) {
@@ -139,6 +140,7 @@ export const handleStreamedResponse: RawResponseBodyHandler = async (
           requestApi: req.inboundApi,
           responseApi: req.outboundApi,
           lastPosition,
+          index: eventCount++,
         });
         lastPosition = position;
         res.write(event + "\n\n");
@@ -175,6 +177,7 @@ type SSETransformationArgs = {
   requestApi: string;
   responseApi: string;
   lastPosition: number;
+  index: number;
 };
 
 /**
@@ -189,6 +192,8 @@ function transformEvent(params: SSETransformationArgs) {
 
   const trans = `${requestApi}->${responseApi}`;
   switch (trans) {
+    case "openai->openai-text":
+      return transformOpenAITextEventToOpenAIChat(params);
     case "openai->anthropic":
       // TODO: handle new anthropic streaming format
       return transformV1AnthropicEventToOpenAI(params);
@@ -197,6 +202,57 @@ function transformEvent(params: SSETransformationArgs) {
     default:
       throw new Error(`Unsupported streaming API transformation. ${trans}`);
   }
+}
+
+function transformOpenAITextEventToOpenAIChat(params: SSETransformationArgs) {
+  const { data, index } = params;
+
+  if (!data.startsWith("data:")) return { position: -1, event: data };
+  if (data.startsWith("data: [DONE]")) return { position: -1, event: data };
+
+  const event = JSON.parse(data.slice("data: ".length));
+
+  // The very first event must be a role assignment with no content.
+
+  const createEvent = () => ({
+    id: event.id,
+    object: "chat.completion.chunk",
+    created: event.created,
+    model: event.model,
+    choices: [
+      {
+        message: { role: "", content: "" } as {
+          role?: string;
+          content: string;
+        },
+        index: 0,
+        finish_reason: null,
+      },
+    ],
+  });
+
+  let buffer = "";
+
+  if (index === 0) {
+    const initialEvent = createEvent();
+    initialEvent.choices[0].message.role = "assistant";
+    buffer = `data: ${JSON.stringify(initialEvent)}\n\n`;
+  }
+
+  const newEvent = {
+    ...event,
+    choices: [
+      {
+        ...event.choices[0],
+        delta: { content: event.choices[0].text },
+        text: undefined,
+      },
+    ],
+  };
+
+  buffer += `data: ${JSON.stringify(newEvent)}`;
+
+  return { position: -1, event: buffer };
 }
 
 function transformV1AnthropicEventToOpenAI(params: SSETransformationArgs) {

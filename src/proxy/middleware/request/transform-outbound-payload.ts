@@ -4,7 +4,6 @@ import { config } from "../../../config";
 import { OpenAIPromptMessage } from "../../../shared/tokenization";
 import { isCompletionRequest } from "../common";
 import { RequestPreprocessor } from ".";
-import { assertNever } from "../../../shared/utils";
 import { APIFormat } from "../../../shared/key-management";
 
 const CLAUDE_OUTPUT_MAX = config.maxOutputTokensAnthropic;
@@ -80,9 +79,11 @@ const OpenAIV1TextCompletionSchema = z
       required_error:
         "No `prompt` found. Ensure you've set the correct completion endpoint.",
     }),
-    logprobs: z.number().optional().default(0),
+    logprobs: z.number().int().nullish().default(null),
     echo: z.boolean().optional().default(false),
     best_of: z.literal(1).optional(),
+    stop: z.union([z.string(), z.array(z.string()).max(4)]).optional(),
+    suffix: z.string().optional(),
   })
   .merge(OpenAIV1ChatCompletionSchema.omit({ messages: true }));
 
@@ -213,7 +214,17 @@ function openaiToOpenaiText(body: any, req: Request) {
   const { messages, ...rest } = result.data;
   const prompt = flattenOpenAiChatMessages(messages);
 
-  return { ...rest, prompt: prompt };
+  let stops = rest.stop
+    ? Array.isArray(rest.stop)
+      ? rest.stop
+      : [rest.stop]
+    : [];
+  stops.push("\n\nUser:");
+  stops = [...new Set(stops)];
+
+  const transformed = { ...rest, prompt: prompt, stop: stops };
+  const validated = OpenAIV1TextCompletionSchema.parse(transformed);
+  return validated;
 }
 
 function openaiToPalm(
