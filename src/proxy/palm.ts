@@ -113,8 +113,6 @@ const palmResponseHandler: ProxyResHandlerWithBody = async (
     body.proxy_note = `Prompts are logged on this proxy instance. See ${host} for more information.`;
   }
 
-  // req.log.debug({ response: body, request: req.body }, "PaLM response");
-
   if (req.inboundApi === "openai") {
     req.log.info("Transforming Google PaLM response to OpenAI format");
     body = transformPalmResponse(body, req);

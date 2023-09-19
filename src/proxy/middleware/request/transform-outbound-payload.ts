@@ -4,6 +4,8 @@ import { config } from "../../../config";
 import { OpenAIPromptMessage } from "../../../shared/tokenization";
 import { isCompletionRequest } from "../common";
 import { RequestPreprocessor } from ".";
+import { assertNever } from "../../../shared/utils";
+import { APIFormat } from "../../../shared/key-management";
 
 const CLAUDE_OUTPUT_MAX = config.maxOutputTokensAnthropic;
 const OPENAI_OUTPUT_MAX = config.maxOutputTokensOpenAI;
@@ -38,7 +40,7 @@ const OpenAIV1ChatCompletionSchema = z.object({
     }),
     {
       required_error:
-        "No prompt found. Are you sending an Anthropic-formatted request to the OpenAI endpoint?",
+        "No `messages` found. Ensure you've set the correct completion endpoint.",
       invalid_type_error:
         "Messages were not formatted correctly. Refer to the OpenAI Chat API documentation for more information.",
     }
@@ -66,6 +68,24 @@ const OpenAIV1ChatCompletionSchema = z.object({
   user: z.string().optional(),
 });
 
+const OpenAIV1TextCompletionSchema = z
+  .object({
+    model: z
+      .string()
+      .regex(
+        /^gpt-3.5-turbo-instruct/,
+        "Model must start with 'gpt-3.5-turbo-instruct'"
+      ),
+    prompt: z.string({
+      required_error:
+        "No `prompt` found. Ensure you've set the correct completion endpoint.",
+    }),
+    logprobs: z.number().optional().default(0),
+    echo: z.boolean().optional().default(false),
+    best_of: z.literal(1).optional(),
+  })
+  .merge(OpenAIV1ChatCompletionSchema.omit({ messages: true }));
+
 // https://developers.generativeai.google/api/rest/generativelanguage/models/generateText
 const PalmV1GenerateTextSchema = z.object({
   model: z.string().regex(/^\w+-bison-\d{3}$/),
@@ -84,6 +104,13 @@ const PalmV1GenerateTextSchema = z.object({
   stopSequences: z.array(z.string()).max(5).optional(),
 });
 
+const VALIDATORS: Record<APIFormat, z.ZodSchema<any>> = {
+  anthropic: AnthropicV1CompleteSchema,
+  openai: OpenAIV1ChatCompletionSchema,
+  "openai-text": OpenAIV1TextCompletionSchema,
+  "google-palm": PalmV1GenerateTextSchema,
+};
+
 /** Transforms an incoming request body to one that matches the target API. */
 export const transformOutboundPayload: RequestPreprocessor = async (req) => {
   const sameService = req.inboundApi === req.outboundApi;
@@ -95,11 +122,7 @@ export const transformOutboundPayload: RequestPreprocessor = async (req) => {
   }
 
   if (sameService) {
-    const validator =
-      req.outboundApi === "openai"
-        ? OpenAIV1ChatCompletionSchema
-        : AnthropicV1CompleteSchema;
-    const result = validator.safeParse(req.body);
+    const result = VALIDATORS[req.inboundApi].safeParse(req.body);
     if (!result.success) {
       req.log.error(
         { issues: result.error.issues, body: req.body },
@@ -118,6 +141,11 @@ export const transformOutboundPayload: RequestPreprocessor = async (req) => {
 
   if (req.inboundApi === "openai" && req.outboundApi === "google-palm") {
     req.body = openaiToPalm(req.body, req);
+    return;
+  }
+
+  if (req.inboundApi === "openai" && req.outboundApi === "openai-text") {
+    req.body = openaiToOpenaiText(req.body, req);
     return;
   }
 
@@ -172,6 +200,22 @@ function openaiToAnthropic(body: any, req: Request) {
   };
 }
 
+function openaiToOpenaiText(body: any, req: Request) {
+  const result = OpenAIV1ChatCompletionSchema.safeParse(body);
+  if (!result.success) {
+    req.log.error(
+      { issues: result.error.issues, body: req.body },
+      "Invalid OpenAI-to-OpenAI-text request"
+    );
+    throw result.error;
+  }
+
+  const { messages, ...rest } = result.data;
+  const prompt = flattenOpenAiChatMessages(messages);
+
+  return { ...rest, prompt: prompt };
+}
+
 function openaiToPalm(
   body: any,
   req: Request
@@ -186,9 +230,7 @@ function openaiToPalm(
   }
 
   const { messages, ...rest } = result.data;
-  const prompt = openAIMessagesToPalmPrompt(messages);
-
-  // console.log(prompt);
+  const prompt = flattenOpenAiChatMessages(messages);
 
   let stops = rest.stop
     ? Array.isArray(rest.stop)
@@ -242,9 +284,9 @@ export function openAIMessagesToClaudePrompt(messages: OpenAIPromptMessage[]) {
   );
 }
 
-function openAIMessagesToPalmPrompt(messages: OpenAIPromptMessage[]) {
+function flattenOpenAiChatMessages(messages: OpenAIPromptMessage[]) {
   // Temporary to allow experimenting with prompt strategies
-  const PROMPT_VERSION: number = 2;
+  const PROMPT_VERSION: number = 1;
   switch (PROMPT_VERSION) {
     case 1:
       return (

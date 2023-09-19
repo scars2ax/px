@@ -27,6 +27,12 @@ export const checkContextSize: RequestPreprocessor = async (req) => {
       result = await countTokens({ req, prompt, service });
       break;
     }
+    case "openai-text": {
+      req.outputTokens = req.body.max_tokens;
+      const prompt: string = req.body.prompt;
+      result = await countTokens({ req, prompt, service });
+      break;
+    }
     case "anthropic": {
       req.outputTokens = req.body.max_tokens_to_sample;
       const prompt: string = req.body.prompt;
@@ -64,6 +70,7 @@ function validateContextSize(req: Request) {
   let proxyMax = 0;
   switch (req.outboundApi) {
     case "openai":
+    case "openai-text":
       proxyMax = OPENAI_MAX_CONTEXT;
       break;
     case "anthropic":

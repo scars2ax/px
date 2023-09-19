@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import httpProxy from "http-proxy";
 import { ZodError } from "zod";
-import { AIService } from "../../shared/key-management";
+import { APIFormat } from "../../shared/key-management";
 import { assertNever } from "../../shared/utils";
 import { QuotaExceededError } from "./request/apply-quota-limits";
 
@@ -142,6 +142,17 @@ export function buildFakeSseMessage(
         ],
       };
       break;
+    case "openai-text":
+      fakeEvent = {
+        id: "cmpl-" + req.id,
+        object: "text_completion",
+        created: Date.now(),
+        choices: [
+          { text: msgContent, index: 0, logprobs: null, finish_reason: type },
+        ],
+        model: req.body?.model,
+      };
+      break;
     case "anthropic":
       fakeEvent = {
         completion: msgContent,
@@ -153,7 +164,6 @@ export function buildFakeSseMessage(
       };
       break;
     case "google-palm":
-    case "kobold": // TODO: remove kobold
       throw new Error("PaLM not supported as an inbound API format");
     default:
       assertNever(req.inboundApi);
@@ -166,13 +176,15 @@ export function getCompletionForService({
   body,
   req,
 }: {
-  service: AIService;
+  service: APIFormat;
   body: Record<string, any>;
   req?: Request;
 }): { completion: string; model: string } {
   switch (service) {
     case "openai":
       return { completion: body.choices[0].message.content, model: body.model };
+    case "openai-text":
+      return { completion: body.choices[0].text, model: body.model };
     case "anthropic":
       return { completion: body.completion.trim(), model: body.model };
     case "google-palm":

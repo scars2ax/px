@@ -51,6 +51,8 @@ const getPromptForRequest = (req: Request): string | OaiMessage[] => {
   switch (req.outboundApi) {
     case "openai":
       return req.body.messages;
+    case "openai-text":
+      return req.body.prompt;
     case "anthropic":
       return req.body.prompt;
     case "google-palm":

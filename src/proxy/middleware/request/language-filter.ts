@@ -43,10 +43,13 @@ function getPromptFromRequest(req: Request) {
     case "anthropic":
       return body.prompt;
     case "openai":
-    case "google-palm":
       return body.messages
         .map((m: { content: string }) => m.content)
         .join("\n");
+    case "openai-text":
+      return body.prompt;
+    case "google-palm":
+      return body.prompt.text;
     default:
       assertNever(service);
   }

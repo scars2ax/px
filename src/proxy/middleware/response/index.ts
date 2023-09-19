@@ -279,6 +279,7 @@ const handleUpstreamErrors: ProxyResHandlerWithBody = async (
     // Bad request (likely prompt is too long)
     switch (req.outboundApi) {
       case "openai":
+      case "openai-text":
       case "google-palm":
         errorPayload.proxy_note = `Upstream service rejected the request as invalid. Your prompt may be too long for ${req.body?.model}.`;
         break;
@@ -295,6 +296,7 @@ const handleUpstreamErrors: ProxyResHandlerWithBody = async (
   } else if (statusCode === 429) {
     switch (req.outboundApi) {
       case "openai":
+      case "openai-text":
         handleOpenAIRateLimitError(req, tryAgainMessage, errorPayload);
         break;
       case "anthropic":
@@ -309,6 +311,7 @@ const handleUpstreamErrors: ProxyResHandlerWithBody = async (
     // Most likely model not found
     switch (req.outboundApi) {
       case "openai":
+      case "openai-text":
         if (errorPayload.error?.code === "model_not_found") {
           const requestedModel = req.body.model;
           const modelFamily = getOpenAIModelFamily(requestedModel);

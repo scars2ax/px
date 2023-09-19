@@ -16,6 +16,19 @@ type OpenAiChatCompletionResponse = {
   }[];
 };
 
+type OpenAiTextCompletionResponse = {
+  id: string;
+  object: string;
+  created: number;
+  model: string;
+  choices: {
+    text: string;
+    finish_reason: string | null;
+    index: number;
+    logprobs: null;
+  }[];
+};
+
 type AnthropicCompletionResponse = {
   completion: string;
   stop_reason: string;
@@ -250,23 +263,20 @@ function copyHeaders(proxyRes: http.IncomingMessage, res: Response) {
 function convertEventsToFinalResponse(events: string[], req: Request) {
   switch (req.outboundApi) {
     case "openai": {
-      let response: OpenAiChatCompletionResponse = {
+      let merged: OpenAiChatCompletionResponse = {
         id: "",
         object: "",
         created: 0,
         model: "",
         choices: [],
       };
-      response = events.reduce((acc, event, i) => {
-        if (!event.startsWith("data: ")) {
-          return acc;
-        }
-
-        if (event === "data: [DONE]") {
-          return acc;
-        }
+      merged = events.reduce((acc, event, i) => {
+        if (!event.startsWith("data: ")) return acc;
+        if (event === "data: [DONE]") return acc;
 
         const data = JSON.parse(event.slice("data: ".length));
+
+        // The first chat chunk only contains the role assignment and metadata
         if (i === 0) {
           return {
             id: data.id,
@@ -288,8 +298,40 @@ function convertEventsToFinalResponse(events: string[], req: Request) {
         }
         acc.choices[0].finish_reason = data.choices[0].finish_reason;
         return acc;
-      }, response);
-      return response;
+      }, merged);
+      return merged;
+    }
+    case "openai-text": {
+      let merged: OpenAiTextCompletionResponse = {
+        id: "",
+        object: "",
+        created: 0,
+        model: "",
+        choices: [],
+        // TODO: merge logprobs
+      };
+      merged = events.reduce((acc, event, i) => {
+        if (!event.startsWith("data: ")) return acc;
+        if (event === "data: [DONE]") return acc;
+
+        const data = JSON.parse(event.slice("data: ".length));
+
+        return {
+          id: data.id,
+          object: data.object,
+          created: data.created,
+          model: data.model,
+          choices: [
+            {
+              text: acc.choices[0]?.text + data.choices[0].text,
+              index: 0,
+              finish_reason: data.choices[0].finish_reason,
+              logprobs: null,
+            },
+          ],
+        };
+      }, merged);
+      return merged;
     }
     case "anthropic": {
       /*
@@ -300,11 +342,8 @@ function convertEventsToFinalResponse(events: string[], req: Request) {
       const data = JSON.parse(
         lastEvent.slice(lastEvent.indexOf("data: ") + "data: ".length)
       );
-      const response: AnthropicCompletionResponse = {
-        ...data,
-        log_id: req.id,
-      };
-      return response;
+      const final: AnthropicCompletionResponse = { ...data, log_id: req.id };
+      return final;
     }
     case "google-palm": {
       throw new Error("PaLM streaming not yet supported.");

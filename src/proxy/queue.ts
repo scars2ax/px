@@ -144,6 +144,7 @@ function getPartitionForRequest(req: Request): ModelFamily {
     case "anthropic":
       return getClaudeModelFamily(model);
     case "openai":
+    case "openai-text":
       return getOpenAIModelFamily(model);
     case "google-palm":
       return getGooglePalmModelFamily(model);

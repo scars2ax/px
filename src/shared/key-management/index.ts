@@ -7,14 +7,14 @@ import { GOOGLE_PALM_SUPPORTED_MODELS, GooglePalmModel } from "./palm/provider";
 import { KeyPool } from "./key-pool";
 import type { ModelFamily } from "../models";
 
-export type AIService = "openai" | "anthropic" | "google-palm";
+export type APIFormat = "openai" | "anthropic" | "google-palm" | "openai-text";
 export type Model = OpenAIModel | AnthropicModel | GooglePalmModel;
 
 export interface Key {
   /** The API key itself. Never log this, use `hash` instead. */
   readonly key: string;
   /** The service that this key is for. */
-  service: AIService;
+  service: APIFormat;
   /** Whether this is a free trial key. These are prioritized over paid keys if they can fulfill the request. */
   isTrial: boolean;
   /** The model families that this key has access to. */
@@ -44,7 +44,7 @@ for service-agnostic functionality.
 */
 
 export interface KeyProvider<T extends Key = Key> {
-  readonly service: AIService;
+  readonly service: APIFormat;
   init(): void;
   get(model: Model): T;
   list(): Omit<T, "key">[];

@@ -164,6 +164,7 @@ function addKeyToAggregates(k: KeyPoolKey) {
 
   switch (k.service) {
     case "openai":
+    case "openai-text":
       if (!keyIsOpenAIKey(k)) throw new Error("Invalid key type");
       increment(
         serviceStats,

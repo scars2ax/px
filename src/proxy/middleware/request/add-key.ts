@@ -39,8 +39,8 @@ export const addKey: ProxyRequestMiddleware = (proxyReq, req) => {
     assignedKey = keyPool.get(req.body.model);
   } else {
     switch (req.outboundApi) {
-      // If we are translating between API formats we need to select a model
-      // for the user because the provided model is for the inbound API.
+      // If we are translating between API formats we may need to select a model
+      // for the user, because the provided model is for the inbound API.
       case "anthropic":
         assignedKey = keyPool.get("claude-v1");
         break;
@@ -48,8 +48,13 @@ export const addKey: ProxyRequestMiddleware = (proxyReq, req) => {
         assignedKey = keyPool.get("text-bison-001");
         delete req.body.stream;
         break;
+      case "openai-text":
+        assignedKey = keyPool.get("gpt-3.5-turbo-instruct");
+        break;
       case "openai":
-        throw new Error("OpenAI as an API translation target is not supported");
+        throw new Error(
+          "OpenAI Chat as an API translation target is not supported"
+        );
       default:
         assertNever(req.outboundApi);
     }
@@ -72,6 +77,7 @@ export const addKey: ProxyRequestMiddleware = (proxyReq, req) => {
       proxyReq.setHeader("X-API-Key", assignedKey.key);
       break;
     case "openai":
+    case "openai-text":
       const key: OpenAIKey = assignedKey as OpenAIKey;
       if (key.organizationId) {
         proxyReq.setHeader("OpenAI-Organization", key.organizationId);

@@ -9,6 +9,7 @@ import {
   getTokenCount as getOpenAITokenCount,
   OpenAIPromptMessage,
 } from "./openai";
+import { APIFormat } from "../key-management";
 
 export async function init() {
   if (config.anthropicKey) {
@@ -19,20 +20,24 @@ export async function init() {
   }
 }
 
+/** Tagged union via `service` field of the different types of requests that can
+ * be made to the tokenization service, for both prompts and completions */
+type TokenCountRequest = { req: Request } & (
+  | { prompt: OpenAIPromptMessage[]; completion?: never; service: "openai" }
+  | {
+      prompt: string;
+      completion?: never;
+      service: "openai-text" | "anthropic" | "google-palm";
+    }
+  | { prompt?: never; completion: string; service: APIFormat }
+);
+
 type TokenCountResult = {
   token_count: number;
   tokenizer: string;
   tokenization_duration_ms: number;
 };
-type TokenCountRequest = { req: Request } & ( // Incoming prompts
-  | { prompt: OpenAIPromptMessage[]; completion?: never; service: "openai" }
-  | { prompt: string; completion?: never; service: "anthropic" }
-  | { prompt: string; completion?: never; service: "google-palm" }
-  // Returned completions
-  | { prompt?: never; completion: string; service: "openai" }
-  | { prompt?: never; completion: string; service: "anthropic" }
-  | { prompt?: never; completion: string; service: "google-palm" }
-);
+
 export async function countTokens({
   req,
   service,
