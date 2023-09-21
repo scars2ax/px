@@ -39,10 +39,6 @@ export interface Key {
   hash: string;
 }
 
-export interface BaseSerializableKey {
-  key: string;
-}
-
 /*
 KeyPool and KeyProvider's similarities are a relic of the old design where
 there was only a single KeyPool for OpenAI keys. Now that there are multiple
@@ -75,11 +71,6 @@ export async function init() {
   await keyPool.init();
 }
 
-export const SUPPORTED_MODELS = [
-  ...OPENAI_SUPPORTED_MODELS,
-  ...ANTHROPIC_SUPPORTED_MODELS,
-] as const;
-export type SupportedModel = (typeof SUPPORTED_MODELS)[number];
 export {
   OPENAI_SUPPORTED_MODELS,
   ANTHROPIC_SUPPORTED_MODELS,

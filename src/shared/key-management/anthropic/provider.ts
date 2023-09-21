@@ -1,12 +1,23 @@
-import crypto from "crypto";
-import { BaseSerializableKey, Key, KeyProvider } from "..";
+import { Key, KeyProvider } from "..";
 import { config } from "../../../config";
 import { logger } from "../../../logger";
 import type { AnthropicModelFamily } from "../../models";
-import { KeyStore } from "../stores";
+import { KeyStore, SerializedKey } from "../stores";
 import { AnthropicKeyChecker } from "./checker";
+import { AnthropicKeySerializer } from "./serializer";
 
-// https://docs.anthropic.com/claude/reference/selecting-a-model
+/**
+ * Upon being rate limited, a key will be locked out for this many milliseconds
+ * while we wait for other concurrent requests to finish.
+ */
+const RATE_LIMIT_LOCKOUT = 2000;
+/**
+ * Upon assigning a key, we will wait this many milliseconds before allowing it
+ * to be used again. This is to prevent the queue from flooding a key with too
+ * many requests while we wait to learn whether previous ones succeeded.
+ */
+const KEY_REUSE_DELAY = 500;
+/* https://docs.anthropic.com/claude/reference/selecting-a-model */
 export const ANTHROPIC_SUPPORTED_MODELS = [
   "claude-instant-v1",
   "claude-instant-v1-100k",
@@ -21,7 +32,7 @@ type AnthropicKeyUsage = {
 };
 
 const SERIALIZABLE_FIELDS = ["key", "service", "hash", "claudeTokens"] as const;
-type SerializableAnthropicKey = BaseSerializableKey &
+export type SerializedAnthropicKey = SerializedKey &
   Partial<Pick<AnthropicKey, (typeof SERIALIZABLE_FIELDS)[number]>>;
 
 export type AnthropicKeyUpdate = Omit<
@@ -56,27 +67,15 @@ export interface AnthropicKey extends Key, AnthropicKeyUsage {
   isPozzed: boolean;
 }
 
-/**
- * Upon being rate limited, a key will be locked out for this many milliseconds
- * while we wait for other concurrent requests to finish.
- */
-const RATE_LIMIT_LOCKOUT = 2000;
-/**
- * Upon assigning a key, we will wait this many milliseconds before allowing it
- * to be used again. This is to prevent the queue from flooding a key with too
- * many requests while we wait to learn whether previous ones succeeded.
- */
-const KEY_REUSE_DELAY = 500;
-
 export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
   readonly service = "anthropic" as const;
 
   private readonly keys: AnthropicKey[] = [];
-  private store: KeyStore<SerializableAnthropicKey>;
+  private store: KeyStore<AnthropicKey>;
   private checker?: AnthropicKeyChecker;
   private log = logger.child({ module: "key-provider", service: this.service });
 
-  constructor(store: KeyStore<SerializableAnthropicKey>) {
+  constructor(store: KeyStore<AnthropicKey>) {
     this.store = store;
   }
 
@@ -92,7 +91,7 @@ export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
       return;
     }
 
-    this.keys.push(...serializedKeys.map(AnthropicKeyProvider.deserialize));
+    this.keys.push(...serializedKeys.map(AnthropicKeySerializer.deserialize));
     this.log.info(
       { count: this.keys.length, via: storeName },
       "Loaded Anthropic keys."
@@ -216,29 +215,5 @@ export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
       });
     });
     this.checker?.scheduleNextCheck();
-  }
-
-  static deserialize({ key, ...rest }: SerializableAnthropicKey): AnthropicKey {
-    return {
-      key,
-      service: "anthropic" as const,
-      modelFamilies: ["claude" as const],
-      isTrial: false,
-      isDisabled: false,
-      isPozzed: false,
-      promptCount: 0,
-      lastUsed: 0,
-      rateLimitedAt: 0,
-      rateLimitedUntil: 0,
-      requiresPreamble: false,
-      hash: `ant-${crypto
-        .createHash("sha256")
-        .update(key)
-        .digest("hex")
-        .slice(0, 8)}`,
-      lastChecked: 0,
-      claudeTokens: 0,
-      ...rest,
-    };
   }
 }

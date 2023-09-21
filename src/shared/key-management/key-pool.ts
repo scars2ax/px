@@ -5,8 +5,8 @@ import schedule from "node-schedule";
 import { config } from "../../config";
 import { logger } from "../../logger";
 import { Key, Model, KeyProvider, LLMService } from "./index";
-import { GooglePalmKeyProvider } from "./palm/provider";
-import { FirebaseKeyStore, MemoryKeyStore } from "./stores";
+import { getSerializer } from "./serializers";
+import { FirebaseKeyStore, KeyStore, MemoryKeyStore } from "./stores";
 import { AnthropicKeyProvider, AnthropicKeyUpdate } from "./anthropic/provider";
 import { OpenAIKeyProvider, OpenAIKeyUpdate } from "./openai/provider";
 import { GooglePalmKeyProvider } from "./palm/provider";
@@ -21,11 +21,9 @@ export class KeyPool {
   };
 
   constructor() {
-    this.keyProviders.push(new OpenAIKeyProvider(createKeyStore("openai")));
     this.keyProviders.push(
-      new AnthropicKeyProvider(createKeyStore("anthropic"))
-    );
-    this.keyProviders.push(
+      new OpenAIKeyProvider(createKeyStore("openai")),
+      new AnthropicKeyProvider(createKeyStore("anthropic")),
       new GooglePalmKeyProvider(createKeyStore("google-palm"))
     );
     // this.keyProviders.push(new AwsBedrockKeyProvider());
@@ -157,12 +155,14 @@ export class KeyPool {
   }
 }
 
-function createKeyStore(service: LLMService) {
+function createKeyStore(service: LLMService): KeyStore<Key> {
+  const serializer = getSerializer(service);
+
   switch (config.persistenceProvider) {
     case "memory":
-      return new MemoryKeyStore(service);
+      return new MemoryKeyStore(service, serializer);
     case "firebase_rtdb":
-      return new FirebaseKeyStore(service);
+      return new FirebaseKeyStore(service, serializer);
     default:
       throw new Error(`Unknown store type: ${config.persistenceProvider}`);
   }

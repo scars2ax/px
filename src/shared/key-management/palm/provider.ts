@@ -1,7 +1,8 @@
-import crypto from "crypto";
-import { Key, KeyProvider, KeyStore } from "..";
+import { Key, KeyProvider } from "..";
+import { KeyStore, SerializedKey } from "../stores";
 import { logger } from "../../../logger";
 import type { GooglePalmModelFamily } from "../../models";
+import { GooglePalmKeySerializer } from "./serializer";
 
 // https://developers.generativeai.google.com/models/language
 export const GOOGLE_PALM_SUPPORTED_MODELS = [
@@ -39,10 +40,8 @@ const SERIALIZABLE_FIELDS: (keyof GooglePalmKey)[] = [
   "hash",
   "bisonTokens",
 ];
-type SerializableGooglePalmKey = Partial<
-  Pick<GooglePalmKey, (typeof SERIALIZABLE_FIELDS)[number]>
-> &
-  Pick<GooglePalmKey, "key">;
+export type SerializedGooglePalmKey = SerializedKey &
+  Partial<Pick<GooglePalmKey, (typeof SERIALIZABLE_FIELDS)[number]>>;
 
 /**
  * Upon being rate limited, a key will be locked out for this many milliseconds
@@ -60,10 +59,10 @@ export class GooglePalmKeyProvider implements KeyProvider<GooglePalmKey> {
   readonly service = "google-palm";
 
   private keys: GooglePalmKey[] = [];
-  private store: KeyStore<SerializableGooglePalmKey>;
+  private store: KeyStore<GooglePalmKey>;
   private log = logger.child({ module: "key-provider", service: this.service });
 
-  constructor(store: KeyStore<SerializableGooglePalmKey>) {
+  constructor(store: KeyStore<GooglePalmKey>) {
     this.store = store;
   }
 
@@ -79,7 +78,7 @@ export class GooglePalmKeyProvider implements KeyProvider<GooglePalmKey> {
       return;
     }
 
-    this.keys.push(...serializedKeys.map(GooglePalmKeyProvider.deserialize));
+    this.keys.push(...serializedKeys.map(GooglePalmKeySerializer.deserialize));
     this.log.info(
       { keyCount: this.keys.length, via: storeName },
       "Loaded PaLM keys."
@@ -184,27 +183,4 @@ export class GooglePalmKeyProvider implements KeyProvider<GooglePalmKey> {
   }
 
   public recheck() {}
-
-  static deserialize(serializedKey: SerializableGooglePalmKey): GooglePalmKey {
-    const { key, ...rest } = serializedKey;
-    return {
-      key,
-      service: "google-palm",
-      modelFamilies: ["bison"],
-      isTrial: false,
-      isDisabled: false,
-      promptCount: 0,
-      lastUsed: 0,
-      rateLimitedAt: 0,
-      rateLimitedUntil: 0,
-      hash: `plm-${crypto
-        .createHash("sha256")
-        .update(key)
-        .digest("hex")
-        .slice(0, 8)}`,
-      lastChecked: 0,
-      bisonTokens: 0,
-      ...rest,
-    };
-  }
 }

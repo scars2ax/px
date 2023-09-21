@@ -1,13 +1,12 @@
-import { KeyDeserializer, KeyStore, getDeserializer } from ".";
-import { APIFormat, BaseSerializableKey } from "..";
+import { assertNever } from "../../utils";
+import { APIFormat, Key } from "..";
+import { KeySerializer } from ".";
+import { KeyStore } from ".";
 
-export class MemoryKeyStore<K extends BaseSerializableKey>
-  implements KeyStore<K>
-{
+export class MemoryKeyStore<K extends Key> implements KeyStore<K> {
   private env: string;
-  private deserializer: KeyDeserializer;
 
-  constructor(service: APIFormat) {
+  constructor(service: APIFormat, private serializer: KeySerializer<K>) {
     switch (service) {
       case "anthropic":
         this.env = "ANTHROPIC_KEY";
@@ -20,21 +19,21 @@ export class MemoryKeyStore<K extends BaseSerializableKey>
         this.env = "GOOGLE_PALM_KEY";
         break;
       default:
-        const never: never = service;
-        throw new Error(`Unknown service: ${never}`);
+        assertNever(service);
     }
-    this.deserializer = getDeserializer(service);
   }
 
   public async load() {
-    let bareKeys: string[];
-    bareKeys = [
+    let envKeys: string[];
+    envKeys = [
       ...new Set(process.env[this.env]?.split(",").map((k) => k.trim())),
     ];
-    return bareKeys.map((key) => this.deserializer({ key }));
+    return envKeys
+      .filter((k) => k)
+      .map((k) => this.serializer.deserialize({ key: k }));
   }
 
-  public add(_key: K) {}
+  public add() {}
 
-  public update(_key: K) {}
+  public update() {}
 }

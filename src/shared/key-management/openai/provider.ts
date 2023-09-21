@@ -6,9 +6,10 @@ import http from "http";
 import { Key, KeyProvider, Model } from "../index";
 import { config } from "../../../config";
 import { logger } from "../../../logger";
-import { OpenAIKeyChecker } from "./checker";
-import { KeyStore } from "../stores";
 import { getOpenAIModelFamily, OpenAIModelFamily } from "../../models";
+import { KeyStore, SerializedKey } from "../stores";
+import { OpenAIKeyChecker } from "./checker";
+import { OpenAIKeySerializer } from "./serializer";
 
 export type OpenAIModel =
   | "gpt-3.5-turbo"
@@ -76,10 +77,8 @@ const SERIALIZABLE_FIELDS: (keyof OpenAIKey)[] = [
   "gpt4-32kTokens",
   "turboTokens",
 ];
-type SerializableOpenAIKey = Partial<
-  Pick<OpenAIKey, (typeof SERIALIZABLE_FIELDS)[number]>
-> &
-  Pick<OpenAIKey, "key">;
+export type SerializedOpenAIKey = SerializedKey &
+  Partial<Pick<OpenAIKey, (typeof SERIALIZABLE_FIELDS)[number]>>;
 
 export type OpenAIKeyUpdate = Omit<
   Partial<OpenAIKey>,
@@ -97,11 +96,11 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
   readonly service = "openai" as const;
 
   private readonly keys: OpenAIKey[] = [];
-  private store: KeyStore<SerializableOpenAIKey>;
+  private store: KeyStore<OpenAIKey>;
   private checker?: OpenAIKeyChecker;
   private log = logger.child({ module: "key-provider", service: this.service });
 
-  constructor(store: KeyStore<SerializableOpenAIKey>) {
+  constructor(store: KeyStore<OpenAIKey>) {
     this.store = store;
   }
 
@@ -123,7 +122,7 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
       return;
     }
 
-    this.keys.push(...serializedKeys.map(OpenAIKeyProvider.deserialize));
+    this.keys.push(...serializedKeys.map(OpenAIKeySerializer.deserialize));
     this.log.info(
       { count: this.keys.length, via: storeName },
       "Loaded OpenAI keys."
@@ -381,33 +380,6 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
       });
     });
     this.checker?.scheduleNextCheck();
-  }
-
-  static deserialize({ key, ...rest }: SerializableOpenAIKey): OpenAIKey {
-    return {
-      key,
-      service: "openai",
-      modelFamilies: ["turbo" as const, "gpt4" as const],
-      isTrial: false,
-      isDisabled: false,
-      isRevoked: false,
-      isOverQuota: false,
-      lastUsed: 0,
-      lastChecked: 0,
-      promptCount: 0,
-      hash: `oai-${crypto
-        .createHash("sha256")
-        .update(key)
-        .digest("hex")
-        .slice(0, 8)}`,
-      rateLimitedAt: 0,
-      rateLimitRequestsReset: 0,
-      rateLimitTokensReset: 0,
-      turboTokens: 0,
-      gpt4Tokens: 0,
-      "gpt4-32kTokens": 0,
-      ...rest,
-    };
   }
 }
 
