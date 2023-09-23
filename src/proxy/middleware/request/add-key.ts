@@ -31,8 +31,9 @@ export const addKey: ProxyRequestMiddleware = (proxyReq, req) => {
   }
 
   // This should happen somewhere else but addKey is guaranteed to run first.
+  
   req.isStreaming = req.body.stream === true || req.body.stream === "true";
-  req.body.stream = req.isStreaming;
+  req.body.stream = req.isStreaming !== undefined ? req.isStreaming : false;
 
   // Anthropic support has a special endpoint that accepts OpenAI-formatted
   // requests and translates them into Anthropic requests.  On this endpoint,
@@ -59,6 +60,8 @@ export const addKey: ProxyRequestMiddleware = (proxyReq, req) => {
 
   if (assignedKey.service === "anthropic") {
     proxyReq.setHeader("X-API-Key", assignedKey.key);
+  } else if (assignedKey.service == "palm") {
+	proxyReq.setHeader("X-GOOG-API-KEY", assignedKey.key);
   } else {
     proxyReq.setHeader("Authorization", `Bearer ${assignedKey.key}`);
 	if (assignedKey.org != "default") {

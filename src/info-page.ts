@@ -2,7 +2,7 @@ import fs from "fs";
 import { Request, Response } from "express";
 import showdown from "showdown";
 import { config, listConfig } from "./config";
-import { OpenAIKey, keyPool } from "./key-management";
+import { PalmKey, OpenAIKey, keyPool } from "./key-management";
 import { getUniqueIps } from "./proxy/rate-limit";
 import { getPublicUsers, getGlobalTokenCount, getClaudeTokenCount, getOpenaiTokenCount } from "./proxy/auth/user-store"; 
 import {
@@ -40,19 +40,29 @@ function cacheInfoPageHtml(baseUrl: string) {
 
   const openaiKeys = keys.filter((k) => k.service === "openai").length;
   const anthropicKeys = keys.filter((k) => k.service === "anthropic").length;
+  const palmKeys = keys.filter((k) => k.service === "palm").length;
+  const ai21Keys = keys.filter((k) => k.service === "ai21").length;
+
 
   const info = {
     uptime: process.uptime(),
     endpoints: {
       ...(openaiKeys ? { openai: baseUrl + "/proxy/openai" } : {}),
       ...(anthropicKeys ? { anthropic: baseUrl + "/proxy/anthropic" } : {}),
+	  ...(palmKeys ? { palm: baseUrl + "/proxy/palm" } : {}),
+	  ...(ai21Keys ? { ai21: baseUrl + "/proxy/ai21" } : {}),
+	  
     },
     proompts: keys.reduce((acc, k) => acc + k.promptCount, 0),
     ...(config.modelRateLimit ? { proomptersNow: getUniqueIps() } : {}),
     openaiKeys,
     anthropicKeys,
+	palmKeys,
+	ai21Keys,
     ...(openaiKeys ? getOpenAIInfo() : {}),
     ...(anthropicKeys ? getAnthropicInfo() : {}),
+	...(palmKeys ? getPalmInfo() : {}),
+    ...(ai21Keys ? getAi21Info() : {}),
     config: listConfig(),
     build: process.env.BUILD_INFO || "dev",
   };
@@ -69,6 +79,9 @@ function cacheInfoPageHtml(baseUrl: string) {
   delete temp_info.config.promptInjections
   
   const openai_info = getOpenAIInfo()
+  const palm_info = getPalmInfo()
+  const ai21_info = getAi21Info()
+  
   const anthropic_info = getAnthropicInfo()
   
   const public_user_info = getPublicUsers();
@@ -82,11 +95,23 @@ function cacheInfoPageHtml(baseUrl: string) {
 		.replaceAll("{uptime}", info?.uptime?.toString())
 		 .replaceAll("{endpoints:openai}",info?.endpoints.openai ?? "Not Avaliable" )
 		 .replaceAll("{endpoints:anthropic}",info?.endpoints.anthropic ?? "Not Avaliable" )
+		 .replaceAll("{endpoints:ai21}",info?.endpoints.ai21 ?? "Not Avaliable" )
+		 .replaceAll("{endpoints:palm}",info?.endpoints.palm ?? "Not Avaliable" ) 
 		 .replaceAll("{proompts}", info?.proompts?.toString() ?? "0")
 		 .replaceAll("{proomptersNow}",info?.proomptersNow?.toString() ?? "0")
 		 .replaceAll("{openaiKeys}", (substring: string) => info.openaiKeys.toString())
 		 .replaceAll("{anthropicKeys}", (substring: string) => info.anthropicKeys.toString() )
+		 .replaceAll("{palmKeys}", (substring: string) => info.palmKeys.toString())
+		 .replaceAll("{ai21Keys}", (substring: string) => info.ai21Keys.toString() )
 		 .replaceAll("{status}", (substring: string) => openai_info.status.toString() ?? "Checking finished")
+		 .replaceAll("{palm:activeKeys}", (substring: string) => palm_info.palm?.activeKeys?.toString() ?? "0")
+		 .replaceAll("{palm:proomptersInQueue}",(substring: string) => palm_info.palm?.proomptersInQueue?.toString() ?? "0")
+		 .replaceAll("{palm:estimatedQueueTime}", (substring: string) => palm_info.palm?.estimatedQueueTime?.toString() ?? "Not Avaliable ")
+		 .replaceAll("{palm:revokedKeys}", (substring: string) => palm_info.palm?.revokedKeys?.toString() ?? "0")
+		 .replaceAll("{ai21:activeKeys}", (substring: string) => ai21_info.ai21?.activeKeys?.toString() ?? "0")
+		 .replaceAll("{ai21:proomptersInQueue}",(substring: string) => ai21_info.ai21?.proomptersInQueue?.toString() ?? "0")
+		 .replaceAll("{ai21:estimatedQueueTime}", (substring: string) => ai21_info.ai21?.estimatedQueueTime?.toString() ?? "Not Avaliable ")
+		 .replaceAll("{ai21:revokedKeys}", (substring: string) => ai21_info.ai21?.revokedKeys?.toString() ?? "0")
 		 .replaceAll("{turbo:activeKeys}", (substring: string) => openai_info.turbo?.activeKeys?.toString() ?? "0")
 		 .replaceAll("{turbo:proomptersInQueue}",(substring: string) => openai_info.turbo?.proomptersInQueue?.toString() ?? "0")
 		 .replaceAll("{turbo:estimatedQueueTime}", (substring: string) => openai_info.turbo?.estimatedQueueTime?.toString() ?? "Not Avaliable ")
@@ -161,6 +186,33 @@ type ServiceInfo = {
   estimatedQueueTime: string;
   status: string;
 };
+
+
+function getAi21Info() {
+  const ai21Info: Partial<ServiceInfo> = {};
+  const keys = keyPool.list().filter((k) => k.service === "ai21");
+  ai21Info.activeKeys = keys.filter((k) => !k.isDisabled && !k.isRevoked).length;
+  ai21Info.revokedKeys = keys.filter((k) => k.isRevoked).length;
+  if (config.queueMode !== "none") {
+    const queue = getQueueInformation("ai21");
+    ai21Info.proomptersInQueue = queue.proomptersInQueue;
+    ai21Info.estimatedQueueTime = queue.estimatedQueueTime;
+  }
+  return { ai21: ai21Info };
+}
+
+function getPalmInfo() {
+  const palmInfo: Partial<ServiceInfo> = {};
+  const keys = keyPool.list().filter((k) => k.service === "palm");
+  palmInfo.activeKeys = keys.filter((k) => !k.isDisabled && !k.isRevoked).length;
+  palmInfo.revokedKeys = keys.filter((k) => k.isRevoked).length;
+  if (config.queueMode !== "none") {
+    const queue = getQueueInformation("palm");
+    palmInfo.proomptersInQueue = queue.proomptersInQueue;
+    palmInfo.estimatedQueueTime = queue.estimatedQueueTime;
+  }
+  return { palm: palmInfo };
+}
 
 // this has long since outgrown this awful "dump everything in a <pre> tag" approach
 // but I really don't want to spend time on a proper UI for this right now
@@ -303,6 +355,9 @@ function buildInfoPageHeader(converter: showdown.Converter, title: string) {
       const turboWait = getQueueInformation("turbo").estimatedQueueTime;
       const gpt4Wait = getQueueInformation("gpt-4").estimatedQueueTime;
 	  const gpt432kWait = getQueueInformation("gpt-4-32k").estimatedQueueTime;
+	  const ai21Wait = getQueueInformation("ai21").estimatedQueueTime;
+	  const palmWait = getQueueInformation("palm").estimatedQueueTime;
+	  
       waits.push(`**Turbo:** ${turboWait}`);
       if (keyPool.list().some((k) => k.isGpt4) && !config.turboOnly) {
         waits.push(`**GPT-4:** ${gpt4Wait}`);
@@ -310,6 +365,13 @@ function buildInfoPageHeader(converter: showdown.Converter, title: string) {
 	  if (keyPool.list().some((k) => k.isGpt432k) && !config.turboOnly) {
         waits.push(`**GPT-4_32k:** ${gpt432kWait}`);
       }
+	  if (keyPool.list().some((k) => k.service == "palm")) {
+        waits.push(`**PALM:** ${palmWait}`);
+      }
+	  if (keyPool.list().some((k) => k.service == "ai21")) {
+        waits.push(`**AI21:** ${ai21Wait}`);
+      }
+	  
 	  
     }
 

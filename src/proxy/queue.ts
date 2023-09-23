@@ -25,7 +25,7 @@ import { init } from "../tokenization";
 import { buildFakeSseMessage } from "./middleware/common";
 
 
-export type QueuePartition = "claude" | "turbo" | "gpt-4" | "gpt-4-32k";
+export type QueuePartition = "claude" | "turbo" | "gpt-4" | "gpt-4-32k" | "palm" | "ai21";
 
 const queue: Request[] = [];
 const log = logger.child({ module: "request-queue" });
@@ -109,6 +109,8 @@ export function enqueue(req: Request) {
         req.res!.write(buildFakeSseMessage("heartbeat", debugMsg, req));
       }
     }, 10000);
+  } else {
+	  req.body.stream = false 
   }
 
   // Register a handler to remove the request from the queue if the connection

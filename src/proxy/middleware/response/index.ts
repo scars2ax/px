@@ -65,6 +65,7 @@ export type ProxyResMiddleware = ProxyResHandlerWithBody[];
  * the client. Once the stream is closed, the finalized body will be attached
  * to res.body and the remaining middleware will execute.
  */
+ 
 export const createOnProxyResHandler = (apiMiddleware: ProxyResMiddleware) => {
   return async (
     proxyRes: http.IncomingMessage,
@@ -79,7 +80,7 @@ export const createOnProxyResHandler = (apiMiddleware: ProxyResMiddleware) => {
 
     try {
       const body = await initialHandler(proxyRes, req, res);
-
+		
       const middlewareStack: ProxyResMiddleware = [];
 
       if (req.isStreaming) {
@@ -142,6 +143,16 @@ function reenqueueRequest(req: Request) {
   enqueue(req);
 }
 
+
+
+
+
+
+
+
+
+
+
 /**
  * Handles the response from the upstream service and decodes the body if
  * necessary.  If the response is JSON, it will be parsed and returned as an
@@ -198,14 +209,18 @@ export const decodeResponseBody: RawResponseBodyHandler = async (
   return promise;
 };
 
-// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
 const getPromptForRequest = (req: Request): string | OaiMessage[] => {
   // Since the prompt logger only runs after the request has been proxied, we
   // can assume the body has already been transformed to the target API's
   // format.
   if (req.outboundApi === "anthropic") {
     return req.body.prompt;
-  } else {
+  } if (req.outboundApi === "palm") {
+    return req.body.candidates[0];
+  } if (req.outboundApi === "ai21") {
+    return req.body.completions[0].data.text;
+  }  else {
     return req.body.messages;
   }
 };
@@ -218,7 +233,11 @@ const getResponseForService = ({
 }): { completion: string; model: string } => {
   if (service === "anthropic") {
     return { completion: body.completion.trim(), model: body.model };
-  } else {
+  } else if (service === "palm") {
+	return { completion: (body.candidates[0]?.output ?? body.candidates.output), model: body.model };
+  } else if (service === "ai21") {
+	return { completion: body.completions[0].data.text, model: body.model };
+  }else {
     return { completion: body.choices[0].message.content, model: body.model };
   }
 };
@@ -397,7 +416,7 @@ const handleUpstreamErrors: ProxyResHandlerWithBody = async (
       "org-xxxxxxxxxxxxxxxxxxx"
     );
   }
-
+ 
   writeErrorResponse(req, res, statusCode, errorPayload);
   throw new Error(errorPayload.error?.message);
 };

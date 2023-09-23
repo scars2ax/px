@@ -22,10 +22,23 @@ export const checkContextSize: RequestPreprocessor = async (req) => {
       req.outputTokens = req.body.max_tokens;
       prompt = req.body.messages;
       break;
+	//case "openai-text": {
+    //  req.outputTokens = req.body.max_tokens;
+    //  prompt = req.body.prompt;
+    //  break;
+    //}
     case "anthropic":
       req.outputTokens = req.body.max_tokens_to_sample;
       prompt = req.body.prompt;
       break;
+	case "palm":
+	  req.outputTokens = 1; // ._. 
+      prompt = req.body.prompt;
+      break;  
+	case "ai21":
+	  req.outputTokens = 1; // ._. ?
+      prompt = req.body.prompt;
+      break;  
     default:
       throw new Error(`Unknown outbound API: ${req.outboundApi}`);
   }
@@ -68,6 +81,12 @@ function validateContextSize(req: Request) {
     modelMax = 9000;
   } else if (model.match(/claude-2/)) {
     modelMax = 100000;
+  } else if (model.match(/text-bison-001-32k/)) {
+    modelMax = 32768; // doesn't matter 
+  } else if (model.match(/text-bison-001/)) {
+    modelMax = 8192; // doesn't matter 
+  } else if (model.match(/j2-ultra/)) {
+    modelMax = 8192; // doesn't matter 
   } else {
     // Don't really want to throw here because I don't want to have to update
     // this ASAP every time a new model is released.

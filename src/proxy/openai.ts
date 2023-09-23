@@ -7,6 +7,7 @@ import { logger } from "../logger";
 import { createQueueMiddleware } from "./queue";
 import { ipLimiter } from "./rate-limit";
 import { handleProxyError } from "./middleware/common";
+import { RequestPreprocessor } from "./middleware/request";
 import {
   addKey,
   blockZoomerOrigins,
@@ -23,6 +24,8 @@ import {
 
 let modelsCache: any = null;
 let modelsCacheTime = 0;
+
+
 
 function getModelsResponse() {
   if (new Date().getTime() - modelsCacheTime < 1000 * 60) {
@@ -42,6 +45,8 @@ function getModelsResponse() {
     "gpt-3.5-turbo-0613",
     "gpt-3.5-turbo-16k",
     "gpt-3.5-turbo-16k-0613",
+	"gpt-3.5-turbo-instruct",
+    "gpt-3.5-turbo-instruct-0914",
   ];
 
   const gpt4Available = keyPool.list().filter((key) => {
@@ -84,6 +89,44 @@ const handleModelRequest: RequestHandler = (_req, res) => {
   res.status(200).json(getModelsResponse());
 };
 
+
+function transformTurboInstructResponse(
+  turboInstructBody: Record<string, any>
+): Record<string, any> {
+  const transformed = { ...turboInstructBody };
+  transformed.choices = [
+    {
+      ...turboInstructBody.choices[0],
+      message: {
+        role: "assistant",
+        content: turboInstructBody.choices[0].text.trim(),
+      },
+    },
+  ];
+  delete transformed.choices[0].text;
+  return transformed;
+}
+
+
+const rewriteForTurboInstruct: RequestPreprocessor = (req) => {
+  // /v1/turbo-instruct/v1/chat/completions accepts either prompt or messages.
+  // Depending on whichever is provided, we need to set the inbound format so
+  // it is transformed correctly later.
+  if (req.body.prompt && !req.body.messages) {
+    //req.inboundApi = "openai-text";
+  } else if (req.body.messages && !req.body.prompt) {
+    req.inboundApi = "openai";
+    // Set model for user since they're using a client which is not aware of
+    // turbo-instruct.
+    req.body.model = "gpt-3.5-turbo-instruct";
+  } else {
+    throw new Error("`prompt` OR `messages` must be provided");
+  }
+
+  req.url = "/v1/completions";
+};
+
+
 const rewriteRequest = (
   proxyReq: http.ClientRequest,
   req: Request,
@@ -117,11 +160,12 @@ const openaiResponseHandler: ProxyResHandlerWithBody = async (
   if (typeof body !== "object") {
     throw new Error("Expected body to be an object");
   }
+  
+  //if (req.outboundApi === "openai-text" && req.inboundApi === "openai") {
+  //  req.log.info("Transforming Turbo-Instruct response to Chat format");
+  //  body = transformTurboInstructResponse(body);
+  //}
 
-  // TODO: Remove once tokenization is stable
-  if (req.debug) {
-    body.proxy_tokenizer_debug_info = req.debug;
-  }
 
   res.status(200).json(body);
 };
@@ -155,6 +199,17 @@ openaiRouter.post(
   createPreprocessorMiddleware({ inApi: "openai", outApi: "openai" }),
   openaiProxy
 );
+
+//openaiRouter.post(
+//  /\/v1\/turbo\-instruct\/(v1\/)?chat\/completions/,
+//  ipLimiter,
+//  createPreprocessorMiddleware({ inApi: "openai", outApi: "openai-text" }, [
+//    rewriteForTurboInstruct,
+//  ]),
+//  openaiProxy
+//);
+
+
 // Redirect browser requests to the homepage.
 openaiRouter.get("*", (req, res, next) => {
   const isBrowser = req.headers["user-agent"]?.includes("Mozilla");

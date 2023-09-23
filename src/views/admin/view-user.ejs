@@ -1,5 +1,16 @@
 <%- include("../_partials/admin-header", { title: "View User - OAI Reverse Proxy Admin" }) %>
 <h1>View User</h1>
+
+<script>
+function toggleExpand(timestamp) {
+    var expandDiv = document.getElementById('expand_' + timestamp);
+    if (expandDiv.style.display === 'none') {
+        expandDiv.style.display = 'block';
+    } else {
+        expandDiv.style.display = 'none';
+    }
+}
+</script>
 <style>
   th:nth-child(n+1) {
         background-color:#0a0a0a;
@@ -14,6 +25,11 @@
 	  text-decoration: none;
 	}
 
+	.edit:hover {
+		background-color:#1a1a1a;
+		cursor: pointer;
+	}
+
 	a:visited {
 	  color: pink;
 	  text-decoration: none;
@@ -26,85 +42,143 @@
 <table class="table table-striped">
   <thead>
     <tr>
+	  <th style="width:32px;" scope="col">Edit</th>
       <th scope="col">Key</th>
       <th scope="col">Value</th>
     </tr>
   <tbody>
     <tr>
+	  <th scope="row" style="width:32px;">&#9940;</th>
+      <th scope="row">Alias</th>
+      <td><%- user.alias %></td>
+    <tr>
+	<tr>
+	  <th class="edit" scope="row" style="width:32px;">&#9997;</th>
+      <th scope="row">Note</th>
+      <td><%- user.note %></td>
+    <tr>
+  
+    <tr>
+	  <th class="edit" scope="row" style="width:32px;">&#9997;</th>
       <th scope="row">Token</th>
       <td><%- user.token %></td>
     <tr>
+	  <th class="edit" class="edit" scope="row" style="width:32px;">&#9997;</th>
       <th scope="row">Type</th>
       <td><%- user.type %></td>
     </tr>
 	<tr>
+	  <th class="edit" scope="row" style="width:32px;">&#9997;</th>
       <th scope="row">Rate Limit</th>
       <td><%- user.rateLimit %></td>
     </tr>
 	<tr>
+	  <th scope="row" style="width:32px;">&#9940;</th>
       <th scope="row">Prompt Gpt Count</th>
       <td><%- user.promptGptCount %></td>
     </tr>
 	<tr>
+	  <th scope="row" style="width:32px;">&#9940;</th>
       <th scope="row">Prompt Claude Count</th>
       <td><%- user.promptClaudeCount %></td>
     </tr>
     <tr>
+	  <th scope="row" style="width:32px;">&#9940;</th>
       <th scope="row">Gpt Token Count</th>
       <td><%- user.tokenGptCount %></td>
     </tr>
 	<tr>
+	  <th scope="row" style="width:32px;">&#9940;</th>
       <th scope="row">Claude Token Count</th>
       <td><%- user.tokenClaudeCount %></td>
     </tr>
     <tr>
+	  <th scope="row" style="width:32px;">&#9940;</th>
       <th scope="row">Created At</th>
       <td><%- user.createdAt %></td>
     </tr>
     <tr>
+	  <th scope="row" style="width:32px;">&#9940;</th>
       <th scope="row">Last Used At</th>
       <td><%- user.lastUsedAt || "never" %></td>
     </tr>
     <tr>
+	  <th scope="row" style="width:32px;">&#9940;</th>
       <th scope="row">Disabled At</th>
       <td><%- user.disabledAt %></td>
     </tr>
     <tr>
+	  <th class="edit" scope="row" style="width:32px;">&#9997;</th>
       <th scope="row">Disabled Reason</th>
       <td><%- user.disabledReason %></td>  
     </tr>
     <tr>
+	  <th scope="row" style="width:32px;">&#9940;</th>
       <th scope="row">IPs</th>
       <td>
         <a href="#" id="ip-list-toggle">Show all (<%- user.ip.length %>)</a>
         <ol id="ip-list" style="display:none; padding-left:1em; margin: 0;">
           <% user.ip.forEach((ip, index) => { %>
-			<li><code><%- index + 1 %></code></li>
+			<li><code><%- ip %></code></li>
 		  <% }) %>
           </ol>
       </td>
     </tr>
 	<tr>
+  <th scope="row" style="width:32px;">&#9940;</th>
   <th scope="row">IPs Prompt Count's</th>
   <td>
 	<a href="#" id="ipcount-list-toggle">Show all (<%= Array.from(user.ipPromptCount.values()).reduce((acc, count) => acc + count, 0) %>)</a>
 	<ol id="ipcount-list" style="display:none; padding-left:1em; margin: 0;">
-	  <% Array.from(user.ipPromptCount.entries()).forEach(([ip, count], index) => { %>
-		<li><code><%= index + 1 %> (Prompts: <%= count %>)</code></li>
-	  <% }) %>
+    <% Array.from(user.ipPromptCount.entries()).forEach(([timestamp, count], index) => { %>
+			<div>
+				<a href="#" onclick="toggleExpand('<%= timestamp %>')"><%= new Date(parseInt(timestamp)).toLocaleString() %></a>
+				<div id="expand_<%= timestamp %>" style="display: none;">
+					<% Object.entries(count).forEach(([ip, promptCount]) => { %>
+						<div>IP: <%= ip %>, Prompt Count: <%= promptCount %></div>
+					<% }) %>
+				</div>
+			</div>
+		<% }) %>
 	</ol>
+		
+	
   </td>
   <tr>
+      <th class="edit" scope="row" style="width:32px;">&#9997;</th>
       <th scope="row">Prompt Limit</th>
       <td><%- user.promptLimit %></td>
     </tr>
 	<tr>
+	  <th class="edit" scope="row" style="width:32px;">&#9997;</th>
       <th scope="row">Time Limit</th>
       <td><%- user.timeLimit %></td>
     </tr>
 	<tr>
+	  <th class="edit" scope="row" style="width:32px;">&#9997;</th>
       <th scope="row">End Time Limit</th>
       <td><%- user.endTimeLimit %></td>
+    </tr>
+	<tr>
+	  <th title="Just click on checkboxes to change allowed models." scope="row" style="width:32px;">&#10067;</th>
+      <th scope="row">Allowed Models</th>
+      <td>
+	  <label>
+		<input onclick="sendPostRequest('Gpt', this.checked)" type="checkbox" name="user.allowGpt" value="Gpt" <% if (user.allowGpt) { %>checked<% } %>> Gpt
+	  </label>
+	  <br>
+	  <label>
+		<input onclick="sendPostRequest('Claude', this.checked)" type="checkbox" name="user.allowClaude" value="Claude" <% if (user.allowClaude) { %>checked<% } %>> Claude
+	  </label>
+	  <br>
+	  <label>
+		<input onclick="sendPostRequest('Palm', this.checked)" type="checkbox" name="user.allowPalm" value="Palm" <% if (user.allowPalm) { %>checked<% } %>> Palm
+	  </label>
+	  <br>
+	  <label>
+		<input onclick="sendPostRequest('Ai21', this.checked)" type="checkbox" name="user.allowAi21" value="Ai21" <% if (user.allowAi21) { %>checked<% } %>> Ai21
+	  </label>
+	</td>
     </tr>
 </tr>
 	
@@ -122,6 +196,70 @@
     document.getElementById("ipcount-list").style.display = "block";
     document.getElementById("ipcount-list-toggle").style.display = "none";
   });
+  
+
+
+
+const editBtns = document.querySelectorAll('th.edit');
+editBtns.forEach(btn => {
+  btn.addEventListener('click', e => {
+    e.preventDefault();
+
+  });
+
+});
+
+var editElements = document.querySelectorAll(".edit");
+
+function sendPostRequest(toEdit, valueOfEdit) {
+	var userToken = "<%- user.token %>";
+	fetch("/admin/manage/edit-user/" + userToken, {
+	  method: "POST",
+	  credentials: "same-origin",
+	  body: JSON.stringify({
+		_csrf: document
+		  .querySelector("meta[name=csrf-token]")
+		  .getAttribute("content"),
+		toEdit: toEdit,
+		valueOfEdit: valueOfEdit
+	  }),
+	  headers: { "Content-Type": "application/json" },
+	}).then(function() {
+	  window.location.reload();
+	});
+}
+  
+editElements.forEach(function(element) {
+  element.addEventListener("click", function() {
+    var userToken = "<%- user.token %>";
+	
+	
+	var trElement = element.closest("tr"); // Find the closest 'tr' element
+    var thElement = trElement.querySelector("th[scope=row]");
+    var tdElement = trElement.querySelector("td");
+	
+	var _e = thElement.nextElementSibling.textContent;
+	var _v = prompt("(Don't do it, if you don't know what you are doing ._.) Enter the new value for "+_e+":");
+	
+	
+	
+    fetch("/admin/manage/edit-user/" + userToken, {
+      method: "POST",
+      credentials: "same-origin",
+      body: JSON.stringify({
+        _csrf: document
+          .querySelector("meta[name=csrf-token]")
+          .getAttribute("content"),
+		toEdit: _e,
+        valueOfEdit: _v
+		  
+      }),
+      headers: { "Content-Type": "application/json" },
+    }).then(function() {
+      window.location.reload();
+    });
+  });
+});
 </script>
   
 <%- include("../_partials/admin-footer") %>

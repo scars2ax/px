@@ -18,9 +18,15 @@ export interface User {
   token: string;
   tokenHash?: string; 
   alias?: string;
+  allowAi21: boolean;
+  allowPalm: boolean;
+  allowGpt: boolean;
+  allowClaude: boolean;
+  
+  note?: string;
   /** The IP addresses the user has connected from. */
   ip: string[];
-  ipPromptCount: Map<string, number>; 
+  ipPromptCount: Map<string, object>; 
   /** The user's privilege level. */
   type: UserType;
   /** The number of prompts the user has made. */
@@ -89,6 +95,7 @@ export function createUser(rLimit: any, pLimit: any) {
     token,
 	tokenHash: `${crypto.createHash("sha256").update(token).digest("hex")}`,
 	alias: "Degenerate",
+	note: "Edit",
     ip: [],
 	ipPromptCount: new Map(),
     type: "normal",
@@ -99,6 +106,10 @@ export function createUser(rLimit: any, pLimit: any) {
 	promptLimit: pLimit,
     tokenClaudeCount: 0,
 	tokenGptCount: 0,
+	allowGpt: true, 
+	allowClaude: true, 
+	allowPalm: true, 
+	allowAi21: true, 
     createdAt: Date.now(),
   });
   usersToFlush.add(token);
@@ -125,6 +136,11 @@ export function createTempUser(pLimit: any, tLimit: any, rLimit: any) {
   users.set(token, {
     token,
 	alias: "Degenerate",
+	allowGpt: true, 
+	allowClaude: true, 
+	allowPalm: true, 
+	allowAi21: true, 
+	note: "Edit",
 	tokenHash: `${crypto.createHash("sha256").update(token).digest("hex")}`,
     ip: [],
 	ipPromptCount: new Map(),
@@ -138,7 +154,6 @@ export function createTempUser(pLimit: any, tLimit: any, rLimit: any) {
 	endTimeLimit: -1,
     tokenClaudeCount: 0,
 	tokenGptCount: 0,
-	
     createdAt: Date.now(),
   });
   usersToFlush.add(token);
@@ -183,6 +198,10 @@ export function getPublicUsers() {
 		  createdAt: user[1].createdAt,
 		  lastUsedAt: user[1].lastUsedAt,
 		  token: user[1].tokenHash,
+		  allowAi21: user[1].allowAi21,
+		  allowClaude: user[1].allowClaude,
+		  allowGpt: user[1].allowGpt,
+		  allowPalm: user[1].allowPalm,
 		  type: user[1].type,
 		  promptLimit: user[1].promptLimit,
 		  timeLimit: user[1].timeLimit,
@@ -203,6 +222,21 @@ export function getPublicUsers() {
   }
 }
 
+
+export function updateToken(user: User, newToken: string) {
+  users.delete(user.token);
+  const updatedUser: User = {
+    ...user,
+    token: newToken,
+  };
+  users.set(newToken, updatedUser);
+  usersToFlush.add(newToken);
+  if (config.gatekeeperStore === "firebase_rtdb") {
+    setImmediate(flushUsers);
+  }
+  return updatedUser;
+}
+
 /**
  * Upserts the given user. Intended for use with the /admin API for updating
  * user information via JSON. Use other functions for more specific operations.
@@ -211,6 +245,11 @@ export function upsertUser(user: UserUpdate) {
   const existing: User = users.get(user.token) ?? {
     token: user.token,
 	alias: "Degenerate",
+	allowAi21: true, 
+	allowClaude: true,
+	allowGpt: true,
+	allowPalm: true,
+	note: "Edit",
     ip: [],
     type: "normal",
     promptCount: 0,
@@ -237,19 +276,50 @@ export function upsertUser(user: UserUpdate) {
   return users.get(user.token);
 }
 
+
+
 /** Increments the prompt count for the given user. */
+
+
 export function incrementPromptCount(token: string, model: string, user_ip: string) {
   const user = users.get(token);
+  const oneHourInMillis = 60 * 60 * 1000;
   if (!user) return;
+  const user_ip_hash = crypto.createHash('sha256').update(user_ip+config.salt).digest('hex'); 
+  const now = Date.now() 
+
   
-  if (user.ipPromptCount.get(user_ip) === undefined) {
-	  user.ipPromptCount.set(user_ip, 1);
-   } else {
-	  const count = user.ipPromptCount.get(user_ip);
-	  if (typeof count === 'number') {
-		user.ipPromptCount.set(user_ip, count + 1);
-		}
-   }
+  
+  if (user.ipPromptCount.size === 0) {
+	  const TimeStampInfo: { [user_ip_hash: string] : number; } = {};
+	  TimeStampInfo[user_ip_hash] = 1;
+	  user.ipPromptCount.set(Date.now().toString(), TimeStampInfo);
+  } else {
+	  const timestamps = Array.from(user.ipPromptCount.keys()); // Convert the keys to an array
+	  const currentTimestamp: number = Number(Date.now());
+	  const recentTimestamp = timestamps.find(timestamp => Number(currentTimestamp) - Number(timestamp) <= oneHourInMillis);
+	  
+	  if (typeof recentTimestamp === 'undefined') {
+		  // Create TimestampInfo object
+			
+		  const TimeStampInfo: { [user_ip_hash: string] : number; } = {};
+			
+		  // Set user count as 1
+		  TimeStampInfo[user_ip_hash] = 1;
+
+		  // Store new TimestampInfo object into ipPromptCount map with current timestamp key
+		  user.ipPromptCount.set(Date.now().toString(), TimeStampInfo);
+	  } else {
+		let count:any = user.ipPromptCount.get(recentTimestamp);
+
+		if (count && typeof count === 'object' && count.hasOwnProperty(user_ip_hash)) {
+		  count[user_ip_hash] = count[user_ip_hash]+1;
+		  user.ipPromptCount.set(recentTimestamp, count);
+		 }
+	   }
+	   
+	}
+	
   
   user.promptCount++;
   if (model.slice(0, 3) == "gpt") {
@@ -349,8 +419,11 @@ export function getOpenaiTokenCount() {
 export function authenticate(token: string, ip: string) {
   const user = users.get(token);
   if (!user || user.disabledAt) return;
-  if (!user.ip.includes(ip)) user.ip.push(ip);
-
+  let ipHash = crypto.createHash('sha256').update(ip+config.salt).digest('hex');
+  if (!user.ip.includes(ipHash)) {
+	user.ip.push( ipHash );
+  };
+  
   // If too many IPs are associated with the user, disable the account.
   const ipLimit =
     user.type === "special" || !MAX_IPS_PER_USER ? Infinity : MAX_IPS_PER_USER;

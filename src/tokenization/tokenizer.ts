@@ -10,6 +10,16 @@ import {
   OpenAIPromptMessage,
 } from "./openai";
 
+import {
+  init as initPalmAi,
+  getTokenCount as getPalmTokenCount,
+} from "./palm";
+
+import {
+  init as initAi21Ai,
+  getTokenCount as getAi21TokenCount,
+} from "./ai21";
+
 export async function init() {
   if (config.anthropicKey) {
     initClaude();
@@ -28,7 +38,10 @@ type TokenCountRequest = {
   req: Request;
 } & (
   | { prompt: string; service: "anthropic" }
+  | { prompt: string; service: "palm" }
+  | { prompt: string; service: "ai21" }
   | { prompt: OpenAIPromptMessage[]; service: "openai" }
+  
 );
 export async function countTokens({
   req,
@@ -47,6 +60,21 @@ export async function countTokens({
         ...getOpenAITokenCount(prompt, req.body.model),
         tokenization_duration_ms: getElapsedMs(time),
       };
+	//case "openai-text":
+    //  return {
+    //    ...getOpenAITokenCount(prompt, req.body.model),
+    //    tokenization_duration_ms: getElapsedMs(time),
+    //  };
+	case "palm":
+		return {
+        ...getPalmTokenCount(prompt),
+        tokenization_duration_ms: getElapsedMs(time),
+      };
+	case "ai21":
+		return {
+        ...getAi21TokenCount(prompt),
+        tokenization_duration_ms: getElapsedMs(time),
+      };  
     default:
       throw new Error(`Unknown service: ${service}`);
   }

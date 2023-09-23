@@ -45,6 +45,10 @@ function getPromptFromRequest(req: Request) {
       return body.messages
         .map((m: { content: string }) => m.content)
         .join("\n");
+	//case "openai-text":
+    //  return body.messages
+    //    .map((m: { content: string }) => m.content)
+    //    .join("\n");	
     default:
       throw new Error(`Unknown service: ${service}`);
   }
