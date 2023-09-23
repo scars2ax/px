@@ -8,7 +8,7 @@ import { ipLimiter } from "./rate-limit";
 import { handleProxyError } from "./middleware/common";
 import {
   addKey,
-  addAnthropicPreamble,
+  //addPalmPreamble,
   blockZoomerOrigins,
   createPreprocessorMiddleware,
   finalizeBody,
@@ -28,31 +28,20 @@ const getModelsResponse = () => {
     return modelsCache;
   }
 
-  if (!config.anthropicKey) return { object: "list", data: [] };
+  if (!config.palmKey) return { object: "list", data: [] };
 
-  const claudeVariants = [
-    "claude-v1",
-    "claude-v1-100k",
-    "claude-instant-v1",
-    "claude-instant-v1-100k",
-    "claude-v1.3",
-    "claude-v1.3-100k",
-    "claude-v1.2",
-    "claude-v1.0",
-    "claude-instant-v1.1",
-    "claude-instant-v1.1-100k",
-    "claude-instant-v1.0",
-    "claude-2", // claude-2 is 100k by default it seems
-    "claude-2.0",
-  ];
+  const palmVariants = [
+    "gpt-text-bison-001"
+  ]; // F u ;v 
 
-  const models = claudeVariants.map((id) => ({
+  const models = palmVariants.map((id) => ({
+    // MAY NEED CHANGE 
     id,
     object: "model",
     created: new Date().getTime(),
-    owned_by: "anthropic",
+    owned_by: "google",
     permission: [],
-    root: "claude",
+    root: "openai",
     parent: null,
   }));
 
@@ -66,18 +55,31 @@ const handleModelRequest: RequestHandler = (_req, res) => {
   res.status(200).json(getModelsResponse());
 };
 
-const rewriteAnthropicRequest = (
+
+const removeStreamProperty = (
+  proxyReq: http.ClientRequest,
+  req: Request,
+  res: http.ServerResponse,
+  options: any
+) => {
+  if (req.body && typeof req.body === "object") {
+    delete req.body.stream;
+  }
+};
+
+const rewritePalmRequest = (
   proxyReq: http.ClientRequest,
   req: Request,
   res: http.ServerResponse
 ) => {
   const rewriterPipeline = [
     addKey,
-    addAnthropicPreamble,
+    //addPalmPreamble,
     languageFilter,
     blockZoomerOrigins,
     removeOriginHeaders,
-    finalizeBody,
+    removeStreamProperty,
+	finalizeBody,
   ];
 
   try {
@@ -88,27 +90,32 @@ const rewriteAnthropicRequest = (
     req.log.error(error, "Error while executing proxy rewriter");
     proxyReq.destroy(error as Error);
   }
+  
+  
 };
 
 /** Only used for non-streaming requests. */
-const anthropicResponseHandler: ProxyResHandlerWithBody = async (
+const palmResponseHandler: ProxyResHandlerWithBody = async (
   _proxyRes,
   req,
   res,
   body
 ) => {
+	
   if (typeof body !== "object") {
     throw new Error("Expected body to be an object");
   }
 
-
   if (req.inboundApi === "openai") {
-    req.log.info("Transforming Anthropic response to OpenAI format");
-    body = transformAnthropicResponse(body);
+    req.log.info("Transforming Palm response to OpenAI format");
+    body = transformPalmResponse(body);
   }
+ 
 
   res.status(200).json(body);
 };
+
+
 
 /**
  * Transforms a model response from the Anthropic API to match those from the
@@ -116,14 +123,15 @@ const anthropicResponseHandler: ProxyResHandlerWithBody = async (
  * is only used for non-streaming requests as streaming requests are handled
  * on-the-fly.
  */
-function transformAnthropicResponse(
-  anthropicBody: Record<string, any>
+function transformPalmResponse(
+  palmBody: Record<string, any>
 ): Record<string, any> {
+  const output = (palmBody.candidates[0]?.output || palmBody.candidates.output)?.trim();
   return {
-    id: "ant-" + anthropicBody.log_id,
+    id: "plm-" + palmBody.log_id,
     object: "chat.completion",
     created: Date.now(),
-    model: anthropicBody.model,
+    model: palmBody.model,
     usage: {
       prompt_tokens: 0,
       completion_tokens: 0,
@@ -132,58 +140,60 @@ function transformAnthropicResponse(
     choices: [
       {
         message: {
-          role: "assistant",
-          content: anthropicBody.completion?.trim(),
+          role: "text",
+          content: output,
         },
-        finish_reason: anthropicBody.stop_reason,
+        finish_reason: palmBody.stop_reason,
         index: 0,
       },
     ],
   };
 }
 
-const anthropicProxy = createQueueMiddleware(
+const palmProxy = createQueueMiddleware(
   createProxyMiddleware({
-    target: "https://api.anthropic.com",
+    target: "https://generativelanguage.googleapis.com/v1beta2/models/text-bison-001:generateText",
     changeOrigin: true,
     on: {
-      proxyReq: rewriteAnthropicRequest,
-      proxyRes: createOnProxyResHandler([anthropicResponseHandler]),
+      proxyReq: rewritePalmRequest,
+      proxyRes: createOnProxyResHandler([palmResponseHandler]),
       error: handleProxyError,
     },
     selfHandleResponse: true,
     logger,
-    pathRewrite: {
-      // Send OpenAI-compat requests to the real Anthropic endpoint.
-      "^/v1/chat/completions": "/v1/complete",
-    },
+	  pathRewrite: {
+	  '^/proxy/palm/chat/completions': '', 
+	  }
   })
 );
 
-const anthropicRouter = Router();
+const palmRouter = Router();
 // Fix paths because clients don't consistently use the /v1 prefix.
-anthropicRouter.use((req, _res, next) => {
+palmRouter.use((req, _res, next) => {
   if (!req.path.startsWith("/v1/")) {
     req.url = `/v1${req.url}`;
   }
   next();
 });
-anthropicRouter.get("/v1/models", handleModelRequest);
-anthropicRouter.post(
+palmRouter.get("/v1/models", handleModelRequest);
+palmRouter.post(
   "/v1/complete",
   ipLimiter,
-  createPreprocessorMiddleware({ inApi: "anthropic", outApi: "anthropic" }),
-  anthropicProxy
+  createPreprocessorMiddleware({ inApi: "palm", outApi: "palm" }),
+  palmProxy
 );
-// OpenAI-to-Anthropic compatibility endpoint.
-anthropicRouter.post(
+// OpenAI-to-Palm compatibility endpoint.
+palmRouter.post(
   "/v1/chat/completions",
   ipLimiter,
-  createPreprocessorMiddleware({ inApi: "openai", outApi: "anthropic" }),
-  anthropicProxy
+  createPreprocessorMiddleware({ inApi: "openai", outApi: "palm" }),
+  (req, res, next) => {
+    req.url = req.originalUrl; // Reset the URL to include the full path
+    palmProxy(req, res, next);
+  }
 );
 // Redirect browser requests to the homepage.
-anthropicRouter.get("*", (req, res, next) => {
+palmRouter.get("*", (req, res, next) => {
   const isBrowser = req.headers["user-agent"]?.includes("Mozilla");
   if (isBrowser) {
     res.redirect("/");
@@ -192,4 +202,4 @@ anthropicRouter.get("*", (req, res, next) => {
   }
 });
 
-export const anthropic = anthropicRouter;
+export const palm = palmRouter;

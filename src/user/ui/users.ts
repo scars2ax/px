@@ -25,7 +25,6 @@ const upload = multer({
   },
 });
 
-
 router.get("/", (_req, res) => {
   res.render("user/index", {
 	user: getUser(_req.cookies.loginToken)

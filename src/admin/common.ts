@@ -56,6 +56,10 @@ export const UserSchema = z
   .object({
     ip: z.array(z.string()).optional(),
 	alias: z.string().optional(),
+	allowGpt: z.boolean().optional(),
+	allowClaude: z.boolean().optional(),
+	allowPalm: z.boolean().optional(),
+	allowAi21: z.boolean().optional(),
 	tokenHash: z.string().optional(),
     type: z.enum(["normal", "special", "temp"]).optional(),
 	promptCount: z.number().optional(),

@@ -33,7 +33,6 @@ const rewriteRequest = (
   req: Request,
   res: Response
 ) => {
-  req.body.stream = false;
   const rewriterPipeline = [
     addKey,
     transformKoboldPayload,

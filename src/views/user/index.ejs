@@ -38,6 +38,15 @@ body {
   background-color: #5e5e5e;
   padding: 5px;
 }
+
+.chart-container {
+  position:relative;
+  min-height:auto;
+  width:100%;
+  display: flex;
+  flex-grow:1;
+}
+
 </style> 
 <script>
 if (window.location.href.includes("?")) {
@@ -62,14 +71,17 @@ if (window.location.href.includes("?")) {
 <script>
   function askForName() {
     var name = prompt("Please enter your name:");
-    if (name !== null) {
-      // Set the value of a hidden input field with the entered name
-      var nameField = document.createElement("input");
-      nameField.setAttribute("type", "hidden");
-      nameField.setAttribute("name", "name");
-      nameField.setAttribute("value", name);
-      document.querySelector("form").appendChild(nameField);
+    if (name === null) {
+      // If the user cancels, set the default value
+      name = "Degenerate";
     }
+    
+    // Set the value of a hidden input field with the entered name
+    var nameField = document.createElement("input");
+    nameField.setAttribute("type", "hidden");
+    nameField.setAttribute("name", "name");
+    nameField.setAttribute("value", name);
+    document.querySelector("form").appendChild(nameField);
     
     // Submit the form
     document.querySelector("form").submit();
@@ -108,7 +120,7 @@ if (window.location.href.includes("?")) {
   </div>
   <div class="box">
     <div class="key">Amount of Unique Ip's overall:</div>
-    <div class="value"><%= user.ip.length %></div>
+    <div class="value"><%= Array.from(user.ipPromptCount.values()).reduce((count, timestamps) => count + (timestamps.hasOwnProperty(user_ip) ? 1 : 0), 0) %></div>
   </div>
   <div class="box">
     <div class="key">Your Alias/Name</div>
@@ -149,6 +161,92 @@ if (window.location.href.includes("?")) {
 
   
 <% } %>
+
+<center>
+<div class="chart-container" style="position: relative; height:50vh; width:100%">
+<div style="position: relative; height:50vh; width:50%">Token Consumption<canvas id="tokenChart" width="400" height="400"></canvas></div>
+<div style="position: relative; height:50vh; width:50%">Prompt Consumption<canvas id="promptChart" width="400" height="400"></canvas></div>
+</div></center>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+var url = window.location.href;
+var sanitizedUrl = url.split('/')[0]; 
+var userItself = "<%= user.tokenHash %>"
+
+// Fetch data from URL
+fetch(sanitizedUrl+'/users-stats')
+  .then(response => response.json())
+  .then(data => {
+	let userTokenCountCLAUDE   = 0
+	let userTokenCountGPT      = 0
+	let userPromptCountCLAUDE  = 0
+	let userPromptCountGPT     = 0
+	
+	let otherTokenCountCLAUDE = 0 
+	let otherTokenCountGPT = 0 
+	let otherPromptCountCLAUDE = 0 
+	let otherPromptCountGPT = 0 
+	data["users"].forEach(user => { 
+		if (user.token != userItself) {
+			otherTokenCountCLAUDE += user.tokenClaudeCount
+			otherTokenCountGPT    += user.tokenGptCount
+			otherPromptCountCLAUDE+= user.promptClaudeCount
+			otherPromptCountGPT   += user.promptGptCount
+		} else {
+			if (user.type != "temp") {
+				userTokenCountCLAUDE = user.tokenClaudeCount
+				userTokenCountGPT    = user.tokenGptCount
+				userPromptCountCLAUDE= user.promptClaudeCount
+				userPromptCountGPT   = user.promptGptCount
+			}
+		}
+	})
+
+	
+	const ctx1 = document.getElementById('tokenChart');
+	const ctx2 = document.getElementById('promptChart');
+
+	display("Total Tokens", [userTokenCountGPT,userTokenCountCLAUDE,otherTokenCountGPT,otherTokenCountCLAUDE], ctx1)
+	display("Total Prompts", [userPromptCountGPT,userPromptCountCLAUDE,otherPromptCountGPT,otherPromptCountCLAUDE], ctx2)
+
+	
+  })
+  .catch(error => {
+	
+  });
+
+
+function display(name, tdata, selector) {
+	const data = {
+	  labels: [
+		'You GPT',
+		'You Claude',
+		'Other GPT',
+		'Other Claude'
+	  ],
+	  datasets: [{
+		label: name,
+		data: tdata,
+		backgroundColor: [
+		  'rgb(116, 170, 156)',
+		  'rgb(212, 163, 127)',
+		  'rgb(47, 77, 69)',
+		  'rgb(94, 71, 54)'
+		  
+		],
+		hoverOffset: 5
+	  }]
+	};
+
+	const config = {
+	  type: 'pie',
+	  data: data,
+	};
+	new Chart(selector, config);
+}
+
+</script>
 
 
 

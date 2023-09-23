@@ -79,8 +79,45 @@ export const ipLimiter = async (
   // Get Custom rate limit for token 
   if (req.user?.token || "undefined" != "undefined") {
 	   customLimit = req.user?.rateLimit ?? RATE_LIMIT;
-	   customLimit+= 2; // don't ask.
   }
+  
+  // Restrict models 
+  let allowContinue = true; 
+  if (req.user?.token || "undefined" != "undefined") {
+	  if (req.body.model.startsWith("gpt-")) {
+		if (req.body.model.includes("bison")) {
+			if (!req.user?.allowPalm) {
+				allowContinue = false 
+			}
+		} else if (req.body.model.includes("j2-ultra")) {
+			if (!req.user?.allowAi21) {
+				allowContinue = false 
+			}
+		} else {
+			if (!req.user?.allowGpt) {
+				allowContinue = false 
+			}
+		}
+		
+	  } else if (req.body.model.startsWith("claude-")) {
+		if (!req.user?.allowClaude) {
+			allowContinue = false
+		}
+	  }
+   }
+
+  // Display model Restriction message 
+  if (!allowContinue) {
+    res.status(200).json({
+      error: {
+        type: "proxy_rate_limited",
+        message: config.restrictedModelMessage,
+      },
+    });
+  
+  
+  }
+  
 
   const { remaining, reset } = getStatus(rateLimitKey, customLimit);
   res.set("X-RateLimit-Limit", customLimit.toString());
@@ -100,7 +137,7 @@ export const ipLimiter = async (
         )} seconds.`,
       },
     });
-  } else {
+  } else if (allowContinue) {
     next();
   }
 };

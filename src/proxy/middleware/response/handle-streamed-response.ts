@@ -40,6 +40,8 @@ type AnthropicCompletionResponse = {
  * compatible requests and translates the received Anthropic SSE events into
  * OpenAI ones, essentially pretending to be an OpenAI streaming API.
  */
+ 
+// TODO: Streaming responses for Bison/Ai21 
 export const handleStreamedResponse: RawResponseBodyHandler = async (
   proxyRes,
   req,

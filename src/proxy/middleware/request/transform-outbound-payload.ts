@@ -27,6 +27,7 @@ const AnthropicV1CompleteSchema = z.object({
   metadata: z.any().optional(),
 });
 
+  
 // https://platform.openai.com/docs/api-reference/chat/create
 const OpenAIV1ChatCompletionSchema = z.object({
   model: z.string().regex(/^gpt/, "Model must start with 'gpt-'"),
@@ -66,6 +67,87 @@ const OpenAIV1ChatCompletionSchema = z.object({
   user: z.string().optional(),
 });
 
+// Text 
+const OpenAIV1TextCompletionSchema = z
+  .object({
+    model: z
+      .string()
+      .regex(
+        /^gpt-3.5-turbo-instruct/,
+        "Model must start with 'gpt-3.5-turbo-instruct'"
+      ),
+    prompt: z.string({
+      required_error:
+        "No `prompt` found. Ensure you've set the correct completion endpoint.",
+    }),
+    logprobs: z.number().int().nullish().default(null),
+    echo: z.boolean().optional().default(false),
+    best_of: z.literal(1).optional(),
+    stop: z.union([z.string(), z.array(z.string()).max(4)]).optional(),
+    suffix: z.string().optional(),
+  })
+  .merge(OpenAIV1ChatCompletionSchema.omit({ messages: true }));
+
+// https://developers.generativeai.google/api/python/google/generativeai/generate_text
+const PalmChatCompletionSchema = z.object({
+  model: z.string(),
+  messages: z.array(
+    z.object({
+      role: z.enum(["system", "user", "assistant"]),
+      content: z.string(),
+      name: z.string().optional(),
+    }),
+    {
+      required_error:
+        "No prompt found. Are you sending an Anthropic-formatted request to the OpenAI endpoint?",
+      invalid_type_error:
+        "Messages were not formatted correctly. Refer to the OpenAI Chat API documentation for more information.",
+    }
+  ),
+  
+  temperature: z.number().optional().default(1),
+  candidate_count: z.number().optional().default(1),
+  stop_sequences: z.union([z.string(), z.array(z.string())]).optional(),
+  max_output_tokens: z.coerce
+    .number()
+    .int()
+    .optional()
+    .default(16)
+    .transform((v) => Math.max(v, OPENAI_OUTPUT_MAX)),
+  top_p: z.number().optional(),
+  top_k: z.number().optional()
+});
+
+const Ai21ChatCompletionSchema = z.object({
+  model: z.string(),
+  prompt: z.string().optional(),
+  messages: z.array(
+    z.object({
+      role: z.enum(["system", "user", "assistant"]),
+      content: z.string(),
+      name: z.string().optional(),
+    }),
+    {
+      required_error:
+        "No prompt found. Are you sending an Anthropic-formatted request to the OpenAI endpoint?",
+      invalid_type_error:
+        "Messages were not formatted correctly. Refer to the OpenAI Chat API documentation for more information.",
+    }
+  ),
+  temperature: z.number().optional().default(1),
+  numResults: z.number().optional().default(1),
+  stop_sequences: z.union([z.string(), z.array(z.string())]).optional(),
+  maxTokens: z.coerce
+    .number()
+    .int()
+    .optional()
+    .default(16)
+    .transform((v) => Math.max(v, OPENAI_OUTPUT_MAX)),
+  topP: z.number().optional(),
+  topKReturn: z.number().optional()
+});
+
+
 /** Transforms an incoming request body to one that matches the target API. */
 export const transformOutboundPayload: RequestPreprocessor = async (req) => {
   const sameService = req.inboundApi === req.outboundApi;
@@ -80,7 +162,9 @@ export const transformOutboundPayload: RequestPreprocessor = async (req) => {
     const validator =
       req.outboundApi === "openai"
         ? OpenAIV1ChatCompletionSchema
-        : AnthropicV1CompleteSchema;
+		: req.outboundApi === "anthropic"
+		? AnthropicV1CompleteSchema
+		: OpenAIV1TextCompletionSchema;
     const result = validator.safeParse(req.body);
     if (!result.success) {
       req.log.error(
@@ -93,8 +177,25 @@ export const transformOutboundPayload: RequestPreprocessor = async (req) => {
     return;
   }
 
+
+
+  //if (req.inboundApi === "openai" && req.outboundApi === "openai-text") {
+  //  req.body = openaiToOpenaiText(req);
+  //  return;
+  //}
+  
   if (req.inboundApi === "openai" && req.outboundApi === "anthropic") {
     req.body = await openaiToAnthropic(req.body, req);
+    return;
+  }
+  
+  if (req.inboundApi === "openai" && req.outboundApi === "palm") {
+    req.body = await openaiToPalm(req.body, req);
+    return;
+  }
+  
+  if (req.inboundApi === "openai" && req.outboundApi === "ai21") {
+    req.body = await openaiToAi21(req.body, req);
     return;
   }
 
@@ -102,6 +203,137 @@ export const transformOutboundPayload: RequestPreprocessor = async (req) => {
     `'${req.inboundApi}' -> '${req.outboundApi}' request proxying is not supported. Make sure your client is configured to use the correct API.`
   );
 };
+
+async function openaiToAi21(body: any, req: Request) {
+
+  const result = Ai21ChatCompletionSchema.safeParse(body);
+   
+  if (!result.success) {
+    req.log.error(
+      { issues: result.error.issues, body: req.body },
+      "Invalid OpenAI-to-Ai21 request"
+    );
+    throw result.error;
+  }
+
+  const { messages, ...rest } = result.data;
+  const prompt = openAIMessagesToClaudePrompt(messages);
+
+  let stops = rest.stop_sequences
+    ? Array.isArray(rest.stop_sequences)
+      ? rest.stop_sequences
+      : [rest.stop_sequences]
+    : [];
+
+  stops.push("\n\nHuman:");
+  stops.push("\n\nSystem:");
+  stops = [...new Set(stops)];
+  
+
+
+  return {
+    ...rest,
+	model: "j2-ultra",
+    prompt: prompt,
+    stopSequences: stops,
+  };
+}
+
+function openaiToOpenaiText(req: Request) {
+  const { body } = req;
+  const result = OpenAIV1ChatCompletionSchema.safeParse(body);
+  if (!result.success) {
+    req.log.error(
+      { issues: result.error.issues, body },
+      "Invalid OpenAI-to-OpenAI-text request"
+    );
+    throw result.error;
+  }
+
+  const { messages, ...rest } = result.data;
+  const prompt = flattenOpenAiChatMessages(messages);
+
+  let stops = rest.stop
+    ? Array.isArray(rest.stop)
+      ? rest.stop
+      : [rest.stop]
+    : [];
+  stops.push("\n\nUser:");
+  stops = [...new Set(stops)];
+
+  const transformed = { ...rest, prompt: prompt, stop: stops };
+  const validated = OpenAIV1TextCompletionSchema.parse(transformed);
+  return validated;
+}
+
+async function openaiToPalm(body: any, req: Request) {
+  const result = PalmChatCompletionSchema.safeParse(body);
+  
+  
+  if (!result.success) {
+    req.log.error(
+      { issues: result.error.issues, body: req.body },
+      "Invalid OpenAI-to-Palm request"
+    );
+    throw result.error;
+  }
+
+  const { messages, ...rest } = result.data;
+  const prompt = { text: openAIMessagesToClaudePrompt(messages) };
+
+  let stops = rest.stop_sequences
+    ? Array.isArray(rest.stop_sequences)
+      ? rest.stop_sequences
+      : [rest.stop_sequences]
+    : [];
+  // Recommended by Anthropic
+  stops.push("\n\nHuman:");
+  // Helps with jailbreak prompts that send fake system messages and multi-bot
+  // chats that prefix bot messages with "System: Respond as <bot name>".
+  stops.push("\n\nSystem:");
+  // Remove duplicates
+  stops = [...new Set(stops)];
+  
+  let model_choice = "text-bison-001"
+  if (req.body?.model !== undefined) {
+  }
+
+  return {
+    ...rest,
+    // Model may be overridden in `calculate-context-size.ts` to avoid having
+    // a circular dependency (`calculate-context-size.ts` needs an already-
+    // transformed request body to count tokens, but this function would like
+    // to know the count to select a model).
+    model: model_choice,
+    prompt: prompt,
+	safety_settings: [
+{
+  "category": "HARM_CATEGORY_DEROGATORY",
+  "threshold": 4
+},
+{
+  "category": "HARM_CATEGORY_TOXICITY",
+  "threshold": 4
+},
+{
+  "category": "HARM_CATEGORY_VIOLENCE",
+  "threshold": 4
+},
+{
+  "category": "HARM_CATEGORY_SEXUAL",
+  "threshold": 4
+},
+{
+  "category": "HARM_CATEGORY_MEDICAL",
+  "threshold": 4
+},
+{
+  "category": "HARM_CATEGORY_DANGEROUS",
+  "threshold": 4
+}],
+    stop_sequences: stops,
+  };
+}
 
 async function openaiToAnthropic(body: any, req: Request) {
   const result = OpenAIV1ChatCompletionSchema.safeParse(body);
@@ -121,7 +353,8 @@ async function openaiToAnthropic(body: any, req: Request) {
   req.headers["anthropic-version"] = "2023-01-01";
   
   const { messages, ...rest } = result.data;
-  const prompt = openAIMessagesToClaudePrompt(messages);
+  const prompt = { text : ""}
+  prompt.text = openAIMessagesToClaudePrompt(messages);
 
   let stops = rest.stop
     ? Array.isArray(rest.stop)
@@ -169,4 +402,43 @@ export function openAIMessagesToClaudePrompt(messages: OpenAIPromptMessage[]) {
       })
       .join("") + "\n\nAssistant:"
   );
+}
+
+
+
+function flattenOpenAiChatMessages(messages: OpenAIPromptMessage[]) {
+  // Temporary to allow experimenting with prompt strategies
+  const PROMPT_VERSION: number = 1;
+  switch (PROMPT_VERSION) {
+    case 1:
+      return (
+        messages
+          .map((m) => {
+            // Claude-style human/assistant turns
+            let role: string = m.role;
+            if (role === "assistant") {
+              role = "Assistant";
+            } else if (role === "system") {
+              role = "System";
+            } else if (role === "user") {
+              role = "User";
+            }
+            return `\n\n${role}: ${m.content}`;
+          })
+          .join("") + "\n\nAssistant:"
+      );
+    case 2:
+      return messages
+        .map((m) => {
+          // Claude without prefixes (except system) and no Assistant priming
+          let role: string = "";
+          if (role === "system") {
+            role = "System: ";
+          }
+          return `\n\n${role}${m.content}`;
+        })
+        .join("");
+    default:
+      throw new Error(`Unknown prompt version: ${PROMPT_VERSION}`);
+  }
 }

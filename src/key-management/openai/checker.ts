@@ -141,6 +141,45 @@ export class OpenAIKeyChecker {
     this.timeout = setTimeout(() => this.checkKey(oldestKey), delay);
   }
 
+
+  private async getOrganization(key: OpenAIKey) {
+	  const payload = {
+      model: "gpt-3.5-turbo",
+      max_tokens: -1,
+      messages: [{ role: "user", content: "" }],
+    };
+    const { headers, data } = await axios.post<OpenAIError>(
+      POST_CHAT_COMPLETIONS_URL,
+      payload,
+      {
+        headers: {
+			Authorization: `Bearer ${key.key}`,
+			...(key.org !== 'default' ? { 'OpenAI-Organization': key.org } : {})
+    },
+        validateStatus: (status) => status === 400,
+      }
+    );
+
+    let orgName = headers["openai-organization"];
+	
+	if (orgName.match("user") || orgName.match("personal")) {
+		orgName = "default"
+	}
+	
+	const updates = {
+	  org: orgName,
+	};
+	this.updateKey(key.hash, updates);
+
+    // invalid_request_error is the expected error
+    if (data.error.type !== "invalid_request_error") {
+      this.log.warn(
+        { key: key.hash, error: data },
+        "Unexpected 400 error class while checking key; assuming key is valid, but this may indicate a change in the API."
+      );
+    } 
+  }
+
   private async checkKey(key: OpenAIKey) {
     // It's possible this key might have been disabled while we were waiting
     // for the next check.
@@ -162,6 +201,7 @@ export class OpenAIKeyChecker {
             // this.getSubscription(key),
             this.getProvisionedModels(key),
             this.testLiveness(key),
+			this.getOrganization(key)
           ]
 		  );
 		  
@@ -235,7 +275,10 @@ export class OpenAIKeyChecker {
     });
     return { turbo, gpt4, gpt432k };
   }
-
+  
+  
+  
+  
   private async getSubscription(key: OpenAIKey) {
     const { data } = await axios.get<GetSubscriptionResponse>(
       GET_SUBSCRIPTION_URL,
@@ -355,9 +398,14 @@ export class OpenAIKeyChecker {
 	if (Array.isArray(data.data)) {
 		await data.data.forEach((item: any) => {
 			if (item["is_default"] == false) {
+				let orgName = item["name"]
+				if (orgName.match("user") || orgName.match("personal")) {
+					orgName = "default"
+				}
+				
 			    this.createKey({
 					key: key.key,
-					org: item["name"], 
+					org: orgName, 
 					service: "openai" as const,
 					isGpt4: true,
 					isGpt432k: false,
@@ -386,6 +434,8 @@ export class OpenAIKeyChecker {
 	} 
     return true;
   }
+  
+
    
   private async testLiveness(key: OpenAIKey): Promise<{ rateLimit: number }> {
     const payload = {
@@ -404,6 +454,8 @@ export class OpenAIKeyChecker {
         validateStatus: (status) => status === 400,
       }
     );
+	
+	
     const rateLimitHeader = headers["x-ratelimit-limit-requests"];
     const rateLimit = parseInt(rateLimitHeader) || 3500; // trials have 200
 

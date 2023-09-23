@@ -1,9 +1,11 @@
 import type * as http from "http";
 import { AnthropicKeyProvider, AnthropicKeyUpdate } from "./anthropic/provider";
+import { PalmKeyProvider, PalmKeyUpdate } from "./palm/provider";
+import { Ai21KeyProvider, Ai21KeyUpdate } from "./ai21/provider";
 import { Key, Model, KeyProvider, AIService } from "./index";
 import { OpenAIKeyProvider, OpenAIKeyUpdate } from "./openai/provider";
 
-type AllowedPartial = OpenAIKeyUpdate | AnthropicKeyUpdate;
+type AllowedPartial = OpenAIKeyUpdate | AnthropicKeyUpdate | PalmKeyUpdate | Ai21KeyUpdate;
 
 export class KeyPool {
   private keyProviders: KeyProvider[] = [];
@@ -11,38 +13,48 @@ export class KeyPool {
   constructor() {
     this.keyProviders.push(new OpenAIKeyProvider());
     this.keyProviders.push(new AnthropicKeyProvider());
+	this.keyProviders.push(new PalmKeyProvider());
+	this.keyProviders.push(new Ai21KeyProvider());
   }
   
   
-
   public init() {
     this.keyProviders.forEach((provider) => provider.init());
     const availableKeys = this.available("all");
     if (availableKeys === 0) {
       throw new Error(
-        "No keys loaded. Ensure either OPENAI_KEY or ANTHROPIC_KEY is set."
+        "No keys loaded. Ensure either OPENAI_KEY or ANTHROPIC_KEY or PALM_KEY or AI21_KEY is set."
       );
     }
   }
   
   public getKeysSafely() {
-
 	const openaiKeys = this.keyProviders[0].getAllKeys();
 	const anthropipcKeys = this.keyProviders[1].getAllKeys();
+	const palmKeys = this.keyProviders[2].getAllKeys();
+	const ai21Keys = this.keyProviders[3].getAllKeys();
 
-	const combinedKeys = Array.prototype.concat.call(openaiKeys, anthropipcKeys);
+	const combinedKeys = Array.prototype.concat.call(openaiKeys, anthropipcKeys, palmKeys, ai21Keys);
 	return combinedKeys;
   }
   
   public addKey(key: string) {
 	  const openaiProvider = this.keyProviders[0]
 	  const anthropicProvider = this.keyProviders[1]
+	  const palmProvider = this.keyProviders[2]
+	  const ai21Provider = this.keyProviders[3]
+	  
 	  let val = false
 	  if (key.includes("sk-ant-api")) {
 		val = anthropicProvider.addKey(key);
 	  } else if (key.includes("sk-")) {
 		val = openaiProvider.addKey(key);
+	  } else if (key.includes("AIzaSy")) {
+		val = palmProvider.addKey(key);
+	  } else {
+		  val = ai21Provider.addKey(key);
 	  }
+
 	  return val;
 	  
   }
@@ -50,12 +62,21 @@ export class KeyPool {
   public deleteKeyByHash(keyHash: string) {
 	const openaiProvider = this.keyProviders[0]
 	const anthropicProvider = this.keyProviders[1]
+	const palmProvider = this.keyProviders[2]
+	const ai21Provider = this.keyProviders[3]
+	
 	const prefix = keyHash.substring(0, 3);
 	if (prefix === 'oai') {
 		openaiProvider.deleteKeyByHash(keyHash);
 		return true 
 	} else if (prefix === 'ant') { 
     	anthropicProvider.deleteKeyByHash(keyHash);
+		return true 
+	} else if (prefix === 'plm') { 
+    	palmProvider.deleteKeyByHash(keyHash);
+		return true 
+	} else if (prefix === 'ai2') { 
+    	ai21Provider.deleteKeyByHash(keyHash);
 		return true 
 	} else {
 		// Nothing invalid key, shouldn't be possible (Maybe in future handle error)
@@ -148,13 +169,18 @@ export class KeyPool {
   }
 
   private getService(model: Model): AIService {
-    if (model.startsWith("gpt")) {
-      // https://platform.openai.com/docs/models/model-endpoint-compatibility
+	  
+	if (model.includes("bison")) { // Cause gpt-text-bison .-. 
+	  return "palm";
+	} else if (model.startsWith("j2-")) {
+      return "ai21";
+    } else if (model.startsWith("gpt")) {
       return "openai";
     } else if (model.startsWith("claude-")) {
       // https://console.anthropic.com/docs/api/reference#parameters
       return "anthropic";
     }
+	
     throw new Error(`Unknown service for model '${model}'`);
   }
 

@@ -4,14 +4,19 @@ import { ZodError } from "zod";
 
 const OPENAI_CHAT_COMPLETION_ENDPOINT = "/v1/chat/completions";
 const ANTHROPIC_COMPLETION_ENDPOINT = "/v1/complete";
+const PALM_COMPLETION_ENDPOINT = "/proxy/palm/chat/completions";
+const AI21_COMPLETION_ENDPOINT = "/proxy/ai21/chat/completions";
+
+
 
 /** Returns true if we're making a request to a completion endpoint. */
 export function isCompletionRequest(req: Request) {
   return (
     req.method === "POST" &&
-    [OPENAI_CHAT_COMPLETION_ENDPOINT, ANTHROPIC_COMPLETION_ENDPOINT].some(
-      (endpoint) => req.path.startsWith(endpoint)
-    )
+    (req.path === null ||
+      [OPENAI_CHAT_COMPLETION_ENDPOINT, ANTHROPIC_COMPLETION_ENDPOINT, PALM_COMPLETION_ENDPOINT, AI21_COMPLETION_ENDPOINT].some(
+        (endpoint) => req.path.startsWith(endpoint)
+      ))
   );
 }
 
@@ -45,9 +50,6 @@ export function writeErrorResponse(
     res.write(`data: [DONE]\n\n`);
     res.end();
   } else {
-    if (req.debug) {
-      errorPayload.error.proxy_tokenizer_debug_info = req.debug;
-    }
     res.status(statusCode).json(errorPayload);
   }
 }

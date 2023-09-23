@@ -141,6 +141,89 @@ router.get("/view-user/:token", (req, res) => {
   res.render("admin/view-user", { user });
 });
 
+
+router.post("/edit-user/:token", (req, res) => {
+  let user = userStore.getUser(req.params.token);
+  
+  if (!user) {
+    return res.status(404).send("User not found");
+  }
+  
+  const edit_type = req.body.toEdit
+  const edit_value = req.body.valueOfEdit
+  
+  if (edit_type == "Token") {
+    userStore.updateToken(user,  edit_value);
+	user = userStore.getUser(edit_value);
+	if (!user) {
+		return res.status(404).send("Token Change Failed");
+	}
+	
+  }
+  
+  if (edit_type == "Type") { // Other types in future ;v 
+	if (edit_value == "normal") {
+		user.type = "normal" 
+	}
+	else if (edit_value == "temp") {
+		user.type = "temp" 
+	}
+  }
+  
+  if (edit_type === "Disabled Reason") {
+	 user.disabledReason = edit_value;
+  }
+  
+  if (edit_type === "Rate Limit") {
+	  const rateLimitValue = parseInt(edit_value);
+	  if (!isNaN(rateLimitValue)) {
+		user.rateLimit = rateLimitValue;
+  }}
+  
+  if (edit_type === "Prompt Limit") {
+	  const promptLimit = parseInt(edit_value);
+	  if (!isNaN(promptLimit)) {
+		user.promptLimit = promptLimit;
+  }}
+  
+  if (edit_type === "Time Limit	") {
+	  const timeLimit = parseInt(edit_value);
+	  if (!isNaN(timeLimit)) {
+		user.timeLimit = timeLimit;
+  }}
+  
+  if (edit_type === "End Time Limit") {
+	  const endTimeLimit = parseInt(edit_value);
+	  if (!isNaN(endTimeLimit)) {
+		user.endTimeLimit = endTimeLimit;
+  }}
+  
+  if (edit_type === "Note") {
+	  if (edit_value != "") {
+		user.note = edit_value;
+  }}
+  
+  
+  if (edit_type === "Claude") {
+		user.allowClaude = Boolean(edit_value);
+  }
+  
+  if (edit_type == "Gpt") {
+		user.allowGpt = Boolean(edit_value);
+  }
+  
+  if (edit_type == "Ai21") {
+		user.allowAi21 = Boolean(edit_value);
+  }
+  
+  if (edit_type == "Palm") {
+	user.allowPalm = Boolean(edit_value);
+  }
+
+
+  res.render("admin/view-user", { user });
+});
+
 router.get("/list-users", (req, res) => {
   const sort = parseSort(req.query.sort) || ["promptGptCount", "lastUsedAt"];
   
@@ -211,6 +294,7 @@ router.post("/import-users", upload.single("users"), (req, res) => {
   return newUser;
 });
   const result = z.array(UserSchemaWithToken).safeParse(data.users);
+
   if (!result.success) {
     return res.status(400).json({ error: result.error });
   }
@@ -240,14 +324,7 @@ router.get("/", (_req, res) => {
   });
 });
 
-router.post("/edit-user/:token", (req, res) => {
-  const result = UserSchema.safeParse(req.body);
-  if (!result.success) {
-    return res.status(400).send(result.error);
-  }
-  userStore.upsertUser({ ...result.data, token: req.params.token });
-  return res.sendStatus(204);
-});
+
 
 router.post("/reactivate-user/:token", (req, res) => {
   const user = userStore.getUser(req.params.token);

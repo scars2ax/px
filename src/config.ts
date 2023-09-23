@@ -1,7 +1,14 @@
 import dotenv from "dotenv";
 import type firebase from "firebase-admin";
 import pino from "pino";
+import crypto from 'crypto';
+
 dotenv.config();
+
+
+function generateSalt(length: number): string {
+  return crypto.randomBytes(Math.ceil(length / 2)).toString('hex').slice(0, length);
+}
 
 // Can't import the usual logger here because it itself needs the config.
 const startupLogger = pino({ level: "debug" }).child({ module: "startup" });
@@ -14,15 +21,20 @@ export type DequeueMode = "fair" | "random" | "none";
 type Config = {
   /** Custom Accept Reject Responses */
   responseOnUnauthorized: string;
-  
+  restrictedModelMessage: string;
   page_body?: string;
   promptInjections?: object;
   /** The port the proxy server will listen on. */
   port: number;
   /** Comma-delimited list of OpenAI API keys. */
   openaiKey?: string;
+  /** Comma-delimited list of Palm API keys */
+  palmKey?: string;
+  /** Comma-delimited list of Ai21 API keys  */
+  ai21Key?: string; 
   /** Comma-delimited list of Anthropic API keys. */
   anthropicKey?: string;
+  salt: string;
   /**
    * The proxy key to require for requests. Only applicable if the user
    * management mode is set to 'proxy_key', and required if so.
@@ -145,9 +157,13 @@ type Config = {
 // See .env.example for an example.
 export const config: Config = {
   port: getEnvWithDefault("PORT", 7860),
+  salt: generateSalt(16),
   responseOnUnauthorized: getEnvWithDefault("RESPONSE_ON_UNAUTHORIZED", "Unauthorized Access"),
+  restrictedModelMessage: getEnvWithDefault("RESTRICTED_MODEL_MESSAGE", "You are not allowed to use this type of models."),
   openaiKey: getEnvWithDefault("OPENAI_KEY", ""),
-  page_body: atob(getEnvWithDefault("PAGE_BODY", "YDwhRE9DVFlQRSBodG1sPgo8aHRtbCBsYW5nPSJlbiI+CiAgPGhlYWQ+CiAgICA8bWV0YSBjaGFyc2V0PSJ1dGYtOCIgLz4KICAgIDxtZXRhIG5hbWU9InJvYm90cyIgY29udGVudD0ibm9pbmRleCIgLz4KICAgIDx0aXRsZT57dGl0bGV9PC90aXRsZT4KICA8L2hlYWQ+CiAgPGJvZHkgc3R5bGU9ImZvbnQtZmFtaWx5OiBzYW5zLXNlcmlmOyBiYWNrZ3JvdW5kLWNvbG9yOiAjZjBmMGYwOyBwYWRkaW5nOiAxZW07Ij4KICAgIHtoZWFkZXJIdG1sfQogICAgPGhyIC8+CiAgICA8aDI+U2VydmljZSBJbmZvPC9oMj4KICAgIDxwcmU+e0pTT059PC9wcmU+CiAgPC9ib2R5PgogIDxiIGlkPSJ1YyI+CiAgPGEgaHJlZj0iL3VzZXIvbG9naW4iIHN0eWxlPSJiYWNrZ3JvdW5kLWNvbG9yOiAjNENBRjUwO2JvcmRlcjogbm9uZTtjb2xvcjogd2hpdGU7cGFkZGluZzogMTVweCAzMnB4O3RleHQtYWxpZ246IGNlbnRlcjt0ZXh0LWRlY29yYXRpb246IG5vbmU7ZGlzcGxheTogaW5saW5lLWJsb2NrO2ZvbnQtc2l6ZTogMTZweDttYXJnaW46IDRweCAycHg7Y3Vyc29yOiBwb2ludGVyOyIgaGlkZGVuPkNoZWNrIHVzZXJfdG9rZW48L2E+CiAgPC9iPgogIDxzY3JpcHQ+CiAgbGV0IGdhdGVrZWVwZXIgPSB7Y29uZmlnOmdhdGVrZWVwZXJ9CiAgaWYgKGdhdGVrZWVwZXIgPT0gInVzZXJfdG9rZW4iKSB7CiAgICBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgidWMiKS5oaWRkZW4gPSBmYWxzZTsKICB9CiAgPC9zY3JpcHQ+CjwvaHRtbD5gCg==")),
+  palmKey: getEnvWithDefault("PALM_KEY", ""),
+  ai21Key: getEnvWithDefault("AI21_KEY", ""),
+  page_body: atob(getEnvWithDefault("PAGE_BODY", "YDwhRE9DVFlQRSBodG1sPgo8aHRtbCBsYW5nPSJlbiI+CiAgPGhlYWQ+CiAgICA8bWV0YSBjaGFyc2V0PSJ1dGYtOCIgLz4KICAgIDxtZXRhIG5hbWU9InJvYm90cyIgY29udGVudD0ibm9pbmRleCIgLz4KICAgIDx0aXRsZT57dGl0bGV9PC90aXRsZT4KICA8L2hlYWQ+CiAgPGJvZHkgc3R5bGU9ImZvbnQtZmFtaWx5OiBzYW5zLXNlcmlmOyBiYWNrZ3JvdW5kLWNvbG9yOiAjZjBmMGYwOyBwYWRkaW5nOiAxZW07Ij4KICAgIHtoZWFkZXJIdG1sfQogICAgPGhyIC8+CiAgICA8aDI+U2VydmljZSBJbmZvPC9oMj4KICAgIDxwcmU+e0pTT059PC9wcmU+CiAgPC9ib2R5PgogIDxiIGlkPSJ1YyI+CiAgPGEgaHJlZj0iL3VzZXIvbG9naW4iIHRhcmdldD0iX2JsYW5rIiBzdHlsZT0iYmFja2dyb3VuZC1jb2xvcjogIzRDQUY1MDtib3JkZXI6IG5vbmU7Y29sb3I6IHdoaXRlO3BhZGRpbmc6IDE1cHggMzJweDt0ZXh0LWFsaWduOiBjZW50ZXI7dGV4dC1kZWNvcmF0aW9uOiBub25lO2Rpc3BsYXk6IGlubGluZS1ibG9jaztmb250LXNpemU6IDE2cHg7bWFyZ2luOiA0cHggMnB4O2N1cnNvcjogcG9pbnRlcjsiIGhpZGRlbj5DaGVjayB1c2VyX3Rva2VuPC9hPgogIDwvYj4KICA8c2NyaXB0PgogIGxldCBnYXRla2VlcGVyID0gIntjb25maWc6Z2F0ZWtlZXBlcn0iCiAgaWYgKGdhdGVrZWVwZXIgPT0gInVzZXJfdG9rZW4iKSB7CiAgICBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgidWMiKS5oaWRkZW4gPSBmYWxzZTsKICB9CiAgPC9zY3JpcHQ+CjwvaHRtbD5gCg==")),
   promptInjections: JSON.parse(atob(getEnvWithDefault("PROMPT_INJECTIONS", "e30="))),
   anthropicKey: getEnvWithDefault("ANTHROPIC_KEY", ""),
   proxyKey: getEnvWithDefault("PROXY_KEY", ""),
@@ -288,6 +304,8 @@ export const OMITTED_KEYS: (keyof Config)[] = [
   "port",
   "logLevel",
   "openaiKey",
+  "palmKey",
+  "ai21Key", 
   "anthropicKey",
   "proxyKey",
   "adminKey",
@@ -333,7 +351,7 @@ function getEnvWithDefault<T>(name: string, defaultValue: T): T {
     return defaultValue;
   }
   try {
-    if (name === "OPENAI_KEY" || name === "ANTHROPIC_KEY") {
+    if (name === "OPENAI_KEY" || name === "ANTHROPIC_KEY" || name === "PALM_KEY") {
       return value as unknown as T;
     }
     return JSON.parse(value) as T;

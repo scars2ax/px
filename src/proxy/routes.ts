@@ -10,6 +10,9 @@ import { checkRisuToken } from "./auth/check-risu-token";
 import { kobold } from "./kobold";
 import { openai } from "./openai";
 import { anthropic } from "./anthropic";
+import { palm } from "./palm";
+import { ai21 } from "./ai21";
+
 
 const proxyRouter = express.Router();
 proxyRouter.use(
@@ -26,4 +29,8 @@ proxyRouter.use((req, _res, next) => {
 proxyRouter.use("/kobold", kobold);
 proxyRouter.use("/openai", openai);
 proxyRouter.use("/anthropic", anthropic);
+proxyRouter.use("/palm", palm);
+proxyRouter.use("/ai21", ai21);
+
+
 export { proxyRouter as proxyRouter };
