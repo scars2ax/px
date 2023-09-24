@@ -153,12 +153,13 @@ router.post("/edit-user/:token", (req, res) => {
   const edit_value = req.body.valueOfEdit
   
   if (edit_type == "Token") {
-    userStore.updateToken(user,  edit_value);
-	user = userStore.getUser(edit_value);
-	if (!user) {
-		return res.status(404).send("Token Change Failed");
+    if (edit_value.length != 0) {
+		userStore.updateToken(user,  edit_value);
+		user = userStore.getUser(edit_value);
+		if (!user) {
+			return res.status(404).send("Token Change Failed");
+		}
 	}
-	
   }
   
   if (edit_type == "Type") { // Other types in future ;v 
