@@ -59,6 +59,7 @@ export const UserSchema = z
 	allowGpt: z.boolean().optional(),
 	allowClaude: z.boolean().optional(),
 	allowPalm: z.boolean().optional(),
+	note: z.string().optional(), 
 	allowAi21: z.boolean().optional(),
 	tokenHash: z.string().optional(),
     type: z.enum(["normal", "special", "temp"]).optional(),

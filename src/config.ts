@@ -303,6 +303,7 @@ export const SENSITIVE_KEYS: (keyof Config)[] = ["googleSheetsSpreadsheetId"];
 export const OMITTED_KEYS: (keyof Config)[] = [
   "port",
   "logLevel",
+  "salt",
   "openaiKey",
   "palmKey",
   "ai21Key", 

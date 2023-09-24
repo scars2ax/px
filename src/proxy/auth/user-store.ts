@@ -102,8 +102,8 @@ export function createUser(rLimit: any, pLimit: any) {
     promptCount: 0,
 	promptClaudeCount: 0,
 	promptGptCount: 0,
-	rateLimit: rLimit,
-	promptLimit: pLimit,
+	rateLimit: parseInt(rLimit),
+	promptLimit: parseInt(pLimit),
     tokenClaudeCount: 0,
 	tokenGptCount: 0,
 	allowGpt: true, 
@@ -129,9 +129,6 @@ function generateTempString(): string {
 }
 /** Creates a new temp user and returns their token. */
 export function createTempUser(pLimit: any, tLimit: any, rLimit: any) {
-  rLimit = parseInt(rLimit)
-  pLimit = parseInt(pLimit)
-  tLimit = parseInt(tLimit)  
   const token = "temp-"+generateTempString();
   users.set(token, {
     token,
@@ -148,9 +145,9 @@ export function createTempUser(pLimit: any, tLimit: any, rLimit: any) {
     promptCount: 0,
 	promptClaudeCount: 0,
 	promptGptCount: 0,
-	rateLimit: rLimit,
-	promptLimit: pLimit,
-	timeLimit: tLimit,
+	rateLimit: parseInt(rLimit),
+	promptLimit: parseInt(pLimit),
+	timeLimit: parseInt(tLimit),
 	endTimeLimit: -1,
     tokenClaudeCount: 0,
 	tokenGptCount: 0,
