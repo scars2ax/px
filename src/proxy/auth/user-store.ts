@@ -312,7 +312,12 @@ export function incrementPromptCount(token: string, model: string, user_ip: stri
 		if (count && typeof count === 'object' && count.hasOwnProperty(user_ip_hash)) {
 		  count[user_ip_hash] = count[user_ip_hash]+1;
 		  user.ipPromptCount.set(recentTimestamp, count);
+		 } else if (count && typeof count === 'object') {
+			 count[user_ip_hash] = 1;
+			 user.ipPromptCount.set(recentTimestamp, count);
 		 }
+
+
 	   }
 	   
 	}
