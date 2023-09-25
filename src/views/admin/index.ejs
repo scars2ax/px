@@ -1,22 +1,253 @@
-<%- include("../_partials/admin-header", { title: "OAI Reverse Proxy Admin" }) %>
-<h1>OAI Reverse Proxy Admin</h1>
-<% if (!isPersistenceEnabled) { %>
-<p style="color: red; background-color: #0f0f0f; padding: 1em">
-  <strong>⚠️ Users will be lost when the server restarts because persistence is
-  not configured.</strong><br />
-  <br />Be sure to export your users and import them again after restarting the
-  server if you want to keep them.<br />
-  <br /> See the <a target="_blank"
-  href="https://gitgud.io/khanon/oai-reverse-proxy/-/blob/main/docs/user-management.md#firebase-realtime-database">
-  user management documentation</a> to learn how to set up persistence.
-</p>
+<!DOCTYPE html> <html> <head> <title>User Info</title> <meta name="viewport" content="width=device-width, initial-scale=1"> 
+
+
+
+<style> 
+.header { background: linear-gradient(to bottom right, #8955c0, #4d0099); background-color: #8955c0; padding: 20px; text-align: center; } 
+html {
+  background-color: #1a1a1a;
+}
+body {
+  background-color: #1a1a1a;
+  color: white;
+}
+
+.box {
+  display: flex;
+  margin-bottom: 10px;
+}
+
+.key {
+  width: 33%;
+  background-color: #5a5a5a;
+  padding: 5px;
+}
+
+.value {
+  flex-grow: 1;
+  background-color: #3e3e3e;
+  padding: 5px;
+}
+.value2 {
+  flex-grow: 1;
+  background-color: #5e5e5e;
+  padding: 5px;
+}
+.value3 {
+  width: 100%;
+  background-color: #5e5e5e;
+  padding: 5px;
+}
+
+.chart-container {
+  position:relative;
+  min-height:auto;
+  width:100%;
+  display: flex;
+  flex-grow:1;
+}
+
+</style> 
+<script>
+if (window.location.href.includes("?")) {
+	let notValid = ''
+	if (window.location.href.split("?")[1].split("=")[0] == "notValid") {
+		notValid = window.location.href.split("?")[1].split("=")[1];
+	}
+
+	if (notValid.length > 16) {
+	  alert('Alias/Name can have max of 16 characters.');
+	  var url = window.location.href;
+	  var baseUrl = url.split('?')[0];
+	  window.location.href = baseUrl;
+	} else if (/[^A-Za-z0-9_\s]/.test(notValid)) {
+	  alert('Alias/Name contains special characters. Only A-Z, a-z, 0-9, space, and underscore are allowed.');
+	  var url = window.location.href;
+	  var baseUrl = url.split('?')[0];
+	  window.location.href = baseUrl;
+	} else {
+	}}
+</script>
+<script>
+  function askForName() {
+    var name = prompt("Please enter your name:");
+    if (name === null) {
+      // If the user cancels, set the default value
+      name = "Degenerate";
+    }
+    
+    // Set the value of a hidden input field with the entered name
+    var nameField = document.createElement("input");
+    nameField.setAttribute("type", "hidden");
+    nameField.setAttribute("name", "name");
+    nameField.setAttribute("value", name);
+    document.querySelector("form").appendChild(nameField);
+    
+    // Submit the form
+    document.querySelector("form").submit();
+  }
+</script>
+</head> 
+<body> 
+<% if (user.type === "normal") { %>
+  <div class="header"> 
+    <h1>User Info</h1> 
+  </div>
+  </body>
+  <br>
+  <div class="box">
+    <div class="key">Your Sha256:</div>
+    <div class="value"><%= user.tokenHash || "Not Available" %></div>
+  </div>
+  <div class="box">
+    <div class="key">Total Prompts:</div>
+    <div class="value"><%= user.promptCount %></div>
+  </div>
+  <% if (user.promptLimit != -1) { %>
+  <div class="box">
+    <div class="key">Daily Prompts Left:</div>
+    <div class="value"><%= user.promptCount-user.promptLimit %></div>
+  </div>
+  <div class="box">
+    <div class="key">Daily Limit Refills At:</div>
+    <div class="value"><%= new Date(user.endTimeLimit).toLocaleString() %></div>
+  </div>
+  
+  <% } %>
+  <div class="box">
+    <div class="key">Total Tokens Used:</div>
+    <div class="value"><%= user.tokenGptCount + user.tokenClaudeCount %></div>
+  </div>
+  <div class="box">
+    <div class="key">Amount of Unique Ip's overall:</div>
+    <div class="value"><%- user.ip.length %></div>
+  </div>
+  <div class="box">
+    <div class="key">Your Alias/Name</div>
+    <div class="value"><%= user.alias || "Degenerate" %></div>
+	<form class="value2" action="/user/manage/change-alias" method="POST">
+	   <input type="hidden" name="_csrf_user" value="<%= csrfTokenUser %>">
+	   <button class="value3" type="button" onclick="askForName()">Change</button>
+	</form>
+  </div>
+<% } else { %>
+	<div class="header"> 
+    <h1>User Info</h1> 
+  </div>
+  </body>
+  <br>
+  <div class="box">
+    <div class="key">Your Sha256:</div>
+    <div class="value"><%= user.tokenHash || "Not Available" %></div>
+  </div>
+  
+  <% if (user.promptLimit === -1) { %>
+	<div class="box">
+    <div class="key">Time Left:</div>
+	
+	<% if (user.endTimeLimit === -1) { %>
+		<div class="value">Not yet activated, use it once to start timer, ( <%= user.timeLimit/60 %> Minutes ) </div>
+	<% } else { %>
+		<div class="value">Expires at: <%= new Date(user.endTimeLimit).toLocaleString() %></div>
+	<% } %>
+	</div
+  
+  <% } else { %>
+	<div class="box">
+    <div class="key">Prompts Left:</div>
+    <div class="value"><%= user.promptLimit-user.promptCount %></div>
+	</div>
+  <% } %>
+
+  
 <% } %>
-<ul>
-  <li><a href="/admin/manage/list-users">List Users</a></li>
-  <li><a href="/admin/manage/create-user">Create User</a></li>
-  <li><a href="/admin/manage/import-users">Import Users</a></li>
-  <li><a href="/admin/manage/export-users">Export Users</a></li>
-  <li><a href="/admin/manage/key-manager">Key Manager</a></li>
-  <li><a href="/admin/manage/other">Other</a></li>
-</ul>
-<%- include("../_partials/admin-footer") %>
+
+<center>
+<div class="chart-container" style="position: relative; height:50vh; width:100%">
+<div style="position: relative; height:50vh; width:50%">Token Consumption<canvas id="tokenChart" width="400" height="400"></canvas></div>
+<div style="position: relative; height:50vh; width:50%">Prompt Consumption<canvas id="promptChart" width="400" height="400"></canvas></div>
+</div></center>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+var url = window.location.href;
+var sanitizedUrl = url.split('/')[0]; 
+var userItself = "<%= user.tokenHash %>"
+
+// Fetch data from URL
+fetch(sanitizedUrl+'/users-stats')
+  .then(response => response.json())
+  .then(data => {
+	let userTokenCountCLAUDE   = 0
+	let userTokenCountGPT      = 0
+	let userPromptCountCLAUDE  = 0
+	let userPromptCountGPT     = 0
+	
+	let otherTokenCountCLAUDE = 0 
+	let otherTokenCountGPT = 0 
+	let otherPromptCountCLAUDE = 0 
+	let otherPromptCountGPT = 0 
+	data["users"].forEach(user => { 
+		if (user.token != userItself) {
+			otherTokenCountCLAUDE += user.tokenClaudeCount
+			otherTokenCountGPT    += user.tokenGptCount
+			otherPromptCountCLAUDE+= user.promptClaudeCount
+			otherPromptCountGPT   += user.promptGptCount
+		} else {
+			if (user.type != "temp") {
+				userTokenCountCLAUDE = user.tokenClaudeCount
+				userTokenCountGPT    = user.tokenGptCount
+				userPromptCountCLAUDE= user.promptClaudeCount
+				userPromptCountGPT   = user.promptGptCount
+			}
+		}
+	})
+
+	
+	const ctx1 = document.getElementById('tokenChart');
+	const ctx2 = document.getElementById('promptChart');
+
+	display("Total Tokens", [userTokenCountGPT,userTokenCountCLAUDE,otherTokenCountGPT,otherTokenCountCLAUDE], ctx1)
+	display("Total Prompts", [userPromptCountGPT,userPromptCountCLAUDE,otherPromptCountGPT,otherPromptCountCLAUDE], ctx2)
+
+	
+  })
+  .catch(error => {
+	
+  });
+
+
+function display(name, tdata, selector) {
+	const data = {
+	  labels: [
+		'You GPT',
+		'You Claude',
+		'Other GPT',
+		'Other Claude'
+	  ],
+	  datasets: [{
+		label: name,
+		data: tdata,
+		backgroundColor: [
+		  'rgb(116, 170, 156)',
+		  'rgb(212, 163, 127)',
+		  'rgb(47, 77, 69)',
+		  'rgb(94, 71, 54)'
+		  
+		],
+		hoverOffset: 5
+	  }]
+	};
+
+	const config = {
+	  type: 'pie',
+	  data: data,
+	};
+	new Chart(selector, config);
+}
+
+</script>
+
+
+
+</html>
