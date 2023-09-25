@@ -93,10 +93,10 @@ function cacheInfoPageHtml(baseUrl: string) {
 		.replaceAll("{title}", title)
 		.replaceAll("{JSON}", JSON.stringify(temp_info, null, 2))
 		.replaceAll("{uptime}", info?.uptime?.toString())
-		 .replaceAll("{endpoints:openai}",info?.endpoints.openai ?? "Not Avaliable" )
-		 .replaceAll("{endpoints:anthropic}",info?.endpoints.anthropic ?? "Not Avaliable" )
-		 .replaceAll("{endpoints:ai21}",info?.endpoints.ai21 ?? "Not Avaliable" )
-		 .replaceAll("{endpoints:palm}",info?.endpoints.palm ?? "Not Avaliable" ) 
+		 .replaceAll("{endpoints:openai}",info?.endpoints.openai ?? "Not Available" )
+		 .replaceAll("{endpoints:anthropic}",info?.endpoints.anthropic ?? "Not Available" )
+		 .replaceAll("{endpoints:ai21}",info?.endpoints.ai21 ?? "Not Available" )
+		 .replaceAll("{endpoints:palm}",info?.endpoints.palm ?? "Not Available" ) 
 		 .replaceAll("{proompts}", info?.proompts?.toString() ?? "0")
 		 .replaceAll("{proomptersNow}",info?.proomptersNow?.toString() ?? "0")
 		 .replaceAll("{openaiKeys}", (substring: string) => info.openaiKeys.toString())
@@ -106,27 +106,27 @@ function cacheInfoPageHtml(baseUrl: string) {
 		 .replaceAll("{status}", (substring: string) => openai_info.status.toString() ?? "Checking finished")
 		 .replaceAll("{palm:activeKeys}", (substring: string) => palm_info.palm?.activeKeys?.toString() ?? "0")
 		 .replaceAll("{palm:proomptersInQueue}",(substring: string) => palm_info.palm?.proomptersInQueue?.toString() ?? "0")
-		 .replaceAll("{palm:estimatedQueueTime}", (substring: string) => palm_info.palm?.estimatedQueueTime?.toString() ?? "Not Avaliable ")
+		 .replaceAll("{palm:estimatedQueueTime}", (substring: string) => palm_info.palm?.estimatedQueueTime?.toString() ?? "Not Available")
 		 .replaceAll("{palm:revokedKeys}", (substring: string) => palm_info.palm?.revokedKeys?.toString() ?? "0")
 		 .replaceAll("{ai21:activeKeys}", (substring: string) => ai21_info.ai21?.activeKeys?.toString() ?? "0")
 		 .replaceAll("{ai21:proomptersInQueue}",(substring: string) => ai21_info.ai21?.proomptersInQueue?.toString() ?? "0")
-		 .replaceAll("{ai21:estimatedQueueTime}", (substring: string) => ai21_info.ai21?.estimatedQueueTime?.toString() ?? "Not Avaliable ")
+		 .replaceAll("{ai21:estimatedQueueTime}", (substring: string) => ai21_info.ai21?.estimatedQueueTime?.toString() ?? "Not Available")
 		 .replaceAll("{ai21:revokedKeys}", (substring: string) => ai21_info.ai21?.revokedKeys?.toString() ?? "0")
 		 .replaceAll("{turbo:activeKeys}", (substring: string) => openai_info.turbo?.activeKeys?.toString() ?? "0")
 		 .replaceAll("{turbo:proomptersInQueue}",(substring: string) => openai_info.turbo?.proomptersInQueue?.toString() ?? "0")
-		 .replaceAll("{turbo:estimatedQueueTime}", (substring: string) => openai_info.turbo?.estimatedQueueTime?.toString() ?? "Not Avaliable ")
+		 .replaceAll("{turbo:estimatedQueueTime}", (substring: string) => openai_info.turbo?.estimatedQueueTime?.toString() ?? "Not Available")
 		 .replaceAll("{turbo:revokedKeys}", (substring: string) => openai_info.turbo?.revokedKeys?.toString() ?? "0")
 		 .replaceAll("{turbo:overQuotaKeys}", (substring: string) => openai_info.turbo?.overQuotaKeys?.toString() ?? "0")
 		 .replaceAll("{gpt4:activeKeys}",(substring: string) => openai_info.gpt4?.activeKeys?.toString() ?? "0")
 		 .replaceAll("{gpt4:overQuotaKeys}",(substring: string) => openai_info.gpt4?.overQuotaKeys?.toString() ?? "0")
 		 .replaceAll("{gpt4:revokedKeys}",(substring: string) => openai_info.gpt4?.revokedKeys?.toString() ?? "0")
 		 .replaceAll("{gpt4:proomptersInQueue}",(substring: string) => openai_info.gpt4?.proomptersInQueue?.toString() ?? "0")
-		 .replaceAll("{gpt4:estimatedQueueTime}",(substring: string) => openai_info.gpt4?.estimatedQueueTime?.toString() ?? "No wait")
+		 .replaceAll("{gpt4:estimatedQueueTime}",(substring: string) => openai_info.gpt4?.estimatedQueueTime?.toString() ?? "Not Available")
 		 .replaceAll("{gpt432k:activeKeys}",(substring: string) => openai_info.gpt4_32k?.activeKeys?.toString() ?? "0")
 		 .replaceAll("{gpt432k:overQuotaKeys}",(substring: string) => openai_info.gpt4_32k?.overQuotaKeys?.toString() ?? "0")
 		 .replaceAll("{gpt432k:revokedKeys}",(substring: string) => openai_info.gpt4_32k?.revokedKeys?.toString() ?? "0")
 		 .replaceAll("{gpt432k:proomptersInQueue}",(substring: string) => openai_info.gpt4_32k?.proomptersInQueue?.toString() ?? "0")
-		 .replaceAll("{gpt432k:estimatedQueueTime}",(substring: string) => openai_info.gpt4_32k?.estimatedQueueTime?.toString() ?? "0")
+		 .replaceAll("{gpt432k:estimatedQueueTime}",(substring: string) => openai_info.gpt4_32k?.estimatedQueueTime?.toString() ?? "Not Available")
 		 .replaceAll("{globalTokenCount}",(substring: string) => getGlobalTokenCount().toString())
 		 .replaceAll("{openaiTokenCount}",(substring: string) => getOpenaiTokenCount().toString())
 		 .replaceAll("{anthropicTokenCount}",(substring: string) => getClaudeTokenCount().toString())
@@ -403,7 +403,7 @@ function getQueueInformation(partition: QueuePartition) {
         )}sec`;
   return {
     proomptersInQueue: getQueueLength(partition),
-    estimatedQueueTime: waitMs > 2000 ? waitTime : "no wait",
+    estimatedQueueTime: waitMs > 2000 ? waitTime : "No wait",
   };
 }
 
