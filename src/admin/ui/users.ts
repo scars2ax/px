@@ -172,7 +172,9 @@ router.post("/edit-user/:token", (req, res) => {
   }
   
   if (edit_type === "Disabled Reason") {
+    if (edit_value != null) {
 	 user.disabledReason = edit_value;
+    }
   }
   
   if (edit_type === "Rate Limit") {
@@ -200,7 +202,7 @@ router.post("/edit-user/:token", (req, res) => {
   }}
   
   if (edit_type === "Note") {
-	  if (edit_value != "") {
+	  if (edit_value != null) {
 		user.note = edit_value;
   }}
   
