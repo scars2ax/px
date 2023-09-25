@@ -291,10 +291,17 @@ export function incrementPromptCount(token: string, model: string, user_ip: stri
 	  const TimeStampInfo: { [user_ip_hash: string] : number; } = {};
 	  TimeStampInfo[user_ip_hash] = 1;
 	  user.ipPromptCount.set(Date.now().toString(), TimeStampInfo);
-  } else {
+  }  else {
+	 
+	  
 	  const timestamps = Array.from(user.ipPromptCount.keys()); // Convert the keys to an array
 	  const currentTimestamp: number = Number(Date.now());
 	  const recentTimestamp = timestamps.find(timestamp => Number(currentTimestamp) - Number(timestamp) <= oneHourInMillis);
+	  
+	  if (user.ipPromptCount.size >= 25) {
+		const oldestTimestamp = timestamps.reduce((oldest, current) => {return Number(current) < Number(oldest) ? current : oldest;});
+		user.ipPromptCount.delete(oldestTimestamp);
+	  }
 	  
 	  if (typeof recentTimestamp === 'undefined') {
 		  // Create TimestampInfo object
@@ -316,8 +323,6 @@ export function incrementPromptCount(token: string, model: string, user_ip: stri
 			 count[user_ip_hash] = 1;
 			 user.ipPromptCount.set(recentTimestamp, count);
 		 }
-
-
 	   }
 	   
 	}
