@@ -313,7 +313,10 @@ router.get("/other", (_req, res) => {
 
 router.get("/export-users.json", (_req, res) => {
   const users = userStore.getUsers();
-  const usersWithoutIPs = users.map(({ ip, ...rest }) => rest);
+  const usersWithoutIPs = users.map(({ ip, promptLimit, ...rest }) => ({
+  ...rest,
+  promptLimit: typeof promptLimit === 'number' ? promptLimit : parseInt(promptLimit || '0', 10)
+  }));
   res.setHeader("Content-Disposition", "attachment; filename=users.json");
   res.setHeader("Content-Type", "application/json");
   res.send(JSON.stringify({ users: usersWithoutIPs }, null, 2));
