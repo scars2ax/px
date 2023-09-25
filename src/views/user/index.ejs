@@ -120,7 +120,7 @@ if (window.location.href.includes("?")) {
   </div>
   <div class="box">
     <div class="key">Amount of Unique Ip's overall:</div>
-    <div class="value"><%= Array.from(user.ipPromptCount.values()).reduce((count, timestamps) => count + (timestamps.hasOwnProperty(user_ip) ? 1 : 0), 0) %></div>
+    <div class="value"><%- user.ip.length %></div>
   </div>
   <div class="box">
     <div class="key">Your Alias/Name</div>
