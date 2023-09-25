@@ -132,6 +132,7 @@ function cacheInfoPageHtml(baseUrl: string) {
 		 .replaceAll("{anthropicTokenCount}",(substring: string) => getClaudeTokenCount().toString())
 		 .replaceAll("{config:gatekeeper}",(substring: string) => info.config.gatekeeper).replace("{config:modelRateLimit}", (substring: string) => info.config.modelRateLimit?.toString())
 		 .replaceAll("{config:maxOutputTokensOpenAI}",(substring: string) => info.config.maxOutputTokensOpenAI.toString())
+		 .replaceAll("{config:maxOutputTokensAnthropic}",(substring: string) => info.config.maxOutputTokensAnthropic.toString())
 		 .replaceAll("{config:promptLogging}",(substring: string) => info.config.promptLogging)
 		 .replaceAll("{config:queueMode}", (substring: string) => info.config.queueMode.toString() ?? "Fair")
 		 .replaceAll("{build}",info.build)
