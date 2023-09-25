@@ -72,7 +72,7 @@ export class KeyPool {
 	} else if (prefix === 'ant') { 
     	anthropicProvider.deleteKeyByHash(keyHash);
 		return true 
-	} else if (prefix === 'plm') { 
+	} else if (prefix === 'palm') { 
     	palmProvider.deleteKeyByHash(keyHash);
 		return true 
 	} else if (prefix === 'ai2') { 
