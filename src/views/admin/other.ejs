@@ -25,6 +25,14 @@
     <button type="submit">Update</button>
   </form>
 </body>
+<a>Proxy Key (Won't work if not set to proxy_key):</a>
+<body>
+  <form action="/admin/manage/update-proxypass" method="POST">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+    <input type="text" name="proxy_password" placeholder="Enter string for new password...">
+    <button type="submit">Update</button>
+  </form>
+</body>
 
 
 <%- include("../_partials/admin-footer") %>

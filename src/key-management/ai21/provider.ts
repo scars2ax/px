@@ -111,8 +111,7 @@ export class Ai21KeyProvider implements KeyProvider<Ai21Key> {
         hash: `ai21-${crypto
           .createHash("sha256")
           .update(keyValue)
-          .digest("hex")
-          .slice(0, 8)}`,
+          .digest("hex")}`,
         lastChecked: 0,
       };
       this.keys.push(newKey);

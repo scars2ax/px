@@ -3,7 +3,6 @@ import { config } from "../../config";
 import { authenticate, getUser } from "./user-store";
 
 const GATEKEEPER = config.gatekeeper;
-const PROXY_KEY = config.proxyKey;
 const ADMIN_KEY = config.adminKey;
 
 function getProxyAuthorizationFromRequest(req: Request): string | undefined {
@@ -41,7 +40,7 @@ export const gatekeeper: RequestHandler = (req, res, next) => {
     return next();
   }
 
-  if (GATEKEEPER === "proxy_key" && token === PROXY_KEY) {
+  if (GATEKEEPER === "proxy_key" && token === config.proxyKey) {
     return next();
   }
 

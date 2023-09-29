@@ -111,8 +111,7 @@ export class PalmKeyProvider implements KeyProvider<PalmKey> {
         hash: `palm-${crypto
           .createHash("sha256")
           .update(keyValue)
-          .digest("hex")
-          .slice(0, 8)}`,
+          .digest("hex")}`,
         lastChecked: 0,
       };
       this.keys.push(newKey);

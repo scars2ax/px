@@ -62,6 +62,14 @@ router.post("/update-unauthresponse", (_req, res) => {
   return res.redirect(`/admin`);
 });
 
+router.post("/update-proxypass", (_req, res) => {
+  if (config.gatekeeper == "proxy_key") {
+	config.proxyKey = _req.body.proxy_password;
+  }
+  return res.redirect(`/admin`);
+});
+
+
 router.post("/recheck-keys", (_req, res) => {
   keyPool.recheck();
   
@@ -160,6 +168,7 @@ router.post("/edit-user/:token", (req, res) => {
 			return res.status(404).send("Token Change Failed");
 		}
 	}
+	
   }
   
   if (edit_type == "Type") { // Other types in future ;v 
@@ -202,7 +211,7 @@ router.post("/edit-user/:token", (req, res) => {
   }}
   
   if (edit_type === "Note") {
-	  if (edit_value != null) {
+	  if (edit_value != null && edit_value != "") {
 		user.note = edit_value;
   }}
   
@@ -318,7 +327,7 @@ router.get("/export-users.json", (_req, res) => {
   const usersWithoutIPs = users.map(({ ip, promptLimit, ...rest }) => ({
   ...rest,
   promptLimit: typeof promptLimit === 'number' ? promptLimit : parseInt(promptLimit || '0', 10)
-  }));
+}));
   res.setHeader("Content-Disposition", "attachment; filename=users.json");
   res.setHeader("Content-Type", "application/json");
   res.send(JSON.stringify({ users: usersWithoutIPs }, null, 2));
