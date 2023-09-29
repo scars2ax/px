@@ -21,6 +21,12 @@ type Config = {
   /** Comma-delimited list of Google PaLM API keys. */
   googlePalmKey?: string;
   /**
+   * Comma-delimited list of AWS credentials. Each credential item should be a
+   * semicolon-delimited list of access key, secret key, and AWS region.
+   * Example: `AWS_CREDENTIALS=access_key_1;secret_key_1;us-east-1,access_key_2;secret_key_2;us-west-2`
+   */
+  awsCredentials?: string;
+  /**
    * The proxy key to require for requests. Only applicable if the user
    * management mode is set to 'proxy_key', and required if so.
    */
@@ -142,6 +148,7 @@ export const config: Config = {
   openaiKey: getEnvWithDefault("OPENAI_KEY", ""),
   anthropicKey: getEnvWithDefault("ANTHROPIC_KEY", ""),
   googlePalmKey: getEnvWithDefault("GOOGLE_PALM_KEY", ""),
+  awsCredentials: getEnvWithDefault("AWS_CREDENTIALS", ""),
   proxyKey: getEnvWithDefault("PROXY_KEY", ""),
   adminKey: getEnvWithDefault("ADMIN_KEY", ""),
   gatekeeper: getEnvWithDefault("GATEKEEPER", "none"),
@@ -288,6 +295,7 @@ export const OMITTED_KEYS: (keyof Config)[] = [
   "openaiKey",
   "anthropicKey",
   "googlePalmKey",
+  "awsCredentials",
   "proxyKey",
   "adminKey",
   "checkKeys",
