@@ -7,7 +7,7 @@ const log = logger.child({ module: "sse-stream-adapter" });
 
 type SSEStreamAdapterOptions = TransformOptions & { isAwsStream?: boolean };
 type AwsEventStreamMessage = {
-  headers: { ":message-type": "event" | "error" };
+  headers: { ":message-type": "event" | "exception" };
   payload: { message?: string /** base64 encoded */; bytes?: string };
 };
 
@@ -33,19 +33,16 @@ export class ServerSentEventStreamAdapter extends Transform {
   }
 
   processAwsEvent(event: AwsEventStreamMessage): string | null {
-    if (event.headers[":message-type"] === "error") {
-      return `event: error\ndata: ${event.payload.message}\n\n`;
+    const { payload, headers } = event;
+    if (headers[":message-type"] === "exception" || !payload.bytes) {
+      log.error(
+        { event: JSON.stringify(event) },
+        "Received bad streaming event from AWS"
+      );
+      const message = JSON.stringify(event);
+      return getFakeErrorCompletion("proxy AWS error", message);
     } else {
-      if (!event.payload.bytes) {
-        log.error(
-          { event: JSON.stringify(event) },
-          "Received unparseable streaming event from AWS, skipping chunk"
-        );
-        return null;
-      }
-      return `data: ${Buffer.from(event.payload.bytes, "base64").toString(
-        "utf8"
-      )}`;
+      return `data: ${Buffer.from(payload.bytes, "base64").toString("utf8")}`;
     }
   }
 
@@ -71,4 +68,18 @@ export class ServerSentEventStreamAdapter extends Transform {
       callback(error);
     }
   }
+}
+
+function getFakeErrorCompletion(type: string, message: string) {
+  const content = `\`\`\`\n[${type}: ${message}]\n\`\`\`\n`;
+  const fakeEvent = {
+    log_id: "aws-proxy-sse-message",
+    stop_reason: type,
+    completion:
+      "\nProxy encountered an error during streaming response.\n" + content,
+    truncated: false,
+    stop: null,
+    model: "",
+  };
+  return `data: ${JSON.stringify(fakeEvent)}\n\n`;
 }
