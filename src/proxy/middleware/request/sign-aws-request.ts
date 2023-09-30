@@ -19,6 +19,9 @@ export const signAwsRequest: RequestPreprocessor = async (req) => {
   const { model, stream } = req.body;
   req.isStreaming = stream === true || stream === "true";
 
+  let preamble = req.body.prompt.startsWith("\n\nHuman:") ? "" : "\n\nHuman:";
+  req.body.prompt = preamble + req.body.prompt;
+
   // AWS supports only a subset of Anthropic's parameters and is more strict
   // about unknown parameters.
   // TODO: This should happen in transform-outbound-payload.ts
