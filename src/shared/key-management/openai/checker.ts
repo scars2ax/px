@@ -33,10 +33,10 @@ type UpdateFn = typeof OpenAIKeyProvider.prototype.update;
 
 export class OpenAIKeyChecker {
   private readonly keys: OpenAIKey[];
-  private log = logger.child({ module: "key-checker", service: "openai" });
-  private timeout?: NodeJS.Timeout;
   private cloneKey: CloneFn;
   private updateKey: UpdateFn;
+  private log = logger.child({ module: "key-checker", service: "openai" });
+  private timeout?: NodeJS.Timeout;
   private lastCheck = 0;
 
   constructor(keys: OpenAIKey[], cloneFn: CloneFn, updateKey: UpdateFn) {
