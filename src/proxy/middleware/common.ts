@@ -180,6 +180,13 @@ export function getCompletionFromBody(req: Request, body: Record<string, any>) {
     case "openai-text":
       return body.choices[0].text;
     case "anthropic":
+      if (!body.completion) {
+        req.log.error(
+          { body: JSON.stringify(body) },
+          "Received empty Anthropic completion"
+        );
+        return "";
+      }
       return body.completion.trim();
     case "google-palm":
       return body.candidates[0].output;
