@@ -29,7 +29,7 @@ export interface AwsBedrockKey extends Key, AwsBedrockKeyUsage {
  * Upon being rate limited, a key will be locked out for this many milliseconds
  * while we wait for other concurrent requests to finish.
  */
-const RATE_LIMIT_LOCKOUT = 2000;
+const RATE_LIMIT_LOCKOUT = 300;
 /**
  * Upon assigning a key, we will wait this many milliseconds before allowing it
  * to be used again. This is to prevent the queue from flooding a key with too
@@ -169,7 +169,7 @@ export class AwsBedrockKeyProvider implements KeyProvider<AwsBedrockKey> {
    * retrying in order to give the other requests a chance to finish.
    */
   public markRateLimited(keyHash: string) {
-    this.log.warn({ key: keyHash }, "Key rate limited");
+    this.log.debug({ key: keyHash }, "Key rate limited");
     const key = this.keys.find((k) => k.hash === keyHash)!;
     const now = Date.now();
     key.rateLimitedAt = now;
