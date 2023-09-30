@@ -1,9 +1,6 @@
 import { Transform, TransformOptions } from "stream";
 // @ts-ignore
 import { Parser } from "lifion-aws-event-stream";
-import { logger } from "../../../logger";
-
-const log = logger.child({ module: "sse-stream-adapter" });
 
 type SSEStreamAdapterOptions = TransformOptions & { isAwsStream?: boolean };
 type AwsEventStreamMessage = {
@@ -12,7 +9,7 @@ type AwsEventStreamMessage = {
 };
 
 /**
- * Receives either text chunks or AWS binary eventstream chunks and emits
+ * Receives either text chunks or AWS binary event stream chunks and emits
  * full SSE events.
  */
 export class ServerSentEventStreamAdapter extends Transform {
@@ -26,7 +23,6 @@ export class ServerSentEventStreamAdapter extends Transform {
 
     this.parser.on("data", (data: AwsEventStreamMessage) => {
       const message = this.processAwsEvent(data);
-      // log.debug({ data, message }, "Parsed AWS binary event");
       this.push(Buffer.from(message, "utf8"));
     });
   }
@@ -47,7 +43,7 @@ export class ServerSentEventStreamAdapter extends Transform {
         this.parser.write(chunk);
       } else {
         // We may receive multiple (or partial) SSE messages in a single chunk,
-        // so we need to buffer and emit seperate stream events for full
+        // so we need to buffer and emit separate stream events for full
         // messages so we can parse/transform them properly.
         const str = chunk.toString("utf8");
         const fullMessages = (this.partialMessage + str).split(/\r?\n\r?\n/);
