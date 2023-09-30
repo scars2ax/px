@@ -10,6 +10,7 @@ export {
 } from "./preprocess";
 export { checkContextSize } from "./check-context-size";
 export { setApiFormat } from "./set-api-format";
+export { signAwsRequest } from "./sign-aws-request";
 export { transformOutboundPayload } from "./transform-outbound-payload";
 
 // HPM middleware (runs on onProxyReq, cannot be async)
@@ -17,6 +18,7 @@ export { addKey, addKeyForEmbeddingsRequest } from "./add-key";
 export { addAnthropicPreamble } from "./add-anthropic-preamble";
 export { blockZoomerOrigins } from "./block-zoomer-origins";
 export { finalizeBody } from "./finalize-body";
+export { finalizeAwsRequest } from "./finalize-aws-request";
 export { languageFilter } from "./language-filter";
 export { limitCompletions } from "./limit-completions";
 export { stripHeaders } from "./strip-headers";

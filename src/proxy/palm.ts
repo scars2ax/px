@@ -16,8 +16,8 @@ import {
   stripHeaders,
 } from "./middleware/request";
 import {
-  ProxyResHandlerWithBody,
   createOnProxyResHandler,
+  ProxyResHandlerWithBody,
 } from "./middleware/response";
 import { v4 } from "uuid";
 
@@ -72,11 +72,10 @@ const rewritePalmRequest = (
   // The chat api (generateMessage) is not very useful at this time as it has
   // few params and no adjustable safety settings.
 
-  const newProxyReqPath = proxyReq.path.replace(
+  proxyReq.path = proxyReq.path.replace(
     /^\/v1\/chat\/completions/,
     `/v1beta2/models/${req.body.model}:generateText`
   );
-  proxyReq.path = newProxyReqPath;
 
   const rewriterPipeline = [
     applyQuotaLimits,

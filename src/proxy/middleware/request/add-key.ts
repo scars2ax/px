@@ -94,8 +94,9 @@ export const addKey: ProxyRequestMiddleware = (proxyReq, req) => {
       );
       break;
     case "aws":
-      // TODO: implement
-      break;
+      throw new Error(
+        "add-key should not be used for AWS security credentials. Use sign-aws-request instead."
+      );
     default:
       assertNever(assignedKey.service);
   }

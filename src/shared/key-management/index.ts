@@ -80,3 +80,4 @@ export {
 export { AnthropicKey } from "./anthropic/provider";
 export { OpenAIKey } from "./openai/provider";
 export { GooglePalmKey } from "./palm/provider";
+export { AwsBedrockKey } from "./aws/provider";

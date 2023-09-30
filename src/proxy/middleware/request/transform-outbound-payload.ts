@@ -10,7 +10,7 @@ const CLAUDE_OUTPUT_MAX = config.maxOutputTokensAnthropic;
 const OPENAI_OUTPUT_MAX = config.maxOutputTokensOpenAI;
 
 // https://console.anthropic.com/docs/api/reference#-v1-complete
-const AnthropicV1CompleteSchema = z.object({
+export const AnthropicV1CompleteSchema = z.object({
   model: z.string().regex(/^claude-/, "Model must start with 'claude-'"),
   prompt: z.string({
     required_error:
@@ -23,8 +23,8 @@ const AnthropicV1CompleteSchema = z.object({
   stop_sequences: z.array(z.string()).optional(),
   stream: z.boolean().optional().default(false),
   temperature: z.coerce.number().optional().default(1),
-  top_k: z.coerce.number().optional().default(-1),
-  top_p: z.coerce.number().optional().default(-1),
+  top_k: z.coerce.number().optional(),
+  top_p: z.coerce.number().optional(),
   metadata: z.any().optional(),
 });
 
@@ -227,8 +227,7 @@ function openaiToOpenaiText(req: Request) {
   stops = [...new Set(stops)];
 
   const transformed = { ...rest, prompt: prompt, stop: stops };
-  const validated = OpenAIV1TextCompletionSchema.parse(transformed);
-  return validated;
+  return OpenAIV1TextCompletionSchema.parse(transformed);
 }
 
 function openaiToPalm(req: Request): z.infer<typeof PalmV1GenerateTextSchema> {

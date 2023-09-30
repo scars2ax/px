@@ -7,19 +7,25 @@ import {
   transformOutboundPayload,
 } from ".";
 
+/** Additional functions to run before/after the request is transformed. */
+type RequestPreprocessorOptions = {
+  beforeTransform?: RequestPreprocessor[];
+  afterTransform?: RequestPreprocessor[];
+};
 /**
  * Returns a middleware function that processes the request body into the given
  * API format, and then sequentially runs the given additional preprocessors.
  */
 export const createPreprocessorMiddleware = (
   apiFormat: Parameters<typeof setApiFormat>[0],
-  additionalPreprocessors?: RequestPreprocessor[]
+  { beforeTransform, afterTransform }: RequestPreprocessorOptions = {}
 ): RequestHandler => {
   const preprocessors: RequestPreprocessor[] = [
     setApiFormat(apiFormat),
-    ...(additionalPreprocessors ?? []),
+    ...(beforeTransform ?? []),
     transformOutboundPayload,
     checkContextSize,
+    ...(afterTransform ?? []),
   ];
   return async (...args) => executePreprocessors(preprocessors, args);
 };

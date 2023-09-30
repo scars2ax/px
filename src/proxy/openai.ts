@@ -252,11 +252,12 @@ openaiRouter.post(
 
 // turbo-instruct compatibility endpoint, accepts either prompt or messages
 openaiRouter.post(
-  /\/v1\/turbo\-instruct\/(v1\/)?chat\/completions/,
+  /\/v1\/turbo-instruct\/(v1\/)?chat\/completions/,
   ipLimiter,
-  createPreprocessorMiddleware({ inApi: "openai", outApi: "openai-text" }, [
-    rewriteForTurboInstruct,
-  ]),
+  createPreprocessorMiddleware(
+    { inApi: "openai", outApi: "openai-text" },
+    { beforeTransform: [rewriteForTurboInstruct] }
+  ),
   openaiProxy
 );
 

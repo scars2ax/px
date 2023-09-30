@@ -93,7 +93,8 @@ export function enqueue(req: Request) {
   // If the request opted into streaming, we need to register a heartbeat
   // handler to keep the connection alive while it waits in the queue. We
   // deregister the handler when the request is dequeued.
-  if (req.body.stream === "true" || req.body.stream === true) {
+  const { stream } = req.body;
+  if (stream === "true" || stream === true || req.isStreaming) {
     const res = req.res!;
     if (!res.headersSent) {
       initStreaming(req);
