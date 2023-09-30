@@ -82,6 +82,8 @@ const awsResponseHandler: ProxyResHandlerWithBody = async (
     throw new Error("Expected body to be an object");
   }
 
+  req.log.info({ body, headers: _proxyRes.headers }, "AWS response");
+
   if (config.promptLogging) {
     const host = req.get("host");
     body.proxy_note = `Prompts are logged on this proxy instance. See ${host} for more information.`;

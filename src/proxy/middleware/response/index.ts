@@ -268,50 +268,80 @@ const handleUpstreamErrors: ProxyResHandlerWithBody = async (
   logger.warn(
     {
       statusCode,
-      type: errorPayload.error?.code,
+      type:
+        errorPayload.error?.code ||
+        errorPayload.error?.type ||
+        getAwsErrorType(proxyRes.headers["x-amzn-errortype"]),
       errorPayload,
       key: req.key?.hash,
     },
     `Received error response from upstream. (${proxyRes.statusMessage})`
   );
 
+  const service = req.key!.service;
+  if (service === "aws") {
+    // Try to standardize the error format for AWS
+    errorPayload.error = {
+      message: errorPayload.message,
+      type: getAwsErrorType(proxyRes.headers["x-amzn-errortype"]),
+    };
+    delete errorPayload.message;
+  }
+
   if (statusCode === 400) {
     // Bad request (likely prompt is too long)
-    switch (req.outboundApi) {
+    switch (service) {
       case "openai":
-      case "openai-text":
       case "google-palm":
         errorPayload.proxy_note = `Upstream service rejected the request as invalid. Your prompt may be too long for ${req.body?.model}.`;
         break;
       case "anthropic":
+      case "aws":
         maybeHandleMissingPreambleError(req, errorPayload);
         break;
       default:
-        assertNever(req.outboundApi);
+        assertNever(service);
     }
   } else if (statusCode === 401) {
     // Key is invalid or was revoked
     keyPool.disable(req.key!, "revoked");
     errorPayload.proxy_note = `API key is invalid or revoked. ${tryAgainMessage}`;
+  } else if (statusCode === 403) {
+    // Amazon is the only service that returns 403.
+    switch (errorPayload.error?.type) {
+      case "UnrecognizedClientException":
+        // Key is invalid.
+        keyPool.disable(req.key!, "revoked");
+        errorPayload.proxy_note = `API key is invalid or revoked. ${tryAgainMessage}`;
+        break;
+      case "AccessDeniedException":
+        // Doesn't necessarily mean the key is invalid.
+        errorPayload.proxy_note = `API key doesn't have access to the requested resource. ${tryAgainMessage}`;
+        break;
+      default:
+        errorPayload.proxy_note = `Unrecognized Forbidden error. Key may be invalid.`;
+    }
   } else if (statusCode === 429) {
-    switch (req.outboundApi) {
+    switch (service) {
       case "openai":
-      case "openai-text":
         handleOpenAIRateLimitError(req, tryAgainMessage, errorPayload);
         break;
       case "anthropic":
         handleAnthropicRateLimitError(req, errorPayload);
         break;
+      case "aws": {
+        handleAwsRateLimitError(req, errorPayload, errorPayload.error?.type);
+        break;
+      }
       case "google-palm":
         throw new Error("Rate limit handling not implemented for PaLM");
       default:
-        assertNever(req.outboundApi);
+        assertNever(service);
     }
   } else if (statusCode === 404) {
     // Most likely model not found
-    switch (req.outboundApi) {
+    switch (service) {
       case "openai":
-      case "openai-text":
         if (errorPayload.error?.code === "model_not_found") {
           const requestedModel = req.body.model;
           const modelFamily = getOpenAIModelFamily(requestedModel);
@@ -328,8 +358,11 @@ const handleUpstreamErrors: ProxyResHandlerWithBody = async (
       case "google-palm":
         errorPayload.proxy_note = `The requested Google PaLM model might not exist, or the key might not be provisioned for it.`;
         break;
+      case "aws":
+        errorPayload.proxy_note = `The requested AWS resource might not exist, or the key might not have access to it.`;
+        break;
       default:
-        assertNever(req.outboundApi);
+        assertNever(service);
     }
   } else {
     errorPayload.proxy_note = `Unrecognized error from upstream service.`;
@@ -396,6 +429,24 @@ function handleAnthropicRateLimitError(
     throw new RetryableError("Claude rate-limited request re-enqueued.");
   } else {
     errorPayload.proxy_note = `Unrecognized rate limit error from Anthropic. Key may be over quota.`;
+  }
+}
+
+function handleAwsRateLimitError(
+  req: Request,
+  errorPayload: Record<string, any>,
+  errorType?: string
+) {
+  switch (errorType) {
+    case "ThrottlingException":
+      keyPool.markRateLimited(req.key!);
+      reenqueueRequest(req);
+      throw new RetryableError("AWS rate-limited request re-enqueued.");
+    case "ModelNotReadyException":
+      errorPayload.proxy_note = `The requested model is overloaded. Try again in a few seconds.`;
+      break;
+    default:
+      errorPayload.proxy_note = `Unrecognized rate limit error from AWS.`;
   }
 }
 
@@ -505,3 +556,8 @@ const copyHttpHeaders: ProxyResHandlerWithBody = async (
     res.setHeader(key, proxyRes.headers[key] as string);
   });
 };
+
+function getAwsErrorType(header: string | string[] | undefined) {
+  const val = String(header).match(/^(\w+):?/)?.[1];
+  return val || String(header);
+}
