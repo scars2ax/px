@@ -61,15 +61,12 @@ export class KeyPool {
     service.update(key.hash, props);
   }
 
-  public available(service: LLMService | "all" = "all"): number {
+  public available(model: Model | "all" = "all"): number {
     return this.keyProviders.reduce((sum, provider) => {
-      const includeProvider = service === "all" || service === provider.service;
+      const includeProvider =
+        model === "all" || this.getService(model) === provider.service;
       return sum + (includeProvider ? provider.available() : 0);
     }, 0);
-  }
-
-  public anyUnchecked(): boolean {
-    return this.keyProviders.some((provider) => provider.anyUnchecked());
   }
 
   public incrementUsage(key: Key, model: string, tokens: number): void {

@@ -177,10 +177,6 @@ export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
     return this.keys.filter((k) => !k.isDisabled).length;
   }
 
-  public anyUnchecked() {
-    return this.keys.some((k) => k.lastChecked === 0);
-  }
-
   public incrementUsage(hash: string, _model: string, tokens: number) {
     const key = this.keys.find((k) => k.hash === hash);
     if (!key) return;

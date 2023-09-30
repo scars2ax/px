@@ -276,10 +276,6 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
     return this.keys.filter((k) => !k.isDisabled).length;
   }
 
-  public anyUnchecked() {
-    return !!config.checkKeys && this.keys.some((key) => !key.lastChecked);
-  }
-
   /**
    * Given a model, returns the period until a key will be available to service
    * the request, or returns 0 if a key is ready immediately.

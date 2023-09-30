@@ -137,10 +137,6 @@ export class AwsBedrockKeyProvider implements KeyProvider<AwsBedrockKey> {
     return this.keys.filter((k) => !k.isDisabled).length;
   }
 
-  public anyUnchecked() {
-    return false;
-  }
-
   public incrementUsage(hash: string, _model: string, tokens: number) {
     const key = this.keys.find((k) => k.hash === hash);
     if (!key) return;

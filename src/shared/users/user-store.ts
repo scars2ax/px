@@ -23,6 +23,7 @@ const INITIAL_TOKENS: Required<UserTokenCounts> = {
   "gpt4-32k": 0,
   claude: 0,
   bison: 0,
+  "aws-claude": 0,
 };
 
 const users: Map<string, User> = new Map();
