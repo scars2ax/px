@@ -115,11 +115,12 @@ export const handleStreamedResponse: RawResponseBodyHandler = async (
 
     proxyRes.pipe(adapter);
 
-    adapter.on("data", (data: any) => {
+    adapter.on("data", (chunk: any) => {
       try {
-        req.log.debug({ str: data.toString() }, `Received SSE event.`);
+        const str = chunk.toString();
+        req.log.debug({ str }, `Received SSE event.`);
         const { event, position } = transformEvent({
-          data: data.toString(),
+          data: chunk.toString(),
           requestApi: req.inboundApi,
           responseApi: req.outboundApi,
           lastPosition,
@@ -134,11 +135,15 @@ export const handleStreamedResponse: RawResponseBodyHandler = async (
     });
 
     adapter.on("end", () => {
-      req.log.info({ key: key.hash }, `Finished proxying SSE stream.`);
-      const finalBody = convertEventsToFinalResponse(events, req);
-      req.log.debug({ finalBody }, `Final response body.`);
-      res.end();
-      resolve(finalBody);
+      try {
+        req.log.info({ key: key.hash }, `Finished proxying SSE stream.`);
+        const finalBody = convertEventsToFinalResponse(events, req);
+        req.log.debug({ finalBody }, `Final response body.`);
+        res.end();
+        resolve(finalBody);
+      } catch (err) {
+        adapter.emit("error", err);
+      }
     });
 
     adapter.on("error", (err) => {
@@ -176,8 +181,6 @@ function transformEvent(params: SSETransformationArgs) {
     case "openai->anthropic":
       // TODO: handle new anthropic streaming format
       return transformV1AnthropicEventToOpenAI(params);
-    case "openai->google-palm":
-      return transformPalmEventToOpenAI(params);
     default:
       throw new Error(`Unsupported streaming API transformation. ${trans}`);
   }
@@ -267,11 +270,6 @@ function transformV1AnthropicEventToOpenAI(params: SSETransformationArgs) {
   };
 }
 
-function transformPalmEventToOpenAI({ data }: SSETransformationArgs) {
-  throw new Error("PaLM streaming not yet supported.");
-  return { position: -1, event: data };
-}
-
 /** Copy headers, excluding ones we're already setting for the SSE response. */
 function copyHeaders(proxyRes: http.IncomingMessage, res: Response) {
   const toOmit = [
@@ -345,7 +343,7 @@ function convertEventsToFinalResponse(events: string[], req: Request) {
         choices: [],
         // TODO: merge logprobs
       };
-      merged = events.reduce((acc, event, i) => {
+      merged = events.reduce((acc, event) => {
         if (!event.startsWith("data: ")) return acc;
         if (event === "data: [DONE]") return acc;
 
@@ -383,7 +381,7 @@ function convertEventsToFinalResponse(events: string[], req: Request) {
         exception: null,
       }
 
-      merged = events.reduce((acc, event, i) => {
+      merged = events.reduce((acc, event) => {
         if (!event.startsWith("data: ")) return acc;
         if (event === "data: [DONE]") return acc;
 
