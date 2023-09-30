@@ -4,12 +4,12 @@
   "description": "Reverse proxy for the OpenAI API",
   "scripts": {
     "build": "tsc && copyfiles -u 1 src/**/*.ejs build",
-    "start:dev": "nodemon --watch src --exec ts-node --transpile-only src/server.ts",
-    "start:watch": "nodemon --require source-map-support/register build/server.js",
-    "start:replit": "tsc && node build/server.js",
+    "prepare": "husky install",
     "start": "node build/server.js",
-    "type-check": "tsc --noEmit",
-    "prepare": "husky install"
+    "start:dev": "nodemon --watch src --exec ts-node --transpile-only src/server.ts",
+    "start:replit": "tsc && node build/server.js",
+    "start:watch": "nodemon --require source-map-support/register build/server.js",
+    "type-check": "tsc --noEmit"
   },
   "engines": {
     "node": ">=18.0.0"

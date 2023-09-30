@@ -22,8 +22,8 @@ type Config = {
   googlePalmKey?: string;
   /**
    * Comma-delimited list of AWS credentials. Each credential item should be a
-   * semicolon-delimited list of access key, secret key, and AWS region.
-   * Example: `AWS_CREDENTIALS=access_key_1;secret_key_1;us-east-1,access_key_2;secret_key_2;us-west-2`
+   * colon-delimited list of access key, secret key, and AWS region.
+   * Example: `AWS_CREDENTIALS=access_key_1:secret_key_1:us-east-1,access_key_2:secret_key_2:us-west-2`
    */
   awsCredentials?: string;
   /**

@@ -1,5 +1,6 @@
+import type { HttpRequest } from "@smithy/types";
 import { Express } from "express-serve-static-core";
-import { APIFormat, Key } from "../shared/key-management/index";
+import { APIFormat, Key } from "../shared/key-management";
 import { User } from "../shared/users/user-store";
 
 declare global {
@@ -24,6 +25,7 @@ declare global {
       outputTokens?: number;
       // TODO: remove later
       debug: Record<string, any>;
+      signedRequest: HttpRequest;
     }
   }
 }
