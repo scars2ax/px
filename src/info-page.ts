@@ -6,6 +6,7 @@ import {
   AnthropicKey,
   GooglePalmKey,
   OpenAIKey,
+  AwsBedrockKey,
   keyPool,
 } from "./shared/key-management";
 import { ModelFamily, OpenAIModelFamily } from "./shared/models";
@@ -13,7 +14,6 @@ import { getUniqueIps } from "./proxy/rate-limit";
 import { getEstimatedWaitTime, getQueueLength } from "./proxy/queue";
 import { getTokenCostUsd, prettyTokens } from "./shared/stats";
 import { assertNever } from "./shared/utils";
-import { AwsBedrockKey } from "./shared/key-management/aws/provider";
 
 const INFO_PAGE_TTL = 2000;
 let infoPageHtml: string | undefined;
@@ -111,9 +111,11 @@ function cacheInfoPageHtml(baseUrl: string) {
     openaiKeys,
     anthropicKeys,
     palmKeys,
+    awsKeys,
     ...(openaiKeys ? getOpenAIInfo() : {}),
     ...(anthropicKeys ? getAnthropicInfo() : {}),
     ...(palmKeys ? { "palm-bison": getPalmInfo() } : {}),
+    ...(awsKeys ? { "aws-claude": getAwsInfo() } : {}),
     config: listConfig(),
     build: process.env.BUILD_INFO || "dev",
   };
@@ -350,6 +352,26 @@ function getPalmInfo() {
     proomptersInQueue: bisonInfo.queued,
     estimatedQueueTime: bisonInfo.queueTime,
   };
+}
+
+function getAwsInfo() {
+  const awsInfo: Partial<ModelAggregates> = {
+    active: modelStats.get("aws-claude__active") || 0,
+  }
+
+  const queue = getQueueInformation("aws-claude");
+  awsInfo.queued = queue.proomptersInQueue;
+  awsInfo.queueTime = queue.estimatedQueueTime;
+
+  const tokens = modelStats.get("aws-claude__tokens") || 0;
+  const cost = getTokenCostUsd("aws-claude", tokens);
+
+  return {
+    usage: `${prettyTokens(tokens)} tokens${getCostString(cost)}`,
+    activeKeys: awsInfo.active,
+    proomptersInQueue: awsInfo.queued,
+    estimatedQueueTime: awsInfo.queueTime,
+  }
 }
 
 const customGreeting = fs.existsSync("greeting.md")
