@@ -190,7 +190,11 @@ palmRouter.get("/v1/models", handleModelRequest);
 palmRouter.post(
   "/v1/chat/completions",
   ipLimiter,
-  createPreprocessorMiddleware({ inApi: "openai", outApi: "google-palm" }),
+  createPreprocessorMiddleware({
+    inApi: "openai",
+    outApi: "google-palm",
+    service: "google-palm",
+  }),
   googlePalmProxy
 );
 // Redirect browser requests to the homepage.

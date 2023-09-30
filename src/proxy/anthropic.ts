@@ -185,14 +185,22 @@ anthropicRouter.get("/v1/models", handleModelRequest);
 anthropicRouter.post(
   "/v1/complete",
   ipLimiter,
-  createPreprocessorMiddleware({ inApi: "anthropic", outApi: "anthropic" }),
+  createPreprocessorMiddleware({
+    inApi: "anthropic",
+    outApi: "anthropic",
+    service: "anthropic",
+  }),
   anthropicProxy
 );
 // OpenAI-to-Anthropic compatibility endpoint.
 anthropicRouter.post(
   "/v1/chat/completions",
   ipLimiter,
-  createPreprocessorMiddleware({ inApi: "openai", outApi: "anthropic" }),
+  createPreprocessorMiddleware({
+    inApi: "openai",
+    outApi: "anthropic",
+    service: "anthropic",
+  }),
   anthropicProxy
 );
 // Redirect browser requests to the homepage.

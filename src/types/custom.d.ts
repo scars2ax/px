@@ -1,12 +1,13 @@
 import type { HttpRequest } from "@smithy/types";
 import { Express } from "express-serve-static-core";
-import { APIFormat, Key } from "../shared/key-management";
+import { APIFormat, Key, LLMService } from "../shared/key-management";
 import { User } from "../shared/users/user-store";
 
 declare global {
   namespace Express {
     interface Request {
       key?: Key;
+      service?: LLMService;
       /** Denotes the format of the user's submitted request. */
       inboundApi: APIFormat;
       /** Denotes the format of the request being proxied to the API. */

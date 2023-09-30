@@ -246,7 +246,11 @@ openaiRouter.get("/v1/models", handleModelRequest);
 openaiRouter.post(
   "/v1/completions",
   ipLimiter,
-  createPreprocessorMiddleware({ inApi: "openai-text", outApi: "openai-text" }),
+  createPreprocessorMiddleware({
+    inApi: "openai-text",
+    outApi: "openai-text",
+    service: "openai",
+  }),
   openaiProxy
 );
 
@@ -255,7 +259,7 @@ openaiRouter.post(
   /\/v1\/turbo-instruct\/(v1\/)?chat\/completions/,
   ipLimiter,
   createPreprocessorMiddleware(
-    { inApi: "openai", outApi: "openai-text" },
+    { inApi: "openai", outApi: "openai-text", service: "openai" },
     { beforeTransform: [rewriteForTurboInstruct] }
   ),
   openaiProxy
@@ -265,7 +269,11 @@ openaiRouter.post(
 openaiRouter.post(
   "/v1/chat/completions",
   ipLimiter,
-  createPreprocessorMiddleware({ inApi: "openai", outApi: "openai" }),
+  createPreprocessorMiddleware({
+    inApi: "openai",
+    outApi: "openai",
+    service: "openai",
+  }),
   openaiProxy
 );
 

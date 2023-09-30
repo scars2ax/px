@@ -169,7 +169,7 @@ awsRouter.post(
   "/v1/complete",
   ipLimiter,
   createPreprocessorMiddleware(
-    { inApi: "anthropic", outApi: "anthropic" },
+    { inApi: "anthropic", outApi: "anthropic", service: "aws" },
     { afterTransform: [signAwsRequest] }
   ),
   awsProxy
@@ -179,7 +179,7 @@ awsRouter.post(
   "/v1/chat/completions",
   ipLimiter,
   createPreprocessorMiddleware(
-    { inApi: "openai", outApi: "anthropic" },
+    { inApi: "openai", outApi: "anthropic", service: "aws" },
     { afterTransform: [signAwsRequest] }
   ),
   awsProxy

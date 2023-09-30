@@ -39,7 +39,7 @@ export const createEmbeddingsPreprocessorMiddleware = (
   additionalPreprocessors?: RequestPreprocessor[]
 ): RequestHandler => {
   const preprocessors: RequestPreprocessor[] = [
-    setApiFormat({ inApi: "openai", outApi: "openai" }),
+    setApiFormat({ inApi: "openai", outApi: "openai", service: "openai" }),
     (req) => void (req.promptTokens = req.outputTokens = 0),
     ...(additionalPreprocessors ?? []),
   ];
