@@ -40,14 +40,20 @@ export const signAwsRequest: RequestPreprocessor = async (req) => {
     method: "POST",
     protocol: "https:",
     hostname: host,
-    path: `/model/anthropic.claude-v1/invoke${stream ? "-with-response-stream" : ""}`,
+    path: `/model/${model}/invoke${stream ? "-with-response-stream" : ""}`,
     headers: {
       ["Host"]: host,
-      ["accept"]: "*/*",
       ["content-type"]: "application/json",
     },
     body: JSON.stringify(strippedParams),
   });
+
+  if (stream) {
+    newRequest.headers["x-amzn-bedrock-accept"] = "application/json";
+  } else {
+    newRequest.headers["accept"] = "*/*";
+  }
+
   req.signedRequest = await sign(newRequest, getCredentialParts(req));
 };
 
