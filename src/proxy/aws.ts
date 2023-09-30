@@ -99,6 +99,9 @@ const awsResponseHandler: ProxyResHandlerWithBody = async (
     body.proxy_tokenizer_debug_info = req.debug;
   }
 
+  // AWS does not confirm the model in the response, so we have to add it
+  body.model = req.body.model;
+
   res.status(200).json(body);
 };
 
