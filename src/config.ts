@@ -116,7 +116,7 @@ type Config = {
   blockedOrigins?: string;
   /** Message to return when rejecting requests from blocked origins. */
   blockMessage?: string;
-  /** Desination URL to redirect blocked requests to, for non-JSON requests. */
+  /** Destination URL to redirect blocked requests to, for non-JSON requests. */
   blockRedirect?: string;
   /** Which model families to allow requests for. Applies only to OpenAI. */
   allowedModelFamilies: ModelFamily[];
@@ -175,6 +175,8 @@ export const config: Config = {
     "gpt4",
     "gpt4-32k",
     "claude",
+    "bison",
+    "aws-claude",
   ]),
   rejectDisallowed: getEnvWithDefault("REJECT_DISALLOWED", false),
   rejectMessage: getEnvWithDefault(
@@ -203,6 +205,7 @@ export const config: Config = {
     "gpt4-32k": getEnvWithDefault("TOKEN_QUOTA_GPT4_32K", 0),
     claude: getEnvWithDefault("TOKEN_QUOTA_CLAUDE", 0),
     bison: getEnvWithDefault("TOKEN_QUOTA_BISON", 0),
+    "aws-claude": getEnvWithDefault("TOKEN_QUOTA_AWS_CLAUDE", 0),
   },
   quotaRefreshPeriod: getEnvWithDefault("QUOTA_REFRESH_PERIOD", undefined),
   allowNicknameChanges: getEnvWithDefault("ALLOW_NICKNAME_CHANGES", true),
@@ -352,7 +355,12 @@ function getEnvWithDefault<T>(env: string | string[], defaultValue: T): T {
   }
   try {
     if (
-      ["OPENAI_KEY", "ANTHROPIC_KEY", "GOOGLE_PALM_KEY"].includes(String(env))
+      [
+        "OPENAI_KEY",
+        "ANTHROPIC_KEY",
+        "GOOGLE_PALM_KEY",
+        "AWS_CREDENTIALS",
+      ].includes(String(env))
     ) {
       return value as unknown as T;
     }
