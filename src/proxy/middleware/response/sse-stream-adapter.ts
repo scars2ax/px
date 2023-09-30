@@ -1,6 +1,9 @@
 import { Transform, TransformOptions } from "stream";
 // @ts-ignore
 import { Parser } from "lifion-aws-event-stream";
+import { logger } from "../../../logger";
+
+const log = logger.child({ module: "sse-stream-adapter" });
 
 type SSEStreamAdapterOptions = TransformOptions & { isAwsStream?: boolean };
 type AwsEventStreamMessage = {
@@ -23,15 +26,24 @@ export class ServerSentEventStreamAdapter extends Transform {
 
     this.parser.on("data", (data: AwsEventStreamMessage) => {
       const message = this.processAwsEvent(data);
-      this.push(Buffer.from(message, "utf8"));
+      if (message) {
+        this.push(Buffer.from(message, "utf8"));
+      }
     });
   }
 
-  processAwsEvent(event: AwsEventStreamMessage): string {
+  processAwsEvent(event: AwsEventStreamMessage): string | null {
     if (event.headers[":message-type"] === "error") {
       return `event: error\ndata: ${event.payload.message}\n\n`;
     } else {
-      return `data: ${Buffer.from(event.payload.bytes!, "base64").toString(
+      if (!event.payload.bytes) {
+        log.error(
+          { event: JSON.stringify(event) },
+          "Received unparseable streaming event from AWS, skipping chunk"
+        );
+        return null;
+      }
+      return `data: ${Buffer.from(event.payload.bytes, "base64").toString(
         "utf8"
       )}`;
     }
