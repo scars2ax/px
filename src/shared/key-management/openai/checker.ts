@@ -248,10 +248,10 @@ export class OpenAIKeyChecker {
       } else if (status === 429) {
         switch (data.error.type) {
           case "insufficient_quota":
-          case "access_terminated":
           case "billing_not_active":
-            const isOverQuota = data.error.type === "insufficient_quota";
-            const isRevoked = !isOverQuota;
+          case "access_terminated":
+            const isRevoked = data.error.type === "access_terminated";
+            const isOverQuota = !isRevoked;
             const modelFamilies: OpenAIModelFamily[] = isRevoked
               ? ["turbo"]
               : key.modelFamilies;
@@ -392,10 +392,9 @@ export class OpenAIKeyChecker {
   }
 
   static getHeaders(key: OpenAIKey) {
-    const headers = {
+    return {
       Authorization: `Bearer ${key.key}`,
       ...(key.organizationId && { "OpenAI-Organization": key.organizationId }),
     };
-    return headers;
   }
 }

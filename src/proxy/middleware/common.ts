@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
 import httpProxy from "http-proxy";
 import { ZodError } from "zod";
-import { APIFormat } from "../../shared/key-management";
 import { assertNever } from "../../shared/utils";
 import { QuotaExceededError } from "./request/apply-quota-limits";
 

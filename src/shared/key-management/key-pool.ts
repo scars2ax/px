@@ -45,6 +45,11 @@ export class KeyPool {
     return this.keyProviders.flatMap((provider) => provider.list());
   }
 
+  /**
+   * Marks a key as disabled for a specific reason. `revoked` should be used
+   * to indicate a key that can never be used again, while `quota` should be
+   * used to indicate a key that is still valid but has exceeded its quota.
+   */
   public disable(key: Key, reason: "quota" | "revoked"): void {
     const service = this.getKeyProvider(key.service);
     service.disable(key);
