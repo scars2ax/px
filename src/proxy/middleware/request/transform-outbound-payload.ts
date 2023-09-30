@@ -157,7 +157,10 @@ export const transformOutboundPayload: RequestPreprocessor = async (req) => {
 
 function openaiToAnthropic(req: Request) {
   const { body } = req;
-  const result = OpenAIV1ChatCompletionSchema.safeParse(body);
+  const result = OpenAIV1ChatCompletionSchema.safeParse({
+    ...body,
+    model: "gpt-3.5-turbo",
+  });
   if (!result.success) {
     req.log.error(
       { issues: result.error.issues, body },
