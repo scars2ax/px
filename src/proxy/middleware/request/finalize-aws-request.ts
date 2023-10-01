@@ -1,10 +1,9 @@
 import type { ProxyRequestMiddleware } from ".";
 
 /**
- * For AWS requests, the body is signed and the signature is added to the
- * request headers. This rewriter finalizes the body by serializing it to JSON
- * and copying the signature to the proxy request headers, as well as rewriting
- * the proxied request path.
+ * For AWS requests, the body is signed earlier in the request pipeline, before
+ * the proxy middleware. This function just assigns the path and headers to the
+ * proxy request.
  */
 export const finalizeAwsRequest: ProxyRequestMiddleware = (proxyReq, req) => {
   if (!req.signedRequest) {
