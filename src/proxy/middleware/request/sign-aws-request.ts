@@ -43,7 +43,7 @@ export const signAwsRequest: RequestPreprocessor = async (req) => {
     method: "POST",
     protocol: "https:",
     hostname: host,
-    path: `/model/anthropic.claude-v2/invoke${stream ? "-with-response-stream" : ""}`,
+    path: `/model/${model}/invoke${stream ? "-with-response-stream" : ""}`,
     headers: {
       ["Host"]: host,
       ["content-type"]: "application/json",

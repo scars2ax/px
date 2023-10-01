@@ -47,13 +47,10 @@ export const createPreprocessorMiddleware = (
  * OpenAI's embeddings API. Tokens are not counted because embeddings requests
  * are basically free.
  */
-export const createEmbeddingsPreprocessorMiddleware = (
-  additionalPreprocessors?: RequestPreprocessor[]
-): RequestHandler => {
+export const createEmbeddingsPreprocessorMiddleware = (): RequestHandler => {
   const preprocessors: RequestPreprocessor[] = [
     setApiFormat({ inApi: "openai", outApi: "openai", service: "openai" }),
     (req) => void (req.promptTokens = req.outputTokens = 0),
-    ...(additionalPreprocessors ?? []),
   ];
   return async (...args) => executePreprocessors(preprocessors, args);
 };

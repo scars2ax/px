@@ -82,8 +82,6 @@ const awsResponseHandler: ProxyResHandlerWithBody = async (
     throw new Error("Expected body to be an object");
   }
 
-  req.log.info({ body, headers: _proxyRes.headers }, "AWS response");
-
   if (config.promptLogging) {
     const host = req.get("host");
     body.proxy_note = `Prompts are logged on this proxy instance. See ${host} for more information.`;
@@ -199,14 +197,14 @@ awsRouter.post(
 function maybeReassignModel(req: Request) {
   const model = req.body.model;
   // User's client sent an AWS model already
-  if (model.contains("anthropic.claude")) return;
+  if (model.includes("anthropic.claude")) return;
   // User's client is sending Anthropic-style model names, check for v1
-  if (model.match("^claude-v?1")) {
+  if (model.match(/^claude-v?1/)) {
     req.body.model = "anthropic.claude-v1";
+  } else {
+    // User's client requested v2 or possibly some OpenAI model, default to v2
+    req.body.model = "anthropic.claude-v2";
   }
-  // User's client requested v2 or possibly some OpenAI model, default to v2
-  req.body.model = "anthropic.claude-v2";
-
   // TODO: Handle claude-instant
 }
 

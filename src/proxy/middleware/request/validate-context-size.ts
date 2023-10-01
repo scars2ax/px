@@ -1,8 +1,8 @@
 import { Request } from "express";
 import { z } from "zod";
 import { config } from "../../../config";
-import { RequestPreprocessor } from ".";
 import { assertNever } from "../../../shared/utils";
+import { RequestPreprocessor } from ".";
 
 const CLAUDE_MAX_CONTEXT = config.maxContextTokensAnthropic;
 const OPENAI_MAX_CONTEXT = config.maxContextTokensOpenAI;

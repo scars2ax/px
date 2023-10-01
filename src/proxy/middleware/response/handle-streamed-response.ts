@@ -118,7 +118,7 @@ export const handleStreamedResponse: RawResponseBodyHandler = async (
     adapter.on("data", (chunk: any) => {
       try {
         const str = chunk.toString();
-        req.log.debug({ str }, `Received SSE event.`);
+        // req.log.debug({ str }, `Received SSE event.`);
         const { event, position } = transformEvent({
           data: chunk.toString(),
           requestApi: req.inboundApi,
@@ -138,7 +138,7 @@ export const handleStreamedResponse: RawResponseBodyHandler = async (
       try {
         req.log.info({ key: key.hash }, `Finished proxying SSE stream.`);
         const finalBody = convertEventsToFinalResponse(events, req);
-        req.log.debug({ finalBody }, `Final response body.`);
+        // req.log.debug({ finalBody }, `Final response body.`);
         res.end();
         resolve(finalBody);
       } catch (err) {

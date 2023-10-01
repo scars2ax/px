@@ -512,7 +512,7 @@ const countResponseTokens: ProxyResHandlerWithBody = async (
 
     req.outputTokens = tokens.token_count;
   } catch (error) {
-    req.log.error(
+    req.log.warn(
       error,
       "Error while counting completion tokens; assuming `max_output_tokens`"
     );

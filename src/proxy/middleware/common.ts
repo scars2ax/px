@@ -199,11 +199,11 @@ export function getModelFromBody(req: Request, body: Record<string, any>) {
   const format = req.outboundApi;
   switch (format) {
     case "openai":
-      return body.model;
     case "openai-text":
       return body.model;
     case "anthropic":
-      return body.model;
+      // Anthropic confirms the model in the response, but AWS Claude doesn't.
+      return body.model || req.body.model;
     case "google-palm":
       // Google doesn't confirm the model in the response.
       return req.body.model;

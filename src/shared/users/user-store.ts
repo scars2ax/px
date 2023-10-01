@@ -361,8 +361,11 @@ function getModelFamilyForQuotaUsage(model: string): ModelFamily {
   if (model.includes("bison")) {
     return "bison";
   }
-  if (model.includes("claude")) {
+  if (model.startsWith("claude")) {
     return "claude";
+  }
+  if(model.startsWith("anthropic.claude")) {
+    return "aws-claude";
   }
   throw new Error(`Unknown quota model family for model ${model}`);
 }
