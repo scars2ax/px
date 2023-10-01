@@ -2,16 +2,27 @@ import { RequestHandler } from "express";
 import { handleInternalError } from "../common";
 import {
   RequestPreprocessor,
-  checkContextSize,
+  validateContextSize,
+  countPromptTokens,
   setApiFormat,
   transformOutboundPayload,
 } from ".";
 
-/** Additional functions to run before/after the request is transformed. */
 type RequestPreprocessorOptions = {
+  /**
+   * Functions to run before the request body is transformed between API
+   * formats. Use this to change the behavior of the transformation, such as for
+   * endpoints which can accept multiple API formats.
+   */
   beforeTransform?: RequestPreprocessor[];
+  /**
+   * Functions to run after the request body is transformed and token counts are
+   * assigned. Use this to perform validation or other actions that depend on
+   * the request body being in the final API format.
+   */
   afterTransform?: RequestPreprocessor[];
 };
+
 /**
  * Returns a middleware function that processes the request body into the given
  * API format, and then sequentially runs the given additional preprocessors.
@@ -24,8 +35,9 @@ export const createPreprocessorMiddleware = (
     setApiFormat(apiFormat),
     ...(beforeTransform ?? []),
     transformOutboundPayload,
-    checkContextSize,
+    countPromptTokens,
     ...(afterTransform ?? []),
+    validateContextSize,
   ];
   return async (...args) => executePreprocessors(preprocessors, args);
 };

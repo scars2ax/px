@@ -2,13 +2,15 @@ import type { Request } from "express";
 import type { ClientRequest } from "http";
 import type { ProxyReqCallback } from "http-proxy";
 
-// Express middleware (runs before http-proxy-middleware, can be async)
-export { applyQuotaLimits } from "./apply-quota-limits";
 export {
   createPreprocessorMiddleware,
   createEmbeddingsPreprocessorMiddleware,
 } from "./preprocess";
-export { checkContextSize } from "./check-context-size";
+
+// Express middleware (runs before http-proxy-middleware, can be async)
+export { applyQuotaLimits } from "./apply-quota-limits";
+export { validateContextSize } from "./validate-context-size";
+export { countPromptTokens } from "./count-prompt-tokens";
 export { setApiFormat } from "./set-api-format";
 export { signAwsRequest } from "./sign-aws-request";
 export { transformOutboundPayload } from "./transform-outbound-payload";

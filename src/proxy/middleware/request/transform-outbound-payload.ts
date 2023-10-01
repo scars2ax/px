@@ -11,7 +11,7 @@ const OPENAI_OUTPUT_MAX = config.maxOutputTokensOpenAI;
 
 // https://console.anthropic.com/docs/api/reference#-v1-complete
 export const AnthropicV1CompleteSchema = z.object({
-  model: z.string().regex(/^claude-/, "Model must start with 'claude-'"),
+  model: z.string(),
   prompt: z.string({
     required_error:
       "No prompt found. Are you sending an OpenAI-formatted request to the Claude endpoint?",
@@ -30,7 +30,7 @@ export const AnthropicV1CompleteSchema = z.object({
 
 // https://platform.openai.com/docs/api-reference/chat/create
 const OpenAIV1ChatCompletionSchema = z.object({
-  model: z.string().regex(/^gpt/, "Model must start with 'gpt-'"),
+  model: z.string(),
   messages: z.array(
     z.object({
       role: z.enum(["system", "user", "assistant"]),
@@ -89,7 +89,7 @@ const OpenAIV1TextCompletionSchema = z
 
 // https://developers.generativeai.google/api/rest/generativelanguage/models/generateText
 const PalmV1GenerateTextSchema = z.object({
-  model: z.string().regex(/^\w+-bison-\d{3}$/),
+  model: z.string(),
   prompt: z.object({ text: z.string() }),
   temperature: z.number().optional(),
   maxOutputTokens: z.coerce
@@ -157,12 +157,9 @@ export const transformOutboundPayload: RequestPreprocessor = async (req) => {
 
 function openaiToAnthropic(req: Request) {
   const { body } = req;
-  const result = OpenAIV1ChatCompletionSchema.safeParse({
-    ...body,
-    model: "gpt-3.5-turbo",
-  });
+  const result = OpenAIV1ChatCompletionSchema.safeParse(body);
   if (!result.success) {
-    req.log.error(
+    req.log.warn(
       { issues: result.error.issues, body },
       "Invalid OpenAI-to-Anthropic request"
     );
@@ -211,7 +208,7 @@ function openaiToOpenaiText(req: Request) {
   const { body } = req;
   const result = OpenAIV1ChatCompletionSchema.safeParse(body);
   if (!result.success) {
-    req.log.error(
+    req.log.warn(
       { issues: result.error.issues, body },
       "Invalid OpenAI-to-OpenAI-text request"
     );
@@ -240,7 +237,7 @@ function openaiToPalm(req: Request): z.infer<typeof PalmV1GenerateTextSchema> {
     model: "gpt-3.5-turbo",
   });
   if (!result.success) {
-    req.log.error(
+    req.log.warn(
       { issues: result.error.issues, body },
       "Invalid OpenAI-to-Palm request"
     );
