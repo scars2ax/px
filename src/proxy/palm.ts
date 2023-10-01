@@ -12,6 +12,7 @@ import {
   blockZoomerOrigins,
   createPreprocessorMiddleware,
   finalizeBody,
+  forceModel,
   languageFilter,
   stripHeaders,
 } from "./middleware/request";
@@ -190,21 +191,11 @@ palmRouter.get("/v1/models", handleModelRequest);
 palmRouter.post(
   "/v1/chat/completions",
   ipLimiter,
-  createPreprocessorMiddleware({
-    inApi: "openai",
-    outApi: "google-palm",
-    service: "google-palm",
-  }),
+  createPreprocessorMiddleware(
+    { inApi: "openai", outApi: "google-palm", service: "google-palm" },
+    { afterTransform: [forceModel("text-bison-001")] }
+  ),
   googlePalmProxy
 );
-// Redirect browser requests to the homepage.
-palmRouter.get("*", (req, res, next) => {
-  const isBrowser = req.headers["user-agent"]?.includes("Mozilla");
-  if (isBrowser) {
-    res.redirect("/");
-  } else {
-    next();
-  }
-});
 
 export const googlePalm = palmRouter;

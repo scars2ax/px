@@ -28,4 +28,13 @@ proxyRouter.use("/openai", openai);
 proxyRouter.use("/anthropic", anthropic);
 proxyRouter.use("/google-palm", googlePalm);
 proxyRouter.use("/aws/claude", aws);
+// Redirect browser requests to the homepage.
+proxyRouter.get("*", (req, res, next) => {
+  const isBrowser = req.headers["user-agent"]?.includes("Mozilla");
+  if (isBrowser) {
+    res.redirect("/");
+  } else {
+    next();
+  }
+});
 export { proxyRouter as proxyRouter };

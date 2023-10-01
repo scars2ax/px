@@ -173,7 +173,7 @@ awsRouter.post(
   ipLimiter,
   createPreprocessorMiddleware(
     { inApi: "anthropic", outApi: "anthropic", service: "aws" },
-    { afterTransform: [signAwsRequest] }
+    { afterTransform: [maybeReassignModel, signAwsRequest] }
   ),
   awsProxy
 );
@@ -183,18 +183,31 @@ awsRouter.post(
   ipLimiter,
   createPreprocessorMiddleware(
     { inApi: "openai", outApi: "anthropic", service: "aws" },
-    { afterTransform: [signAwsRequest] }
+    { afterTransform: [maybeReassignModel, signAwsRequest] }
   ),
   awsProxy
 );
-// Redirect browser requests to the homepage.
-awsRouter.get("*", (req, res, next) => {
-  const isBrowser = req.headers["user-agent"]?.includes("Mozilla");
-  if (isBrowser) {
-    res.redirect("/");
-  } else {
-    next();
+
+/**
+ * Tries to deal with:
+ * - frontends sending AWS model names even when they want to use the OpenAI-
+ *   compatible endpoint
+ * - frontends sending Anthropic model names that AWS doesn't recognize
+ * - frontends sending OpenAI model names because they expect the proxy to
+ *   translate them
+ */
+function maybeReassignModel(req: Request) {
+  const model = req.body.model;
+  // User's client sent an AWS model already
+  if (model.contains("anthropic.claude")) return;
+  // User's client is sending Anthropic-style model names, check for v1
+  if (model.match("^claude-v?1")) {
+    req.body.model = "anthropic.claude-v1";
   }
-});
+  // User's client requested v2 or possibly some OpenAI model, default to v2
+  req.body.model = "anthropic.claude-v2";
+
+  // TODO: Handle claude-instant
+}
 
 export const aws = awsRouter;

@@ -196,21 +196,26 @@ anthropicRouter.post(
 anthropicRouter.post(
   "/v1/chat/completions",
   ipLimiter,
-  createPreprocessorMiddleware({
-    inApi: "openai",
-    outApi: "anthropic",
-    service: "anthropic",
-  }),
+  createPreprocessorMiddleware(
+    { inApi: "openai", outApi: "anthropic", service: "anthropic" },
+    { afterTransform: [maybeReassignModel] }
+  ),
   anthropicProxy
 );
-// Redirect browser requests to the homepage.
-anthropicRouter.get("*", (req, res, next) => {
-  const isBrowser = req.headers["user-agent"]?.includes("Mozilla");
-  if (isBrowser) {
-    res.redirect("/");
-  } else {
-    next();
+
+function maybeReassignModel(req: Request) {
+  const model = req.body.model;
+  if (!model.startsWith("gpt-")) return;
+
+  const bigModel = process.env.CLAUDE_BIG_MODEL || "claude-v1-100k";
+  const contextSize = req.promptTokens! + req.outputTokens!;
+  if (contextSize > 8500) {
+    req.log.debug(
+      { model: bigModel, contextSize },
+      "Using Claude 100k model for OpenAI-to-Anthropic request"
+    );
+    req.body.model = bigModel;
   }
-});
+}
 
 export const anthropic = anthropicRouter;

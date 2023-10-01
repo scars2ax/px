@@ -21,6 +21,7 @@ import {
   createEmbeddingsPreprocessorMiddleware,
   createPreprocessorMiddleware,
   finalizeBody,
+  forceModel,
   languageFilter,
   limitCompletions,
   stripHeaders,
@@ -260,7 +261,10 @@ openaiRouter.post(
   ipLimiter,
   createPreprocessorMiddleware(
     { inApi: "openai", outApi: "openai-text", service: "openai" },
-    { beforeTransform: [rewriteForTurboInstruct] }
+    {
+      beforeTransform: [rewriteForTurboInstruct],
+      afterTransform: [forceModel("gpt-3.5-turbo-instruct")],
+    }
   ),
   openaiProxy
 );
@@ -284,19 +288,5 @@ openaiRouter.post(
   createEmbeddingsPreprocessorMiddleware(),
   openaiEmbeddingsProxy
 );
-
-// Redirect browser requests to the homepage.
-openaiRouter.get("*", (req, res, next) => {
-  const isBrowser = req.headers["user-agent"]?.includes("Mozilla");
-  if (isBrowser) {
-    res.redirect("/");
-  } else {
-    next();
-  }
-});
-openaiRouter.use((req, res) => {
-  req.log.warn(`Blocked openai proxy request: ${req.method} ${req.path}`);
-  res.status(404).json({ error: "Not found" });
-});
 
 export const openai = openaiRouter;

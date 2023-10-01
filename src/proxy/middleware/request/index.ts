@@ -54,3 +54,6 @@ export type RequestPreprocessor = (req: Request) => void | Promise<void>;
  * request queue middleware.
  */
 export type ProxyRequestMiddleware = ProxyReqCallback<ClientRequest, Request>;
+
+export const forceModel = (model: string) => (req: Request) =>
+  void (req.body.model = model);
