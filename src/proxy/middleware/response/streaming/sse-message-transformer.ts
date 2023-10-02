@@ -4,23 +4,27 @@ import {
   anthropicV1ToOpenAI,
   anthropicV2ToOpenAI,
   openAITextToOpenAIChat,
-  StreamingResponseTransformer,
+  StreamingCompletionTransformer,
 } from "./index";
 import { openAIChatPassthrough } from "./transformers/openai-chat-passthrough";
 import { assertNever } from "../../../../shared/utils";
 
-type MessageTransformerOptions = TransformOptions & {
+type SSEMessageTransformerOptions = TransformOptions & {
   inputFormat: APIFormat;
   inputApiVersion?: string;
 };
 
+/**
+ * Transforms SSE messages from one API format to OpenAI chat.completion.chunks.
+ * Emits the original string SSE message as an "originalMessage" event.
+ */
 export class SSEMessageTransformer extends Transform  {
   private lastPosition: number;
   private msgCount: number;
-  private readonly transformFn: StreamingResponseTransformer;
+  private readonly transformFn: StreamingCompletionTransformer;
 
-  constructor(options: MessageTransformerOptions) {
-    super(options);
+  constructor(options: SSEMessageTransformerOptions) {
+    super({ ...options, readableObjectMode: true });
     this.lastPosition = 0;
     this.msgCount = 0;
     this.transformFn = getTransformer(
@@ -41,8 +45,7 @@ export class SSEMessageTransformer extends Transform  {
       this.lastPosition = newPosition;
 
       this.emit("originalMessage", originalMessage);
-      this.emit("transformedMessage", transformedMessage);
-      this.push(transformedMessage + "\n\n");
+      this.push(transformedMessage);
       callback();
     } catch (err) {
       callback(err);
@@ -53,7 +56,7 @@ export class SSEMessageTransformer extends Transform  {
 function getTransformer(
   responseApi: APIFormat,
   version?: string
-): StreamingResponseTransformer {
+): StreamingCompletionTransformer {
   switch (responseApi) {
     case "openai":
       return openAIChatPassthrough;

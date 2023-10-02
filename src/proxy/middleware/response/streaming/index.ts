@@ -16,7 +16,7 @@ export type OpenAiChatCompletionStreamEvent = {
   }[];
 }
 
-export type StreamingResponseTransformer = (
+export type StreamingCompletionTransformer = (
   params: SSEResponseTransformArgs
 ) => { position: number; event?: OpenAiChatCompletionStreamEvent };
 

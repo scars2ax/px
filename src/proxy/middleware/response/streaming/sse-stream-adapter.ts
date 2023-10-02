@@ -1,11 +1,11 @@
 import { Transform, TransformOptions } from "stream";
 // @ts-ignore
 import { Parser } from "lifion-aws-event-stream";
-import { logger } from "../../../logger";
+import { logger } from "../../../../logger";
 
 const log = logger.child({ module: "sse-stream-adapter" });
 
-type SSEStreamAdapterOptions = TransformOptions & { isAwsStream?: boolean };
+type SSEStreamAdapterOptions = TransformOptions & { contentType?: string };
 type AwsEventStreamMessage = {
   headers: { ":message-type": "event" | "exception" };
   payload: { message?: string /** base64 encoded */; bytes?: string };
@@ -15,14 +15,15 @@ type AwsEventStreamMessage = {
  * Receives either text chunks or AWS binary event stream chunks and emits
  * full SSE events.
  */
-export class ServerSentEventStreamAdapter extends Transform {
+export class SSEStreamAdapter extends Transform {
   private readonly isAwsStream;
   private parser = new Parser();
   private partialMessage = "";
 
   constructor(options?: SSEStreamAdapterOptions) {
     super(options);
-    this.isAwsStream = options?.isAwsStream || false;
+    this.isAwsStream =
+      options?.contentType === "application/vnd.amazon.eventstream";
 
     this.parser.on("data", (data: AwsEventStreamMessage) => {
       const message = this.processAwsEvent(data);
@@ -32,7 +33,7 @@ export class ServerSentEventStreamAdapter extends Transform {
     });
   }
 
-  processAwsEvent(event: AwsEventStreamMessage): string | null {
+  protected processAwsEvent(event: AwsEventStreamMessage): string | null {
     const { payload, headers } = event;
     if (headers[":message-type"] === "exception" || !payload.bytes) {
       log.error(

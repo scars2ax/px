@@ -1,4 +1,4 @@
-import { StreamingResponseTransformer } from "../index";
+import { StreamingCompletionTransformer } from "../index";
 import { parseEvent } from "../parse-sse";
 import { logger } from "../../../../../logger";
 
@@ -18,7 +18,7 @@ type AnthropicV2StreamEvent = {
  * Transforms an incoming Anthropic SSE (2023-06-01 API) to an equivalent
  * OpenAI chat.completion.chunk SSE.
  */
-export const anthropicV2ToOpenAI: StreamingResponseTransformer = (params) => {
+export const anthropicV2ToOpenAI: StreamingCompletionTransformer = (params) => {
   const { data } = params;
 
   const rawEvent = parseEvent(data);
