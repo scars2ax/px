@@ -2,9 +2,9 @@ import { Transform, TransformOptions } from "stream";
 import { APIFormat } from "../../../../shared/key-management";
 import {
   anthropicV1ToOpenAI,
-  anthropicV2ToOpenAI,
+  anthropicV2ToOpenAI, OpenAIChatCompletionStreamEvent,
   openAITextToOpenAIChat,
-  StreamingCompletionTransformer,
+  StreamingCompletionTransformer
 } from "./index";
 import { openAIChatPassthrough } from "./transformers/openai-chat-passthrough";
 import { assertNever } from "../../../../shared/utils";
@@ -44,6 +44,10 @@ export class SSEMessageTransformer extends Transform  {
         });
       this.lastPosition = newPosition;
 
+      if (this.msgCount === 1 && transformedMessage) {
+        this.push(createInitialMessage(transformedMessage));
+      }
+
       this.emit("originalMessage", originalMessage);
       this.push(transformedMessage);
       callback();
@@ -71,4 +75,22 @@ function getTransformer(
     default:
       assertNever(responseApi);
   }
+}
+
+/**
+ * OpenAI streaming chat completions start with an event that contains only the
+ * metadata and role (always 'assistant') for the response.  To simulate this
+ * for APIs where the first event contains actual content, we create a fake
+ * initial event with no content but correct metadata.
+ */
+function createInitialMessage(
+  event: OpenAIChatCompletionStreamEvent
+): OpenAIChatCompletionStreamEvent {
+  return {
+    ...event,
+    choices: event.choices.map((choice) => ({
+      ...choice,
+      delta: { role: "assistant", content: "" },
+    })),
+  };
 }

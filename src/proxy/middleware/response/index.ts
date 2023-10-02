@@ -203,7 +203,7 @@ export const decodeResponseBody: RawResponseBodyHandler = async (
         return resolve(body.toString());
       } catch (error: any) {
         const errorMessage = `Proxy received response with invalid JSON: ${error.message}`;
-        logger.warn({ error, key: req.key?.hash }, errorMessage);
+        logger.warn({ error: error.stack, key: req.key?.hash }, errorMessage);
         writeErrorResponse(req, res, 500, { error: errorMessage });
         return reject(errorMessage);
       }

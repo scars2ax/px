@@ -55,14 +55,14 @@ function asCompletionEvent(
 ): OpenAITextCompletionStreamEvent | null {
   try {
     const parsed = JSON.parse(event);
-    if (Array.isArray(parsed.choices) && parsed.choices[0].text) {
+    if (Array.isArray(parsed.choices) && parsed.choices[0].text !== undefined) {
       return parsed;
     } else {
       // noinspection ExceptionCaughtLocallyJS
       throw new Error("Missing required fields");
     }
   } catch (error) {
-    log.warn({ error, event }, "Received invalid data event");
+    log.warn({ error: error.stack, event }, "Received invalid data event");
   }
   return null;
 }

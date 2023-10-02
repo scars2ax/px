@@ -1,4 +1,4 @@
-import { OpenAiChatCompletionStreamEvent } from "../index";
+import { OpenAIChatCompletionStreamEvent } from "../index";
 
 export type AnthropicCompletionResponse = {
   completion: string;
@@ -16,7 +16,7 @@ export type AnthropicCompletionResponse = {
  * can operate on it as if it were a blocking response.
  */
 export function mergeEventsForAnthropic(
-  events: OpenAiChatCompletionStreamEvent[]
+  events: OpenAIChatCompletionStreamEvent[]
 ): AnthropicCompletionResponse {
   let merged: AnthropicCompletionResponse = {
     log_id: "",

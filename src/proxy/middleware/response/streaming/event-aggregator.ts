@@ -4,7 +4,7 @@ import {
   mergeEventsForAnthropic,
   mergeEventsForOpenAIChat,
   mergeEventsForOpenAIText,
-  OpenAiChatCompletionStreamEvent
+  OpenAIChatCompletionStreamEvent
 } from "./index";
 
 /**
@@ -13,14 +13,14 @@ import {
  */
 export class EventAggregator {
   private readonly format: APIFormat;
-  private readonly events: OpenAiChatCompletionStreamEvent[];
+  private readonly events: OpenAIChatCompletionStreamEvent[];
 
   constructor({ format }: { format: APIFormat }) {
     this.events = [];
     this.format = format;
   }
 
-  addEvent(event: OpenAiChatCompletionStreamEvent) {
+  addEvent(event: OpenAIChatCompletionStreamEvent) {
     this.events.push(event);
   }
 

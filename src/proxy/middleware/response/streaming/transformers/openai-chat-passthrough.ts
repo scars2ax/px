@@ -1,4 +1,4 @@
-import { OpenAiChatCompletionStreamEvent, SSEResponseTransformArgs } from "../index";
+import { OpenAIChatCompletionStreamEvent, SSEResponseTransformArgs } from "../index";
 import { parseEvent } from "../parse-sse";
 import { logger } from "../../../../../logger";
 
@@ -25,11 +25,11 @@ export const openAIChatPassthrough = (params: SSEResponseTransformArgs) => {
 
 function asCompletionEvent(
   event: string
-): OpenAiChatCompletionStreamEvent | null {
+): OpenAIChatCompletionStreamEvent | null {
   try {
     return JSON.parse(event);
   } catch (error) {
-    log.warn({ error, event }, "Received invalid data event");
+    log.warn({ error: error.stack, event }, "Received invalid data event");
   }
   return null;
 }

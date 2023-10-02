@@ -173,6 +173,7 @@ export function buildFakeSseMessage(
 }
 
 export function getCompletionFromBody(req: Request, body: Record<string, any>) {
+  console.log("getCompletionFromBody", JSON.stringify(body));
   const format = req.outboundApi;
   switch (format) {
     case "openai":

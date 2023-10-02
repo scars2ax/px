@@ -66,16 +66,17 @@ export const handleStreamedResponse: RawResponseBodyHandler = async (
       if (prefersNativeEvents) res.write(msg + "\n\n");
     })
     .on("data", (msg) => {
-      if (!prefersNativeEvents) res.write(msg + "\n\n");
+      if (!prefersNativeEvents) res.write(`data: ${JSON.stringify(msg)}\n\n`);
       aggregator.addEvent(msg);
     });
 
   try {
     await pipelineAsync(proxyRes, adapter, transformer);
     req.log.debug({ key: hash }, `Finished proxying SSE stream.`);
+    const result = aggregator.getFinalResponse();
+    req.log.debug({ result, key: hash }, `Finalized SSE response.`);
     return aggregator.getFinalResponse();
   } catch (err) {
-    req.log.error({ error: err, key: hash }, `Mid-stream error.`);
     const errorEvent = buildFakeSseMessage("stream-error", err.message, req);
     res.write(`data: ${JSON.stringify(errorEvent)}\n\ndata: [DONE]\n\n`);
     res.end();

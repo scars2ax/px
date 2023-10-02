@@ -4,7 +4,7 @@ export type SSEResponseTransformArgs = {
   index: number;
 };
 
-export type OpenAiChatCompletionStreamEvent = {
+export type OpenAIChatCompletionStreamEvent = {
   id: string;
   object: "chat.completion.chunk";
   created: number;
@@ -18,7 +18,7 @@ export type OpenAiChatCompletionStreamEvent = {
 
 export type StreamingCompletionTransformer = (
   params: SSEResponseTransformArgs
-) => { position: number; event?: OpenAiChatCompletionStreamEvent };
+) => { position: number; event?: OpenAIChatCompletionStreamEvent };
 
 export { openAITextToOpenAIChat } from "./transformers/openai-text-to-openai";
 export { anthropicV1ToOpenAI } from "./transformers/anthropic-v1-to-openai";

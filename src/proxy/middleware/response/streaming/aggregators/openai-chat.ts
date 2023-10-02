@@ -1,4 +1,4 @@
-import { OpenAiChatCompletionStreamEvent } from "../index";
+import { OpenAIChatCompletionStreamEvent } from "../index";
 
 export type OpenAiChatCompletionResponse = {
   id: string;
@@ -18,7 +18,7 @@ export type OpenAiChatCompletionResponse = {
  * can operate on it as if it were a blocking response.
  */
 export function mergeEventsForOpenAIChat(
-  events: OpenAiChatCompletionStreamEvent[]
+  events: OpenAIChatCompletionStreamEvent[]
 ): OpenAiChatCompletionResponse {
   let merged: OpenAiChatCompletionResponse = {
     id: "",

@@ -51,14 +51,14 @@ export const anthropicV2ToOpenAI: StreamingCompletionTransformer = (params) => {
 function asCompletionEvent(event: string): AnthropicV2StreamEvent | null {
   try {
     const parsed = JSON.parse(event);
-    if (parsed.completion && parsed.stop_reason) {
+    if (parsed.completion !== undefined && parsed.stop_reason !== undefined) {
       return parsed;
     } else {
       // noinspection ExceptionCaughtLocallyJS
       throw new Error("Missing required fields");
     }
   } catch (error) {
-    log.warn({ error, event }, "Received invalid data event");
+    log.warn({ error: error.stack, event }, "Received invalid data event");
   }
   return null;
 }
