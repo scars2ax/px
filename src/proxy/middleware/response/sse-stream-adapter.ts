@@ -42,7 +42,11 @@ export class ServerSentEventStreamAdapter extends Transform {
       const message = JSON.stringify(event);
       return getFakeErrorCompletion("proxy AWS error", message);
     } else {
-      return `data: ${Buffer.from(payload.bytes, "base64").toString("utf8")}`;
+      const { bytes } = payload;
+      return [
+        "event: completion",
+        `data: ${Buffer.from(bytes, "base64").toString("utf8")}`,
+      ].join("\n");
     }
   }
 
@@ -72,7 +76,7 @@ export class ServerSentEventStreamAdapter extends Transform {
 
 function getFakeErrorCompletion(type: string, message: string) {
   const content = `\`\`\`\n[${type}: ${message}]\n\`\`\`\n`;
-  const fakeEvent = {
+  const fakeEvent = JSON.stringify({
     log_id: "aws-proxy-sse-message",
     stop_reason: type,
     completion:
@@ -80,6 +84,6 @@ function getFakeErrorCompletion(type: string, message: string) {
     truncated: false,
     stop: null,
     model: "",
-  };
-  return `data: ${JSON.stringify(fakeEvent)}\n\n`;
+  });
+  return ["event: completion", `data: ${fakeEvent}\n\n`].join("\n");
 }

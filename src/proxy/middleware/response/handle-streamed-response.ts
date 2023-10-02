@@ -4,41 +4,7 @@ import { buildFakeSseMessage } from "../common";
 import { RawResponseBodyHandler, decodeResponseBody } from ".";
 import { assertNever } from "../../../shared/utils";
 import { ServerSentEventStreamAdapter } from "./sse-stream-adapter";
-
-type OpenAiChatCompletionResponse = {
-  id: string;
-  object: string;
-  created: number;
-  model: string;
-  choices: {
-    message: { role: string; content: string };
-    finish_reason: string | null;
-    index: number;
-  }[];
-};
-
-type OpenAiTextCompletionResponse = {
-  id: string;
-  object: string;
-  created: number;
-  model: string;
-  choices: {
-    text: string;
-    finish_reason: string | null;
-    index: number;
-    logprobs: null;
-  }[];
-};
-
-type AnthropicCompletionResponse = {
-  completion: string;
-  stop_reason: string;
-  truncated: boolean;
-  stop: any;
-  model: string;
-  log_id: string;
-  exception: null;
-};
+import { SSEMessageTransformer } from "./streaming/message-transformer";
 
 /**
  * Consume the SSE stream and forward events to the client. Once the stream is
@@ -87,6 +53,7 @@ export const handleStreamedResponse: RawResponseBodyHandler = async (
     { headers: proxyRes.headers, key: key.hash },
     `Received SSE headers.`
   );
+  const contentType = proxyRes.headers["content-type"];
 
   return new Promise((resolve, reject) => {
     req.log.info({ key: key.hash }, `Starting to proxy SSE stream.`);
@@ -104,29 +71,23 @@ export const handleStreamedResponse: RawResponseBodyHandler = async (
     }
 
     const adapter = new ServerSentEventStreamAdapter({
-      isAwsStream:
-        proxyRes.headers["content-type"] ===
-        "application/vnd.amazon.eventstream",
+      isAwsStream: contentType === "application/vnd.amazon.eventstream",
+    });
+    const transformer = new SSEMessageTransformer({
+      inputFormat: req.outboundApi, // outbound from the request's perspective
+      inputApiVersion: String(proxyRes.headers["anthropic-version"]),
     });
 
     const events: string[] = [];
-    let lastPosition = 0;
-    let eventCount = 0;
 
-    proxyRes.pipe(adapter);
+    proxyRes.pipe(adapter).pipe(transformer);
 
-    adapter.on("data", (chunk: any) => {
+    transformer.on("originalMessage", (message: boolean) => {
+
+    });
+    transformer.on("data", (chunk: any) => {
       try {
-        const { event, position } = transformEvent({
-          data: chunk.toString(),
-          requestApi: req.inboundApi,
-          responseApi: req.outboundApi,
-          lastPosition,
-          index: eventCount++,
-        });
-        events.push(event);
-        lastPosition = position;
-        res.write(event + "\n\n");
+        res.write(chunk + "\n\n");
       } catch (err) {
         adapter.emit("error", err);
       }
@@ -152,120 +113,6 @@ export const handleStreamedResponse: RawResponseBodyHandler = async (
     });
   });
 };
-
-type SSETransformationArgs = {
-  data: string;
-  requestApi: string;
-  responseApi: string;
-  lastPosition: number;
-  index: number;
-};
-
-/**
- * Transforms SSE events from the given response API into events compatible with
- * the API requested by the client.
- */
-function transformEvent(params: SSETransformationArgs) {
-  const { data, requestApi, responseApi } = params;
-  if (requestApi === responseApi) {
-    return { position: -1, event: data };
-  }
-
-  const trans = `${requestApi}->${responseApi}`;
-  switch (trans) {
-    case "openai->openai-text":
-      return transformOpenAITextEventToOpenAIChat(params);
-    case "openai->anthropic":
-      // TODO: handle new anthropic streaming format
-      return transformV1AnthropicEventToOpenAI(params);
-    default:
-      throw new Error(`Unsupported streaming API transformation. ${trans}`);
-  }
-}
-
-function transformOpenAITextEventToOpenAIChat(params: SSETransformationArgs) {
-  const { data, index } = params;
-
-  if (!data.startsWith("data:")) return { position: -1, event: data };
-  if (data.startsWith("data: [DONE]")) return { position: -1, event: data };
-
-  const event = JSON.parse(data.slice("data: ".length));
-
-  // The very first event must be a role assignment with no content.
-
-  const createEvent = () => ({
-    id: event.id,
-    object: "chat.completion.chunk",
-    created: event.created,
-    model: event.model,
-    choices: [
-      {
-        message: { role: "", content: "" } as {
-          role?: string;
-          content: string;
-        },
-        index: 0,
-        finish_reason: null,
-      },
-    ],
-  });
-
-  let buffer = "";
-
-  if (index === 0) {
-    const initialEvent = createEvent();
-    initialEvent.choices[0].message.role = "assistant";
-    buffer = `data: ${JSON.stringify(initialEvent)}\n\n`;
-  }
-
-  const newEvent = {
-    ...event,
-    choices: [
-      {
-        ...event.choices[0],
-        delta: { content: event.choices[0].text },
-        text: undefined,
-      },
-    ],
-  };
-
-  buffer += `data: ${JSON.stringify(newEvent)}`;
-
-  return { position: -1, event: buffer };
-}
-
-function transformV1AnthropicEventToOpenAI(params: SSETransformationArgs) {
-  const { data, lastPosition } = params;
-  // Anthropic sends the full completion so far with each event whereas OpenAI
-  // only sends the delta. To make the SSE events compatible, we remove
-  // everything before `lastPosition` from the completion.
-  if (!data.startsWith("data:")) {
-    return { position: lastPosition, event: data };
-  }
-
-  if (data.startsWith("data: [DONE]")) {
-    return { position: lastPosition, event: data };
-  }
-
-  const event = JSON.parse(data.slice("data: ".length));
-  const newEvent = {
-    id: "ant-" + event.log_id,
-    object: "chat.completion.chunk",
-    created: Date.now(),
-    model: event.model,
-    choices: [
-      {
-        index: 0,
-        delta: { content: event.completion?.slice(lastPosition) },
-        finish_reason: event.stop_reason,
-      },
-    ],
-  };
-  return {
-    position: event.completion.length,
-    event: `data: ${JSON.stringify(newEvent)}`,
-  };
-}
 
 /** Copy headers, excluding ones we're already setting for the SSE response. */
 function copyHeaders(proxyRes: http.IncomingMessage, res: Response) {
@@ -376,7 +223,7 @@ function convertEventsToFinalResponse(events: string[], req: Request) {
         model: req.body.model,
         log_id: "",
         exception: null,
-      }
+      };
 
       merged = events.reduce((acc, event) => {
         if (!event.startsWith("data: ")) return acc;
@@ -405,10 +252,7 @@ function convertEventsToFinalResponse(events: string[], req: Request) {
 }
 
 /** Older Anthropic streaming format which sent full completion each time. */
-function convertAnthropicV1(
-  events: string[],
-  req: Request
-) {
+function convertAnthropicV1(events: string[], req: Request) {
   const lastEvent = events[events.length - 2].toString();
   const data = JSON.parse(
     lastEvent.slice(lastEvent.indexOf("data: ") + "data: ".length)
