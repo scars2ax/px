@@ -1,35 +1,50 @@
 import { Transform, TransformOptions } from "stream";
+import { logger } from "../../../../logger";
 import { APIFormat } from "../../../../shared/key-management";
+import { assertNever } from "../../../../shared/utils";
 import {
   anthropicV1ToOpenAI,
-  anthropicV2ToOpenAI, OpenAIChatCompletionStreamEvent,
+  anthropicV2ToOpenAI,
+  OpenAIChatCompletionStreamEvent,
   openAITextToOpenAIChat,
-  StreamingCompletionTransformer
+  StreamingCompletionTransformer,
 } from "./index";
-import { openAIChatPassthrough } from "./transformers/openai-chat-passthrough";
-import { assertNever } from "../../../../shared/utils";
+import { passthroughToOpenAI } from "./transformers/passthrough-to-openai";
+
+const genlog = logger.child({ module: "sse-transformer" });
 
 type SSEMessageTransformerOptions = TransformOptions & {
   inputFormat: APIFormat;
   inputApiVersion?: string;
+  logger?: typeof logger;
 };
 
 /**
  * Transforms SSE messages from one API format to OpenAI chat.completion.chunks.
  * Emits the original string SSE message as an "originalMessage" event.
  */
-export class SSEMessageTransformer extends Transform  {
+export class SSEMessageTransformer extends Transform {
   private lastPosition: number;
   private msgCount: number;
   private readonly transformFn: StreamingCompletionTransformer;
+  private readonly log;
 
   constructor(options: SSEMessageTransformerOptions) {
     super({ ...options, readableObjectMode: true });
+    this.log = options.logger?.child({ module: "sse-transformer" }) ?? genlog;
     this.lastPosition = 0;
     this.msgCount = 0;
     this.transformFn = getTransformer(
       options.inputFormat,
       options.inputApiVersion
+    );
+    this.log.debug(
+      {
+        fn: this.transformFn.name,
+        format: options.inputFormat,
+        version: options.inputApiVersion,
+      },
+      "Selected SSE transformer"
     );
   }
 
@@ -44,14 +59,18 @@ export class SSEMessageTransformer extends Transform  {
         });
       this.lastPosition = newPosition;
 
-      if (this.msgCount === 1 && transformedMessage) {
+      this.emit("originalMessage", originalMessage);
+
+      // Some events may not be transformed, e.g. ping events
+      if (!transformedMessage) return callback();
+
+      if (this.msgCount === 1) {
         this.push(createInitialMessage(transformedMessage));
       }
-
-      this.emit("originalMessage", originalMessage);
       this.push(transformedMessage);
       callback();
     } catch (err) {
+      this.log.error(err, "Error transforming SSE message");
       callback(err);
     }
   }
@@ -63,7 +82,7 @@ function getTransformer(
 ): StreamingCompletionTransformer {
   switch (responseApi) {
     case "openai":
-      return openAIChatPassthrough;
+      return passthroughToOpenAI;
     case "openai-text":
       return openAITextToOpenAIChat;
     case "anthropic":

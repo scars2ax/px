@@ -42,7 +42,7 @@ export function writeErrorResponse(
   // the stream. Otherwise just send a normal error response.
   if (
     res.headersSent ||
-    res.getHeader("content-type") === "text/event-stream"
+    String(res.getHeader("content-type")).startsWith("text/event-stream")
   ) {
     const errorContent =
       statusCode === 403
@@ -173,7 +173,6 @@ export function buildFakeSseMessage(
 }
 
 export function getCompletionFromBody(req: Request, body: Record<string, any>) {
-  console.log("getCompletionFromBody", JSON.stringify(body));
   const format = req.outboundApi;
   switch (format) {
     case "openai":

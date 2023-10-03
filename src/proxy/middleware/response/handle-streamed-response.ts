@@ -63,10 +63,7 @@ export const handleStreamedResponse: RawResponseBodyHandler = async (
     inputApiVersion: String(req.headers["anthropic-version"]),
   })
     .on("originalMessage", (msg: string) => {
-      if (prefersNativeEvents) {
-        console.log("Sending original message", msg);
-        res.write(msg);
-      }
+      if (prefersNativeEvents) res.write(msg);
     })
     .on("data", (msg) => {
       if (!prefersNativeEvents) res.write(`data: ${JSON.stringify(msg)}\n\n`);

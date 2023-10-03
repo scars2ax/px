@@ -1,5 +1,5 @@
 import { SSEResponseTransformArgs } from "../index";
-import { parseEvent } from "../parse-sse";
+import { parseEvent, ServerSentEvent } from "../parse-sse";
 import { logger } from "../../../../../logger";
 
 const log = logger.child({
@@ -28,7 +28,7 @@ export const openAITextToOpenAIChat = (params: SSEResponseTransformArgs) => {
     return { position: -1 };
   }
 
-  const completionEvent = asCompletionEvent(rawEvent.data);
+  const completionEvent = asCompletion(rawEvent);
   if (!completionEvent) {
     return { position: -1 };
   }
@@ -50,11 +50,11 @@ export const openAITextToOpenAIChat = (params: SSEResponseTransformArgs) => {
   return { position: -1, event: newEvent };
 };
 
-function asCompletionEvent(
-  event: string
+function asCompletion(
+  event: ServerSentEvent
 ): OpenAITextCompletionStreamEvent | null {
   try {
-    const parsed = JSON.parse(event);
+    const parsed = JSON.parse(event.data);
     if (Array.isArray(parsed.choices) && parsed.choices[0].text !== undefined) {
       return parsed;
     } else {

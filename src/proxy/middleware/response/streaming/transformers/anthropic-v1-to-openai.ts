@@ -1,5 +1,5 @@
 import { StreamingCompletionTransformer } from "../index";
-import { parseEvent } from "../parse-sse";
+import { parseEvent, ServerSentEvent } from "../parse-sse";
 import { logger } from "../../../../../logger";
 
 const log = logger.child({
@@ -26,7 +26,7 @@ export const anthropicV1ToOpenAI: StreamingCompletionTransformer = (params) => {
     return { position: lastPosition };
   }
 
-  const completionEvent = asCompletionEvent(rawEvent.data);
+  const completionEvent = asCompletion(rawEvent);
   if (!completionEvent) {
     return { position: lastPosition };
   }
@@ -51,9 +51,9 @@ export const anthropicV1ToOpenAI: StreamingCompletionTransformer = (params) => {
   return { position: completionEvent.completion.length, event: newEvent };
 };
 
-function asCompletionEvent(event: string): AnthropicV1StreamEvent | null {
+function asCompletion(event: ServerSentEvent): AnthropicV1StreamEvent | null {
   try {
-    const parsed = JSON.parse(event);
+    const parsed = JSON.parse(event.data);
     if (parsed.completion !== undefined && parsed.stop_reason !== undefined) {
       return parsed;
     } else {
@@ -61,7 +61,7 @@ function asCompletionEvent(event: string): AnthropicV1StreamEvent | null {
       throw new Error("Missing required fields");
     }
   } catch (error) {
-    log.warn({ error: error.stack, event }, "Received invalid data event");
+    log.warn({ error: error.stack, event }, "Received invalid event");
   }
   return null;
 }
