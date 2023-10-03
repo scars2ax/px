@@ -14,6 +14,8 @@ import { passthroughToOpenAI } from "./transformers/passthrough-to-openai";
 const genlog = logger.child({ module: "sse-transformer" });
 
 type SSEMessageTransformerOptions = TransformOptions & {
+  requestedModel: string;
+  requestId: string;
   inputFormat: APIFormat;
   inputApiVersion?: string;
   logger?: typeof logger;
@@ -28,6 +30,8 @@ export class SSEMessageTransformer extends Transform {
   private msgCount: number;
   private readonly transformFn: StreamingCompletionTransformer;
   private readonly log;
+  private readonly fallbackId: string;
+  private readonly fallbackModel: string;
 
   constructor(options: SSEMessageTransformerOptions) {
     super({ ...options, readableObjectMode: true });
@@ -38,6 +42,8 @@ export class SSEMessageTransformer extends Transform {
       options.inputFormat,
       options.inputApiVersion
     );
+    this.fallbackId = options.requestId;
+    this.fallbackModel = options.requestedModel;
     this.log.debug(
       {
         fn: this.transformFn.name,
@@ -56,6 +62,8 @@ export class SSEMessageTransformer extends Transform {
           data: originalMessage,
           lastPosition: this.lastPosition,
           index: this.msgCount++,
+          fallbackId: this.fallbackId,
+          fallbackModel: this.fallbackModel,
         });
       this.lastPosition = newPosition;
 

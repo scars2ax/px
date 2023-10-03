@@ -28,7 +28,7 @@ export class SSEStreamAdapter extends Transform {
     this.parser.on("data", (data: AwsEventStreamMessage) => {
       const message = this.processAwsEvent(data);
       if (message) {
-        this.push(Buffer.from(message, "utf8"));
+        this.push(Buffer.from(message + "\n\n"), "utf8");
       }
     });
   }
@@ -44,6 +44,9 @@ export class SSEStreamAdapter extends Transform {
       return getFakeErrorCompletion("proxy AWS error", message);
     } else {
       const { bytes } = payload;
+      // technically this is a transformation but we don't really distinguish
+      // between aws claude and anthropic claude at the APIFormat level, so
+      // these will short circuit the message transformer
       return [
         "event: completion",
         `data: ${Buffer.from(bytes, "base64").toString("utf8")}`,

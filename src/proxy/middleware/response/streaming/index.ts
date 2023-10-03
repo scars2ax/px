@@ -2,6 +2,8 @@ export type SSEResponseTransformArgs = {
   data: string;
   lastPosition: number;
   index: number;
+  fallbackId: string;
+  fallbackModel: string;
 };
 
 export type OpenAIChatCompletionStreamEvent = {

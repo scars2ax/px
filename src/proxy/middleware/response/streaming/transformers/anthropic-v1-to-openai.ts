@@ -35,10 +35,10 @@ export const anthropicV1ToOpenAI: StreamingCompletionTransformer = (params) => {
   // only sends the delta. To make the SSE events compatible, we remove
   // everything before `lastPosition` from the completion.
   const newEvent = {
-    id: "ant-" + completionEvent.log_id,
+    id: "ant-" + (completionEvent.log_id ?? params.fallbackId),
     object: "chat.completion.chunk" as const,
     created: Date.now(),
-    model: completionEvent.model ?? "unspecified",
+    model: completionEvent.model ?? params.fallbackModel,
     choices: [
       {
         index: 0,

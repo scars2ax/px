@@ -61,6 +61,9 @@ export const handleStreamedResponse: RawResponseBodyHandler = async (
   const transformer = new SSEMessageTransformer({
     inputFormat: req.outboundApi, // outbound from the request's perspective
     inputApiVersion: String(req.headers["anthropic-version"]),
+    logger: req.log,
+    requestId: String(req.id),
+    requestedModel: req.body.model,
   })
     .on("originalMessage", (msg: string) => {
       if (prefersNativeEvents) res.write(msg);
@@ -73,8 +76,6 @@ export const handleStreamedResponse: RawResponseBodyHandler = async (
   try {
     await pipelineAsync(proxyRes, adapter, transformer);
     req.log.debug({ key: hash }, `Finished proxying SSE stream.`);
-    const result = aggregator.getFinalResponse();
-    req.log.debug({ result, key: hash }, `Finalized SSE response.`);
     res.end();
     return aggregator.getFinalResponse();
   } catch (err) {

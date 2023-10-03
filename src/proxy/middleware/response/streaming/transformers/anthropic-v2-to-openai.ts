@@ -32,10 +32,10 @@ export const anthropicV2ToOpenAI: StreamingCompletionTransformer = (params) => {
   }
 
   const newEvent = {
-    id: "ant-" + completionEvent.log_id,
+    id: "ant-" + (completionEvent.log_id ?? params.fallbackId),
     object: "chat.completion.chunk" as const,
     created: Date.now(),
-    model: completionEvent.model ?? "unspecified",
+    model: completionEvent.model ?? params.fallbackModel,
     choices: [
       {
         index: 0,

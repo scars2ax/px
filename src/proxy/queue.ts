@@ -363,7 +363,6 @@ function initStreaming(req: Request) {
     return;
   }
 
-  res.write("\n");
   res.write(": joining queue\n\n");
 }
 
