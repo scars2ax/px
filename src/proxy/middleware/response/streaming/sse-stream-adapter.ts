@@ -60,11 +60,15 @@ export class SSEStreamAdapter extends Transform {
         // so we need to buffer and emit separate stream events for full
         // messages so we can parse/transform them properly.
         const str = chunk.toString("utf8");
+
         const fullMessages = (this.partialMessage + str).split(/\r?\n\r?\n/);
         this.partialMessage = fullMessages.pop() || "";
 
         for (const message of fullMessages) {
-          this.push(message);
+          // Mixing line endings will break some clients and our request queue
+          // will have already sent \n for heartbeats, so we need to normalize
+          // to \n.
+          this.push(message.replace(/\r\n/g, "\n") + "\n\n");
         }
       }
       callback();

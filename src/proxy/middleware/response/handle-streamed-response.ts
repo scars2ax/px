@@ -57,13 +57,16 @@ export const handleStreamedResponse: RawResponseBodyHandler = async (
   const contentType = proxyRes.headers["content-type"];
 
   const adapter = new SSEStreamAdapter({ contentType });
-  const aggregator = new EventAggregator({ format: req.inboundApi });
+  const aggregator = new EventAggregator({ format: req.outboundApi });
   const transformer = new SSEMessageTransformer({
     inputFormat: req.outboundApi, // outbound from the request's perspective
-    inputApiVersion: String(proxyRes.headers["anthropic-version"]),
+    inputApiVersion: String(req.headers["anthropic-version"]),
   })
     .on("originalMessage", (msg: string) => {
-      if (prefersNativeEvents) res.write(msg + "\n\n");
+      if (prefersNativeEvents) {
+        console.log("Sending original message", msg);
+        res.write(msg);
+      }
     })
     .on("data", (msg) => {
       if (!prefersNativeEvents) res.write(`data: ${JSON.stringify(msg)}\n\n`);
@@ -75,10 +78,11 @@ export const handleStreamedResponse: RawResponseBodyHandler = async (
     req.log.debug({ key: hash }, `Finished proxying SSE stream.`);
     const result = aggregator.getFinalResponse();
     req.log.debug({ result, key: hash }, `Finalized SSE response.`);
+    res.end();
     return aggregator.getFinalResponse();
   } catch (err) {
     const errorEvent = buildFakeSseMessage("stream-error", err.message, req);
-    res.write(`data: ${JSON.stringify(errorEvent)}\n\ndata: [DONE]\n\n`);
+    res.write(`${errorEvent}data: [DONE]\n\n`);
     res.end();
     throw err;
   }
