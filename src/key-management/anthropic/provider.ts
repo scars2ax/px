@@ -128,7 +128,8 @@ export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
         requiresPreamble: false,
         hash: `ant-${crypto
           .createHash("sha256")
-          .update(keyValue)}`,
+          .update(keyValue)
+          .digest("hex")}`,
         lastChecked: 0,
       };
       this.keys.push(newKey);
