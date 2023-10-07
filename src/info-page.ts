@@ -35,6 +35,7 @@ type ModelAggregates = {
   revoked?: number;
   overQuota?: number;
   pozzed?: number;
+  awsLogged?: number;
   queued: number;
   queueTime: string;
   tokens: number;
@@ -199,6 +200,8 @@ function addKeyToAggregates(k: KeyPoolKey) {
       } else {
         family = "turbo";
       }
+
+      increment(modelStats, `${family}__trial`, k.isTrial ? 1 : 0);
       break;
     case "anthropic":
       if (!keyIsAnthropicKey(k)) throw new Error("Invalid key type");
@@ -226,6 +229,11 @@ function addKeyToAggregates(k: KeyPoolKey) {
       sumTokens += k["aws-claudeTokens"];
       sumCost += getTokenCostUsd(family, k["aws-claudeTokens"]);
       increment(modelStats, `${family}__tokens`, k["aws-claudeTokens"]);
+      // Keys are assumed to be logged unless explicitly disabled, but revoked
+      // keys should not be counted as logged.
+      const isLogged = !k.loggingDisabled && !k.isRevoked;
+      console.log(k.hash, "logdisabled", k.loggingDisabled, "revoked", k.isRevoked, "showaslogged", isLogged);
+      increment(modelStats, `${family}__awsLogged`, isLogged ? 1 : 0);
       break;
     default:
       assertNever(k.service);
@@ -234,7 +242,6 @@ function addKeyToAggregates(k: KeyPoolKey) {
   increment(serviceStats, "tokens", sumTokens);
   increment(serviceStats, "tokenCost", sumCost);
   increment(modelStats, `${family}__active`, k.isDisabled ? 0 : 1);
-  increment(modelStats, `${family}__trial`, k.isTrial ? 1 : 0);
   if ("isRevoked" in k) {
     increment(modelStats, `${family}__revoked`, k.isRevoked ? 1 : 0);
   }
@@ -366,11 +373,15 @@ function getAwsInfo() {
   const tokens = modelStats.get("aws-claude__tokens") || 0;
   const cost = getTokenCostUsd("aws-claude", tokens);
 
+  const logged = modelStats.get("aws-claude__awsLogged") || 0;
+  const logMsg = config.allowAwsLogging ? `${logged} active keys are potentially logged.` : `${logged} potentially logged keys were removed from the active key pool.`;
+
   return {
     usage: `${prettyTokens(tokens)} tokens${getCostString(cost)}`,
     activeKeys: awsInfo.active,
     proomptersInQueue: awsInfo.queued,
     estimatedQueueTime: awsInfo.queueTime,
+    ...(logged > 0 ? { privacy: logMsg } : {})
   }
 }
 
