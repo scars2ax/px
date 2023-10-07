@@ -38,8 +38,6 @@ export class AnthropicKeyChecker extends KeyCheckerBase<AnthropicKey> {
   }
 
   protected async checkKey(key: AnthropicKey) {
-    // It's possible this key might have been disabled while we were waiting
-    // for the next check.
     if (key.isDisabled) {
       this.log.warn({ key: key.hash }, "Skipping check for disabled key.");
       this.scheduleNextCheck();
@@ -53,7 +51,7 @@ export class AnthropicKeyChecker extends KeyCheckerBase<AnthropicKey> {
       const updates = { isPozzed: pozzed };
       this.updateKey(key.hash, updates);
       this.log.info(
-        { key: key.hash, models: key.modelFamilies, trial: key.isTrial },
+        { key: key.hash, models: key.modelFamilies },
         "Key check complete."
       );
     } catch (error) {
@@ -70,7 +68,7 @@ export class AnthropicKeyChecker extends KeyCheckerBase<AnthropicKey> {
     }
   }
 
-  private handleAxiosError(key: AnthropicKey, error: AxiosError) {
+  protected handleAxiosError(key: AnthropicKey, error: AxiosError) {
     if (error.response && AnthropicKeyChecker.errorIsAnthropicAPIError(error)) {
       const { status, data } = error.response;
       if (status === 401) {
@@ -78,11 +76,11 @@ export class AnthropicKeyChecker extends KeyCheckerBase<AnthropicKey> {
           { key: key.hash, error: data },
           "Key is invalid or revoked. Disabling key."
         );
-        this.updateKey(key.hash, { isDisabled: true });
+        this.updateKey(key.hash, { isDisabled: true, isRevoked: true });
       } else if (status === 429) {
         switch (data.error.type) {
           case "rate_limit_error":
-            this.log.error(
+            this.log.warn(
               { key: key.hash, error: error.message },
               "Key is rate limited. Rechecking in 10 seconds."
             );
@@ -90,7 +88,7 @@ export class AnthropicKeyChecker extends KeyCheckerBase<AnthropicKey> {
             this.updateKey(key.hash, { lastChecked: next });
             break;
           default:
-            this.log.error(
+            this.log.warn(
               { key: key.hash, rateLimitType: data.error.type, error: data },
               "Encountered unexpected rate limit error class while checking key. This may indicate a change in the API; please report this."
             );

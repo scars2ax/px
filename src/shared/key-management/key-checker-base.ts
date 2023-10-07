@@ -1,6 +1,7 @@
 import pino from "pino";
 import { logger } from "../../logger";
 import { Key } from "./index";
+import { AxiosError } from "axios";
 
 type KeyCheckerOptions = {
   service: string;
@@ -113,4 +114,6 @@ export abstract class KeyCheckerBase<TKey extends Key> {
   }
 
   protected abstract checkKey(key: TKey): Promise<void>;
+
+  protected abstract handleAxiosError(key: TKey, error: AxiosError): void;
 }

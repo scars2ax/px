@@ -39,8 +39,6 @@ export class OpenAIKeyChecker extends KeyCheckerBase<OpenAIKey> {
   }
 
   protected async checkKey(key: OpenAIKey) {
-    // It's possible this key might have been disabled while we were waiting
-    // for the next check.
     if (key.isDisabled) {
       this.log.warn({ key: key.hash }, "Skipping check for disabled key.");
       this.scheduleNextCheck();
@@ -144,7 +142,7 @@ export class OpenAIKeyChecker extends KeyCheckerBase<OpenAIKey> {
     this.cloneKey(key.hash, ids);
   }
 
-  private handleAxiosError(key: OpenAIKey, error: AxiosError) {
+  protected handleAxiosError(key: OpenAIKey, error: AxiosError) {
     if (error.response && OpenAIKeyChecker.errorIsOpenAIError(error)) {
       const { status, data } = error.response;
       if (status === 401) {
