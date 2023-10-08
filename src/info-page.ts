@@ -26,8 +26,7 @@ const keyIsAnthropicKey = (k: KeyPoolKey): k is AnthropicKey =>
   k.service === "anthropic";
 const keyIsGooglePalmKey = (k: KeyPoolKey): k is GooglePalmKey =>
   k.service === "google-palm";
-const keyIsAwsKey = (k: KeyPoolKey): k is AwsBedrockKey =>
-  k.service === "aws";
+const keyIsAwsKey = (k: KeyPoolKey): k is AwsBedrockKey => k.service === "aws";
 
 type ModelAggregates = {
   active: number;
@@ -232,7 +231,8 @@ function addKeyToAggregates(k: KeyPoolKey) {
 
       // Ignore revoked keys for aws logging stats, but include keys where the
       // logging status is unknown.
-      const countAsLogged = !k.isDisabled && k.awsLoggingStatus !== "disabled";
+      const countAsLogged =
+        k.lastChecked && !k.isDisabled && k.awsLoggingStatus !== "disabled";
       increment(modelStats, `${family}__awsLogged`, countAsLogged ? 1 : 0);
 
       break;
@@ -365,7 +365,7 @@ function getPalmInfo() {
 function getAwsInfo() {
   const awsInfo: Partial<ModelAggregates> = {
     active: modelStats.get("aws-claude__active") || 0,
-  }
+  };
 
   const queue = getQueueInformation("aws-claude");
   awsInfo.queued = queue.proomptersInQueue;
@@ -375,15 +375,17 @@ function getAwsInfo() {
   const cost = getTokenCostUsd("aws-claude", tokens);
 
   const logged = modelStats.get("aws-claude__awsLogged") || 0;
-  const logMsg = config.allowAwsLogging ? `${logged} active keys are potentially logged.` : `${logged} active keys are potentially logged and can't be used.`
+  const logMsg = config.allowAwsLogging
+    ? `${logged} active keys are potentially logged.`
+    : `${logged} active keys are potentially logged and can't be used.`;
 
   return {
     usage: `${prettyTokens(tokens)} tokens${getCostString(cost)}`,
     activeKeys: awsInfo.active,
     proomptersInQueue: awsInfo.queued,
     estimatedQueueTime: awsInfo.queueTime,
-    ...(logged > 0 ? { privacy: logMsg } : {})
-  }
+    ...(logged > 0 ? { privacy: logMsg } : {}),
+  };
 }
 
 const customGreeting = fs.existsSync("greeting.md")
