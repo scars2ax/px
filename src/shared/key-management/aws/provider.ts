@@ -2,9 +2,12 @@ import { config } from "../../../config";
 import { logger } from "../../../logger";
 import type { AwsBedrockModelFamily } from "../../models";
 import { Key, KeyProvider } from "../index";
-import { KeyStore, SerializedKey } from "../stores";
+import { KeyStore } from "../stores";
 import { AwsKeyChecker } from "./checker";
 import { AwsBedrockKeySerializer } from "./serializer";
+
+const RATE_LIMIT_LOCKOUT = 2000;
+const KEY_REUSE_DELAY = 500;
 
 // https://docs.aws.amazon.com/bedrock/latest/userguide/model-ids-arns.html
 export const AWS_BEDROCK_SUPPORTED_MODELS = [
@@ -33,27 +36,6 @@ export interface AwsBedrockKey extends Key, AwsBedrockKeyUsage {
    */
   awsLoggingStatus: "unknown" | "disabled" | "enabled";
 }
-
-const SERIALIZABLE_FIELDS: (keyof AwsBedrockKey)[] = [
-  "key",
-  "service",
-  "hash",
-  "aws-claudeTokens",
-];
-export type SerializedAwsBedrockKey = SerializedKey &
-  Partial<Pick<AwsBedrockKey, (typeof SERIALIZABLE_FIELDS)[number]>>;
-
-/**
- * Upon being rate limited, a key will be locked out for this many milliseconds
- * while we wait for other concurrent requests to finish.
- */
-const RATE_LIMIT_LOCKOUT = 300;
-/**
- * Upon assigning a key, we will wait this many milliseconds before allowing it
- * to be used again. This is to prevent the queue from flooding a key with too
- * many requests while we wait to learn whether previous ones succeeded.
- */
-const KEY_REUSE_DELAY = 500;
 
 export class AwsBedrockKeyProvider implements KeyProvider<AwsBedrockKey> {
   readonly service = "aws" as const;

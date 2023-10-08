@@ -6,7 +6,7 @@ import zlib from "zlib";
 import { logger } from "../../../logger";
 import { enqueue, trackWaitTime } from "../../queue";
 import { HttpError } from "../../../shared/errors";
-import { keyPool } from "../../../shared/key-management";
+import { AnthropicKey, keyPool } from "../../../shared/key-management";
 import { getOpenAIModelFamily } from "../../../shared/models";
 import { countTokens } from "../../../shared/tokenization";
 import {
@@ -407,7 +407,7 @@ function maybeHandleMissingPreambleError(
       { key: req.key?.hash },
       "Request failed due to missing preamble. Key will be marked as such for subsequent requests."
     );
-    keyPool.update(req.key!, { requiresPreamble: true });
+    keyPool.update(req.key as AnthropicKey, { requiresPreamble: true });
     reenqueueRequest(req);
     throw new RetryableError("Claude request re-enqueued to add preamble.");
   } else {

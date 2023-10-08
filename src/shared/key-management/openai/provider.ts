@@ -4,24 +4,21 @@ import { config } from "../../../config";
 import { logger } from "../../../logger";
 import { getOpenAIModelFamily, OpenAIModelFamily } from "../../models";
 import { Key, KeyProvider, Model } from "../index";
-import { KeyStore, SerializedKey } from "../stores";
+import { KeyStore } from "../stores";
 import { OpenAIKeyChecker } from "./checker";
 import { OpenAIKeySerializer } from "./serializer";
 
-export type OpenAIModel =
-  | "gpt-3.5-turbo"
-  | "gpt-3.5-turbo-instruct"
-  | "gpt-4"
-  | "gpt-4-32k"
-  | "text-embedding-ada-002";
-export const OPENAI_SUPPORTED_MODELS: readonly OpenAIModel[] = [
+const KEY_REUSE_DELAY = 1000;
+
+export const OPENAI_SUPPORTED_MODELS = [
   "gpt-3.5-turbo",
   "gpt-3.5-turbo-instruct",
   "gpt-4",
+  "gpt-4-32k",
+  "text-embedding-ada-002",
 ] as const;
+export type OpenAIModel = typeof OPENAI_SUPPORTED_MODELS[number];
 
-// Flattening model families instead of using a nested object for easier
-// cloning.
 type OpenAIKeyUsage = {
   [K in OpenAIModelFamily as `${K}Tokens`]: number;
 };
@@ -64,30 +61,6 @@ export interface OpenAIKey extends Key, OpenAIKeyUsage {
    */
   rateLimitTokensReset: number;
 }
-
-const SERIALIZABLE_FIELDS: (keyof OpenAIKey)[] = [
-  "key",
-  "service",
-  "hash",
-  "organizationId",
-  "gpt4Tokens",
-  "gpt4-32kTokens",
-  "turboTokens",
-];
-export type SerializedOpenAIKey = SerializedKey &
-  Partial<Pick<OpenAIKey, (typeof SERIALIZABLE_FIELDS)[number]>>;
-
-export type OpenAIKeyUpdate = Omit<
-  Partial<OpenAIKey>,
-  "key" | "hash" | "promptCount"
->;
-
-/**
- * Upon assigning a key, we will wait this many milliseconds before allowing it
- * to be used again. This is to prevent the queue from flooding a key with too
- * many requests while we wait to learn whether previous ones succeeded.
- */
-const KEY_REUSE_DELAY = 1000;
 
 export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
   readonly service = "openai" as const;
@@ -146,11 +119,11 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
     const excludeTrials = model === "text-embedding-ada-002";
 
     const availableKeys = this.keys.filter(
-      // Allow keys which
+      // Allow keys which...
       (key) =>
-        !key.isDisabled && // are not disabled
-        key.modelFamilies.includes(neededFamily) && // have access to the model
-        (!excludeTrials || !key.isTrial) // and are not trials (if applicable)
+        !key.isDisabled && // ...are not disabled
+        key.modelFamilies.includes(neededFamily) && // ...have access to the model
+        (!excludeTrials || !key.isTrial) // ...and are not trials (if applicable)
     );
 
     if (availableKeys.length === 0) {
@@ -230,10 +203,9 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
   }
 
   /** Called by the key checker to update key information. */
-  public update(keyHash: string, update: OpenAIKeyUpdate) {
+  public update(keyHash: string, update: Partial<OpenAIKey>) {
     const keyFromPool = this.keys.find((k) => k.hash === keyHash)!;
     Object.assign(keyFromPool, { lastChecked: Date.now(), ...update });
-    // this.writeKeyStatus();
   }
 
   /** Called by the key checker to create clones of keys for the given orgs. */

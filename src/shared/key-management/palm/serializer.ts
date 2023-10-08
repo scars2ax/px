@@ -1,7 +1,16 @@
 import crypto from "crypto";
-import { GooglePalmKey } from "..";
-import { KeySerializer } from "../stores";
-import { SerializedGooglePalmKey } from "./provider";
+import type { GooglePalmKey } from "../index";
+import type { KeySerializer } from "../stores";
+import { SerializedKey } from "../stores";
+
+const SERIALIZABLE_FIELDS: (keyof GooglePalmKey)[] = [
+  "key",
+  "service",
+  "hash",
+  "bisonTokens",
+];
+export type SerializedGooglePalmKey = SerializedKey &
+  Partial<Pick<GooglePalmKey, (typeof SERIALIZABLE_FIELDS)[number]>>;
 
 export const GooglePalmKeySerializer: KeySerializer<GooglePalmKey> = {
   serialize(key: GooglePalmKey): SerializedGooglePalmKey {

@@ -1,7 +1,10 @@
 import crypto from "crypto";
-import { AnthropicKey } from "..";
-import { KeySerializer } from "../stores";
-import { SerializedAnthropicKey } from "./provider";
+import type { AnthropicKey } from "../index";
+import type { KeySerializer, SerializedKey } from "../stores";
+
+const SERIALIZABLE_FIELDS = ["key", "service", "hash", "claudeTokens"] as const;
+export type SerializedAnthropicKey = SerializedKey &
+  Partial<Pick<AnthropicKey, (typeof SERIALIZABLE_FIELDS)[number]>>;
 
 export const AnthropicKeySerializer: KeySerializer<AnthropicKey> = {
   serialize(key: AnthropicKey): SerializedAnthropicKey {

@@ -2,22 +2,14 @@ import { Key, KeyProvider } from "..";
 import { config } from "../../../config";
 import { logger } from "../../../logger";
 import type { AnthropicModelFamily } from "../../models";
-import { KeyStore, SerializedKey } from "../stores";
+import { KeyStore } from "../stores";
 import { AnthropicKeyChecker } from "./checker";
 import { AnthropicKeySerializer } from "./serializer";
 
-/**
- * Upon being rate limited, a key will be locked out for this many milliseconds
- * while we wait for other concurrent requests to finish.
- */
 const RATE_LIMIT_LOCKOUT = 2000;
-/**
- * Upon assigning a key, we will wait this many milliseconds before allowing it
- * to be used again. This is to prevent the queue from flooding a key with too
- * many requests while we wait to learn whether previous ones succeeded.
- */
 const KEY_REUSE_DELAY = 500;
-/* https://docs.anthropic.com/claude/reference/selecting-a-model */
+
+// https://docs.anthropic.com/claude/reference/selecting-a-model
 export const ANTHROPIC_SUPPORTED_MODELS = [
   "claude-instant-v1",
   "claude-instant-v1-100k",
@@ -30,20 +22,6 @@ export type AnthropicModel = (typeof ANTHROPIC_SUPPORTED_MODELS)[number];
 type AnthropicKeyUsage = {
   [K in AnthropicModelFamily as `${K}Tokens`]: number;
 };
-
-const SERIALIZABLE_FIELDS = ["key", "service", "hash", "claudeTokens"] as const;
-export type SerializedAnthropicKey = SerializedKey &
-  Partial<Pick<AnthropicKey, (typeof SERIALIZABLE_FIELDS)[number]>>;
-
-export type AnthropicKeyUpdate = Omit<
-  Partial<AnthropicKey>,
-  | "key"
-  | "hash"
-  | "lastUsed"
-  | "promptCount"
-  | "rateLimitedAt"
-  | "rateLimitedUntil"
->;
 
 export interface AnthropicKey extends Key, AnthropicKeyUsage {
   readonly service: "anthropic";

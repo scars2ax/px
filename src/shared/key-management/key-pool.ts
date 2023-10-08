@@ -7,12 +7,10 @@ import { logger } from "../../logger";
 import { Key, Model, KeyProvider, LLMService } from "./index";
 import { getSerializer } from "./serializers";
 import { FirebaseKeyStore, KeyStore, MemoryKeyStore } from "./stores";
-import { AnthropicKeyProvider, AnthropicKeyUpdate } from "./anthropic/provider";
-import { OpenAIKeyProvider, OpenAIKeyUpdate } from "./openai/provider";
+import { AnthropicKeyProvider } from "./anthropic/provider";
+import { OpenAIKeyProvider } from "./openai/provider";
 import { GooglePalmKeyProvider } from "./palm/provider";
 import { AwsBedrockKeyProvider } from "./aws/provider";
-
-type AllowedPartial = OpenAIKeyUpdate | AnthropicKeyUpdate;
 
 export class KeyPool {
   private keyProviders: KeyProvider[] = [];
@@ -24,9 +22,9 @@ export class KeyPool {
     this.keyProviders.push(
       new OpenAIKeyProvider(createKeyStore("openai")),
       new AnthropicKeyProvider(createKeyStore("anthropic")),
-      new GooglePalmKeyProvider(createKeyStore("google-palm"))
+      new GooglePalmKeyProvider(createKeyStore("google-palm")),
+      new AwsBedrockKeyProvider(createKeyStore("aws"))
     );
-    // this.keyProviders.push(new AwsBedrockKeyProvider());
   }
 
   public async init() {
@@ -62,7 +60,7 @@ export class KeyPool {
     }
   }
 
-  public update(key: Key, props: AllowedPartial): void {
+  public update<T extends Key>(key: T, props: Partial<T>): void {
     const service = this.getKeyProvider(key.service);
     service.update(key.hash, props);
   }

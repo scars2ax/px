@@ -1,25 +1,15 @@
 import { Key, KeyProvider } from "..";
 import { logger } from "../../../logger";
 import type { GooglePalmModelFamily } from "../../models";
-import { KeyStore, SerializedKey } from "../stores";
+import { KeyStore } from "../stores";
 import { GooglePalmKeySerializer } from "./serializer";
 
-// https://developers.generativeai.google.com/models/language
-export const GOOGLE_PALM_SUPPORTED_MODELS = [
-  "text-bison-001",
-  // "chat-bison-001", no adjustable safety settings, so it's useless
-] as const;
-export type GooglePalmModel = (typeof GOOGLE_PALM_SUPPORTED_MODELS)[number];
+const RATE_LIMIT_LOCKOUT = 2000;
+const KEY_REUSE_DELAY = 500;
 
-export type GooglePalmKeyUpdate = Omit<
-  Partial<GooglePalmKey>,
-  | "key"
-  | "hash"
-  | "lastUsed"
-  | "promptCount"
-  | "rateLimitedAt"
-  | "rateLimitedUntil"
->;
+// https://developers.generativeai.google.com/models/language
+export const GOOGLE_PALM_SUPPORTED_MODELS = ["text-bison-001"] as const;
+export type GooglePalmModel = (typeof GOOGLE_PALM_SUPPORTED_MODELS)[number];
 
 type GooglePalmKeyUsage = {
   [K in GooglePalmModelFamily as `${K}Tokens`]: number;
@@ -33,27 +23,6 @@ export interface GooglePalmKey extends Key, GooglePalmKeyUsage {
   /** The time until which this key is rate limited. */
   rateLimitedUntil: number;
 }
-
-const SERIALIZABLE_FIELDS: (keyof GooglePalmKey)[] = [
-  "key",
-  "service",
-  "hash",
-  "bisonTokens",
-];
-export type SerializedGooglePalmKey = SerializedKey &
-  Partial<Pick<GooglePalmKey, (typeof SERIALIZABLE_FIELDS)[number]>>;
-
-/**
- * Upon being rate limited, a key will be locked out for this many milliseconds
- * while we wait for other concurrent requests to finish.
- */
-const RATE_LIMIT_LOCKOUT = 2000;
-/**
- * Upon assigning a key, we will wait this many milliseconds before allowing it
- * to be used again. This is to prevent the queue from flooding a key with too
- * many requests while we wait to learn whether previous ones succeeded.
- */
-const KEY_REUSE_DELAY = 500;
 
 export class GooglePalmKeyProvider implements KeyProvider<GooglePalmKey> {
   readonly service = "google-palm";

@@ -1,7 +1,18 @@
 import crypto from "crypto";
-import { OpenAIKey } from "..";
-import { KeySerializer } from "../stores";
-import { SerializedOpenAIKey } from "./provider";
+import type { OpenAIKey } from "../index";
+import type { KeySerializer, SerializedKey } from "../stores";
+
+const SERIALIZABLE_FIELDS: (keyof OpenAIKey)[] = [
+  "key",
+  "service",
+  "hash",
+  "organizationId",
+  "gpt4Tokens",
+  "gpt4-32kTokens",
+  "turboTokens",
+];
+export type SerializedOpenAIKey = SerializedKey &
+  Partial<Pick<OpenAIKey, (typeof SERIALIZABLE_FIELDS)[number]>>;
 
 export const OpenAIKeySerializer: KeySerializer<OpenAIKey> = {
   serialize(key: OpenAIKey): SerializedOpenAIKey {

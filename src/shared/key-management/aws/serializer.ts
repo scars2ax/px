@@ -1,7 +1,15 @@
 import crypto from "crypto";
-import { AwsBedrockKey } from "..";
-import { KeySerializer } from "../stores";
-import { SerializedAwsBedrockKey } from "./provider";
+import type { AwsBedrockKey } from "../index";
+import type { KeySerializer, SerializedKey } from "../stores";
+
+const SERIALIZABLE_FIELDS: (keyof AwsBedrockKey)[] = [
+  "key",
+  "service",
+  "hash",
+  "aws-claudeTokens",
+];
+export type SerializedAwsBedrockKey = SerializedKey &
+  Partial<Pick<AwsBedrockKey, (typeof SERIALIZABLE_FIELDS)[number]>>;
 
 export const AwsBedrockKeySerializer: KeySerializer<AwsBedrockKey> = {
   serialize(key: AwsBedrockKey): SerializedAwsBedrockKey {
