@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
 import type firebase from "firebase-admin";
+import { hostname } from "os";
 import pino from "pino";
 import type { ModelFamily } from "./shared/models";
 dotenv.config();
@@ -64,6 +65,19 @@ type Config = {
    * `private_key` field inside it.
    */
   firebaseKey?: string;
+  /**
+   * The root key under which data will be stored in the Firebase RTDB. This
+   * allows multiple instances of the proxy to share the same database while
+   * keeping their data separate.
+   *
+   * If you want multiple proxies to share the same data, set all of their
+   * `firebaseRtdbRoot` to the same value. Beware that there will likely
+   * be conflicts because concurrent writes are not yet supported and proxies
+   * currently assume they have exclusive access to the database.
+   *
+   * Defaults to the system hostname so that data is kept separate.
+   */
+  firebaseRtdbRoot: string;
   /**
    * Maximum number of IPs per user, after which their token is disabled.
    * Users with the manually-assigned `special` role are exempt from this limit.
@@ -169,6 +183,7 @@ export const config: Config = {
   maxIpsPerUser: getEnvWithDefault("MAX_IPS_PER_USER", 0),
   firebaseRtdbUrl: getEnvWithDefault("FIREBASE_RTDB_URL", undefined),
   firebaseKey: getEnvWithDefault("FIREBASE_KEY", undefined),
+  firebaseRtdbRoot: getEnvWithDefault("FIREBASE_RTDB_ROOT", hostname()),
   modelRateLimit: getEnvWithDefault("MODEL_RATE_LIMIT", 4),
   maxContextTokensOpenAI: getEnvWithDefault("MAX_CONTEXT_TOKENS_OPENAI", 0),
   maxContextTokensAnthropic: getEnvWithDefault(

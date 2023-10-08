@@ -1,12 +1,12 @@
 import { assertNever } from "../../utils";
-import { LLMService, Key } from "..";
-import { KeySerializer } from ".";
-import { KeyStore } from ".";
+import { LLMService, Key } from "../index";
+import { KeySerializer, KeyStore } from ".";
 
 export class MemoryKeyStore<K extends Key> implements KeyStore<K> {
-  private env: string;
+  private readonly env: string;
+  private readonly serializer: KeySerializer<K>;
 
-  constructor(service: LLMService, private serializer: KeySerializer<K>) {
+  constructor(service: LLMService, serializer: KeySerializer<K>) {
     switch (service) {
       case "anthropic":
         this.env = "ANTHROPIC_KEY";
@@ -18,11 +18,12 @@ export class MemoryKeyStore<K extends Key> implements KeyStore<K> {
         this.env = "GOOGLE_PALM_KEY";
         break;
       case "aws":
-        this.env = "AWS_CREDENTIALS"; // TODO: parse AWS security credentials
+        this.env = "AWS_CREDENTIALS";
         break;
       default:
         assertNever(service);
     }
+    this.serializer = serializer;
   }
 
   public async load() {

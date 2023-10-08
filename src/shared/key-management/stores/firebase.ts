@@ -1,30 +1,32 @@
 import firebase from "firebase-admin";
-import { getFirebaseApp } from "../../../config";
+import { config, getFirebaseApp } from "../../../config";
 import { logger } from "../../../logger";
-import { LLMService, Key } from "..";
-import { KeyStore, assertSerializableKey } from ".";
-import { KeySerializer } from ".";
+import { Key, LLMService } from "..";
+import { assertSerializableKey, KeySerializer, KeyStore } from ".";
 
 export class FirebaseKeyStore<K extends Key> implements KeyStore<K> {
-  private log: typeof logger;
-  private db: firebase.database.Database;
-  private keysRef: firebase.database.Reference | null = null;
-  private pendingUpdates: Map<string, Partial<K>> = new Map();
+  private readonly db: firebase.database.Database;
+  private readonly log: typeof logger;
+  private readonly pendingUpdates: Map<string, Partial<K>> = new Map();
+  private readonly root: string;
+  private readonly serializer: KeySerializer<K>;
   private flushInterval: NodeJS.Timeout | null = null;
+  private keysRef: firebase.database.Reference | null = null;
 
   constructor(
-    private readonly service: LLMService,
-    private serializer: KeySerializer<K>,
+    service: LLMService,
+    serializer: KeySerializer<K>,
     app = getFirebaseApp()
   ) {
     this.db = firebase.database(app);
-    this.service = service;
     this.log = logger.child({ module: "firebase-key-store", service });
+    this.root = `keys/${config.firebaseRtdbRoot}/${service}`;
+    this.serializer = serializer;
     this.schedulePeriodicFlush();
   }
 
   public async load() {
-    const keysRef = this.db.ref(`keys/${this.service}`);
+    const keysRef = this.db.ref(this.root);
     const snapshot = await keysRef.once("value");
     const keys = snapshot.val();
 

@@ -1,7 +1,7 @@
+import { AxiosError } from "axios";
 import pino from "pino";
 import { logger } from "../../logger";
 import { Key } from "./index";
-import { AxiosError } from "axios";
 
 type KeyCheckerOptions = {
   service: string;
