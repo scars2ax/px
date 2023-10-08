@@ -1,12 +1,9 @@
-/* Manages OpenAI API keys. Tracks usage, disables expired keys, and provides
-round-robin access to keys. Keys are stored in the OPENAI_KEY environment
-variable as a comma-separated list of keys. */
 import crypto from "crypto";
-import http from "http";
-import { Key, KeyProvider, Model } from "../index";
+import { IncomingHttpHeaders } from "http";
 import { config } from "../../../config";
 import { logger } from "../../../logger";
 import { getOpenAIModelFamily, OpenAIModelFamily } from "../../models";
+import { Key, KeyProvider, Model } from "../index";
 import { KeyStore, SerializedKey } from "../stores";
 import { OpenAIKeyChecker } from "./checker";
 import { OpenAIKeySerializer } from "./serializer";
@@ -337,7 +334,7 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
     key[`${getOpenAIModelFamily(model)}Tokens`] += tokens;
   }
 
-  public updateRateLimits(keyHash: string, headers: http.IncomingHttpHeaders) {
+  public updateRateLimits(keyHash: string, headers: IncomingHttpHeaders) {
     const key = this.keys.find((k) => k.hash === keyHash)!;
     const requestsReset = headers["x-ratelimit-reset-requests"];
     const tokensReset = headers["x-ratelimit-reset-tokens"];

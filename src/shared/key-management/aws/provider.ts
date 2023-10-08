@@ -1,9 +1,10 @@
-import crypto from "crypto";
-import { Key, KeyProvider } from "..";
 import { config } from "../../../config";
 import { logger } from "../../../logger";
 import type { AwsBedrockModelFamily } from "../../models";
+import { Key, KeyProvider } from "../index";
+import { KeyStore, SerializedKey } from "../stores";
 import { AwsKeyChecker } from "./checker";
+import { AwsBedrockKeySerializer } from "./serializer";
 
 // https://docs.aws.amazon.com/bedrock/latest/userguide/model-ids-arns.html
 export const AWS_BEDROCK_SUPPORTED_MODELS = [
@@ -33,6 +34,15 @@ export interface AwsBedrockKey extends Key, AwsBedrockKeyUsage {
   awsLoggingStatus: "unknown" | "disabled" | "enabled";
 }
 
+const SERIALIZABLE_FIELDS: (keyof AwsBedrockKey)[] = [
+  "key",
+  "service",
+  "hash",
+  "aws-claudeTokens",
+];
+export type SerializedAwsBedrockKey = SerializedKey &
+  Partial<Pick<AwsBedrockKey, (typeof SERIALIZABLE_FIELDS)[number]>>;
+
 /**
  * Upon being rate limited, a key will be locked out for this many milliseconds
  * while we wait for other concurrent requests to finish.
@@ -46,48 +56,34 @@ const RATE_LIMIT_LOCKOUT = 300;
 const KEY_REUSE_DELAY = 500;
 
 export class AwsBedrockKeyProvider implements KeyProvider<AwsBedrockKey> {
-  readonly service = "aws";
+  readonly service = "aws" as const;
 
-  private keys: AwsBedrockKey[] = [];
+  private readonly keys: AwsBedrockKey[] = [];
+  private store: KeyStore<AwsBedrockKey>;
   private checker?: AwsKeyChecker;
   private log = logger.child({ module: "key-provider", service: this.service });
 
-  constructor() {
-    const keyConfig = config.awsCredentials?.trim();
-    if (!keyConfig) {
-      this.log.warn(
-        "AWS_CREDENTIALS is not set. AWS Bedrock API will not be available."
-      );
-      return;
-    }
-    let bareKeys: string[];
-    bareKeys = [...new Set(keyConfig.split(",").map((k) => k.trim()))];
-    for (const key of bareKeys) {
-      const newKey: AwsBedrockKey = {
-        key,
-        service: this.service,
-        modelFamilies: ["aws-claude"],
-        isDisabled: false,
-        isRevoked: false,
-        promptCount: 0,
-        lastUsed: 0,
-        rateLimitedAt: 0,
-        rateLimitedUntil: 0,
-        awsLoggingStatus: "unknown",
-        hash: `aws-${crypto
-          .createHash("sha256")
-          .update(key)
-          .digest("hex")
-          .slice(0, 8)}`,
-        lastChecked: 0,
-        ["aws-claudeTokens"]: 0,
-      };
-      this.keys.push(newKey);
-    }
-    this.log.info({ keyCount: this.keys.length }, "Loaded AWS Bedrock keys.");
+  constructor(store: KeyStore<AwsBedrockKey>) {
+    this.store = store;
   }
 
-  public init() {
+  public async init() {
+    const storeName = this.store.constructor.name;
+    const serializedKeys = await this.store.load();
+
+    if (serializedKeys.length === 0) {
+      return this.log.warn(
+        { via: storeName },
+        "No AWS credentials found. AWS Bedrock API will not be available."
+      );
+    }
+
+    this.keys.push(...serializedKeys.map(AwsBedrockKeySerializer.deserialize));
+    this.log.info(
+      { count: this.keys.length, via: storeName },
+      "Loaded AWS Bedrock keys."
+    );
+
     if (config.checkKeys) {
       this.checker = new AwsKeyChecker(this.keys, this.update.bind(this));
       this.checker.start();

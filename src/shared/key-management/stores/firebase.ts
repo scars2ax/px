@@ -1,7 +1,7 @@
 import firebase from "firebase-admin";
 import { getFirebaseApp } from "../../../config";
 import { logger } from "../../../logger";
-import { APIFormat, Key } from "..";
+import { LLMService, Key } from "..";
 import { KeyStore, assertSerializableKey } from ".";
 import { KeySerializer } from ".";
 
@@ -13,7 +13,7 @@ export class FirebaseKeyStore<K extends Key> implements KeyStore<K> {
   private flushInterval: NodeJS.Timeout | null = null;
 
   constructor(
-    private service: APIFormat,
+    private readonly service: LLMService,
     private serializer: KeySerializer<K>,
     app = getFirebaseApp()
   ) {

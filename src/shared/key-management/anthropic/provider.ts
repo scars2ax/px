@@ -84,11 +84,10 @@ export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
     const serializedKeys = await this.store.load();
 
     if (serializedKeys.length === 0) {
-      this.log.warn(
+      return this.log.warn(
         { via: storeName },
         "No Anthropic keys found. Anthropic API will not be available."
       );
-      return;
     }
 
     this.keys.push(...serializedKeys.map(AnthropicKeySerializer.deserialize));

@@ -1,7 +1,7 @@
 import { Key, KeyProvider } from "..";
-import { KeyStore, SerializedKey } from "../stores";
 import { logger } from "../../../logger";
 import type { GooglePalmModelFamily } from "../../models";
+import { KeyStore, SerializedKey } from "../stores";
 import { GooglePalmKeySerializer } from "./serializer";
 
 // https://developers.generativeai.google.com/models/language

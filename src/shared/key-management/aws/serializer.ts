@@ -1,31 +1,32 @@
 import crypto from "crypto";
-import { GooglePalmKey } from "..";
+import { AwsBedrockKey } from "..";
 import { KeySerializer } from "../stores";
-import { SerializedGooglePalmKey } from "./provider";
+import { SerializedAwsBedrockKey } from "./provider";
 
-export const GooglePalmKeySerializer: KeySerializer<GooglePalmKey> = {
-  serialize(key: GooglePalmKey): SerializedGooglePalmKey {
+export const AwsBedrockKeySerializer: KeySerializer<AwsBedrockKey> = {
+  serialize(key: AwsBedrockKey): SerializedAwsBedrockKey {
     return { key: key.key };
   },
-  deserialize(serializedKey: SerializedGooglePalmKey): GooglePalmKey {
+  deserialize(serializedKey: SerializedAwsBedrockKey): AwsBedrockKey {
     const { key, ...rest } = serializedKey;
     return {
       key,
-      service: "google-palm" as const,
-      modelFamilies: ["bison"],
+      service: "aws",
+      modelFamilies: ["aws-claude"],
       isDisabled: false,
       isRevoked: false,
       promptCount: 0,
       lastUsed: 0,
       rateLimitedAt: 0,
       rateLimitedUntil: 0,
+      awsLoggingStatus: "unknown",
       hash: `plm-${crypto
         .createHash("sha256")
         .update(key)
         .digest("hex")
         .slice(0, 8)}`,
       lastChecked: 0,
-      bisonTokens: 0,
+      ["aws-claudeTokens"]: 0,
       ...rest,
     };
   },
