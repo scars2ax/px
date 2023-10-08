@@ -1,11 +1,10 @@
-import axios, { AxiosError, AxiosRequestConfig, AxiosHeaders } from "axios";
 import { Sha256 } from "@aws-crypto/sha256-js";
 import { SignatureV4 } from "@smithy/signature-v4";
 import { HttpRequest } from "@smithy/protocol-http";
+import axios, { AxiosError, AxiosRequestConfig, AxiosHeaders } from "axios";
 import { URL } from "url";
 import { KeyCheckerBase } from "../key-checker-base";
 import type { AwsBedrockKey, AwsBedrockKeyProvider } from "./provider";
-import { config } from "../../../config";
 
 const MIN_CHECK_INTERVAL = 3 * 1000; // 3 seconds
 const KEY_CHECK_PERIOD = 3 * 60 * 1000; // 3 minutes
@@ -52,47 +51,36 @@ export class AwsKeyChecker extends KeyCheckerBase<AwsBedrockKey> {
     this.log.debug({ key: key.hash }, "Checking key...");
     let isInitialCheck = !key.lastChecked;
     try {
-      const checks: Promise<unknown>[] = [this.testLogging(key)];
       // Only check models on startup.  For now all models must be available to
       // the proxy because we don't route requests to different keys.
+      const modelChecks: Promise<unknown>[] = [];
       if (isInitialCheck) {
-        checks.push(this.invokeModel("anthropic.claude-v1", key));
-        checks.push(this.invokeModel("anthropic.claude-v2", key));
+        modelChecks.push(this.invokeModel("anthropic.claude-v1", key));
+        modelChecks.push(this.invokeModel("anthropic.claude-v2", key));
       }
 
-      const [logged] = await Promise.all(checks);
-      if (logged) this.handleLoggedKey(key);
+      await Promise.all(modelChecks);
+      await this.checkLoggingConfiguration(key);
 
-      this.updateKey(key.hash, {});
       this.log.info(
-        { key: key.hash, models: key.modelFamilies, logged },
+        {
+          key: key.hash,
+          models: key.modelFamilies,
+          logged: key.awsLoggingStatus,
+        },
         "Key check complete."
       );
     } catch (error) {
-      // touch the key so we don't check it again for a while
-      this.updateKey(key.hash, {});
       this.handleAxiosError(key, error as AxiosError);
     }
+
+    this.updateKey(key.hash, {});
 
     this.lastCheck = Date.now();
     // Only enqueue the next check if this wasn't a startup check, since those
     // are batched together elsewhere.
     if (!isInitialCheck) {
       this.scheduleNextCheck();
-    }
-  }
-
-  /**
-   * If model invocation logging is enabled for a key, we can only use the key
-   * if the proxy operator has opted into allowing logged keys.
-   */
-  private handleLoggedKey(key: AwsBedrockKey) {
-    if (!config.allowAwsLogging) {
-      this.log.warn(
-        { key: key.hash },
-        "Key may have model invocation logging enabled and proxy is not configured to allow this; disabling."
-      );
-      return this.updateKey(key.hash, { isDisabled: true });
     }
   }
 
@@ -106,11 +94,11 @@ export class AwsKeyChecker extends KeyCheckerBase<AwsBedrockKey> {
           // to perform the requested action.
           // How we handle this depends on whether the action was one that we
           // must be able to perform in order to use the key.
-          const action = error.config?.url?.split("/").pop();
+          const path = new URL(error.config?.url!).pathname;
           const data = error.response.data;
           this.log.warn(
-            { key: key.hash, type: errorType, action, data },
-            "Key cannot perform required action or invoke required model; disabling."
+            { key: key.hash, type: errorType, path, data },
+            "Key can't perform a required action; disabling."
           );
           return this.updateKey(key.hash, { isDisabled: true });
         case "UnrecognizedClientException":
@@ -160,11 +148,7 @@ export class AwsKeyChecker extends KeyCheckerBase<AwsBedrockKey> {
     const creds = AwsKeyChecker.getCredentialsFromKey(key);
     // This is not a valid invocation payload, but a 400 response indicates that
     // the principal at least has permission to invoke the model.
-    const payload = {
-      max_tokens_to_sample: -1,
-      stream: false,
-      prompt: TEST_PROMPT,
-    };
+    const payload = { max_tokens_to_sample: -1, prompt: TEST_PROMPT };
     const config: AxiosRequestConfig = {
       method: "POST",
       url: POST_INVOKE_MODEL_URL(creds.region, model),
@@ -201,10 +185,9 @@ export class AwsKeyChecker extends KeyCheckerBase<AwsBedrockKey> {
       { key: key.hash, errorType, data, status },
       "Liveness test complete."
     );
-    return { model, valid: true };
   }
 
-  private async testLogging(key: AwsBedrockKey): Promise<boolean> {
+  private async checkLoggingConfiguration(key: AwsBedrockKey) {
     const creds = AwsKeyChecker.getCredentialsFromKey(key);
     const config: AxiosRequestConfig = {
       method: "GET",
@@ -216,29 +199,25 @@ export class AwsKeyChecker extends KeyCheckerBase<AwsBedrockKey> {
     const { data, status, headers } =
       await axios.request<GetLoggingConfigResponse>(config);
 
+    let result: AwsBedrockKey["awsLoggingStatus"] = "unknown";
+
     if (status === 200) {
       const { loggingConfig } = data;
       const loggingEnabled = !!loggingConfig?.textDataDeliveryEnabled;
-      this.log.info(
+      this.log.debug(
         { key: key.hash, loggingConfig, loggingEnabled },
         "AWS model invocation logging test complete."
       );
-
-      // The double boolean negation is confusing but intentional; the flag on
-      // the key asserts that we were able to check and determine the logging
-      // status, whereas the default when we cannot check is to assume that
-      // logging *could* be enabled, but we don't know for sure.
-      // Might be better represented as an enum.
-      this.updateKey(key.hash, { loggingDisabled: !loggingEnabled });
-      return loggingEnabled;
+      result = loggingEnabled ? "enabled" : "disabled";
+    } else {
+      const errorType = (headers["x-amzn-errortype"] as string).split(":")[0];
+      this.log.debug(
+        { key: key.hash, errorType, data, status },
+        "Can't determine AWS model invocation logging status."
+      );
     }
 
-    const errorType = (headers["x-amzn-errortype"] as string).split(":")[0];
-    this.log.warn(
-      { key: key.hash, errorType, data, status },
-      "AWS model invocation logging status could not be determined. Assuming key may be logged."
-    );
-    return true;
+    this.updateKey(key.hash, { awsLoggingStatus: result });
   }
 
   static errorIsAwsError(error: AxiosError): error is AxiosError<AwsError> {

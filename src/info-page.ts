@@ -229,11 +229,12 @@ function addKeyToAggregates(k: KeyPoolKey) {
       sumTokens += k["aws-claudeTokens"];
       sumCost += getTokenCostUsd(family, k["aws-claudeTokens"]);
       increment(modelStats, `${family}__tokens`, k["aws-claudeTokens"]);
-      // Keys are assumed to be logged unless explicitly disabled, but revoked
-      // keys should not be counted as logged.
-      const isLogged = !k.loggingDisabled && !k.isRevoked;
-      console.log(k.hash, "logdisabled", k.loggingDisabled, "revoked", k.isRevoked, "showaslogged", isLogged);
-      increment(modelStats, `${family}__awsLogged`, isLogged ? 1 : 0);
+
+      // Ignore revoked keys for aws logging stats, but include keys where the
+      // logging status is unknown.
+      const countAsLogged = !k.isDisabled && k.awsLoggingStatus !== "disabled";
+      increment(modelStats, `${family}__awsLogged`, countAsLogged ? 1 : 0);
+
       break;
     default:
       assertNever(k.service);
@@ -374,7 +375,7 @@ function getAwsInfo() {
   const cost = getTokenCostUsd("aws-claude", tokens);
 
   const logged = modelStats.get("aws-claude__awsLogged") || 0;
-  const logMsg = config.allowAwsLogging ? `${logged} active keys are potentially logged.` : `${logged} potentially logged keys were removed from the active key pool.`;
+  const logMsg = config.allowAwsLogging ? `${logged} active keys are potentially logged.` : `${logged} active keys are potentially logged and can't be used.`
 
   return {
     usage: `${prettyTokens(tokens)} tokens${getCostString(cost)}`,

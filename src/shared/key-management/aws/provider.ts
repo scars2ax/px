@@ -25,11 +25,12 @@ export interface AwsBedrockKey extends Key, AwsBedrockKeyUsage {
   /** The time until which this key is rate limited. */
   rateLimitedUntil: number;
   /**
-   * Whether we've confirmed that model invocations are not being logged for
-   * this key.  Some credentials are missing the policy that allows us to even
-   * check this value, in which case we cannot confirm that logging is disabled.
+   * The confirmed logging status of this key. This is "unknown" until we
+   * receive a response from the AWS API. Keys which are logged, or not
+   * confirmed as not being logged, won't be used unless ALLOW_AWS_LOGGING is
+   * set.
    */
-  loggingDisabled: boolean;
+  awsLoggingStatus: "unknown" | "disabled" | "enabled";
 }
 
 /**
@@ -72,7 +73,7 @@ export class AwsBedrockKeyProvider implements KeyProvider<AwsBedrockKey> {
         lastUsed: 0,
         rateLimitedAt: 0,
         rateLimitedUntil: 0,
-        loggingDisabled: false,
+        awsLoggingStatus: "unknown",
         hash: `aws-${crypto
           .createHash("sha256")
           .update(key)
@@ -98,7 +99,10 @@ export class AwsBedrockKeyProvider implements KeyProvider<AwsBedrockKey> {
   }
 
   public get(_model: AwsBedrockModel) {
-    const availableKeys = this.keys.filter((k) => !k.isDisabled);
+    const availableKeys = this.keys.filter((k) => {
+      const isNotLogged = k.awsLoggingStatus === "disabled";
+      return !k.isDisabled && (isNotLogged || config.allowAwsLogging);
+    });
     if (availableKeys.length === 0) {
       throw new Error("No AWS Bedrock keys available");
     }
