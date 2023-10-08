@@ -37,19 +37,15 @@ export class GooglePalmKeyProvider implements KeyProvider<GooglePalmKey> {
 
   public async init() {
     const storeName = this.store.constructor.name;
-    const serializedKeys = await this.store.load();
+    const loadedKeys = await this.store.load();
 
-    if (serializedKeys.length === 0) {
-      this.log.warn(
-        { via: storeName },
-        "No PaLM keys found. PaLM API will not be available."
-      );
-      return;
+    if (loadedKeys.length === 0) {
+      return this.log.warn({ via: storeName }, "No Google PaLM keys found.");
     }
 
-    this.keys.push(...serializedKeys.map(GooglePalmKeySerializer.deserialize));
+    this.keys.push(...loadedKeys);
     this.log.info(
-      { keyCount: this.keys.length, via: storeName },
+      { count: this.keys.length, via: storeName },
       "Loaded PaLM keys."
     );
   }

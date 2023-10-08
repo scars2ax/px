@@ -6,7 +6,6 @@ import { getOpenAIModelFamily, OpenAIModelFamily } from "../../models";
 import { Key, KeyProvider, Model } from "../index";
 import { KeyStore } from "../stores";
 import { OpenAIKeyChecker } from "./checker";
-import { OpenAIKeySerializer } from "./serializer";
 
 const KEY_REUSE_DELAY = 1000;
 
@@ -17,7 +16,7 @@ export const OPENAI_SUPPORTED_MODELS = [
   "gpt-4-32k",
   "text-embedding-ada-002",
 ] as const;
-export type OpenAIModel = typeof OPENAI_SUPPORTED_MODELS[number];
+export type OpenAIModel = (typeof OPENAI_SUPPORTED_MODELS)[number];
 
 type OpenAIKeyUsage = {
   [K in OpenAIModelFamily as `${K}Tokens`]: number;
@@ -76,23 +75,16 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
 
   public async init() {
     const storeName = this.store.constructor.name;
-    const serializedKeys = await this.store.load();
+    const loadedKeys = await this.store.load();
 
-    // TODO: If keystore is unavailable or returns no keys, instantiate a
-    // MemoryKeyStore and use the keys from process.env. Migrate them to the
-    // keystore when it becomes available.
     // TODO: after key management UI, keychecker should always be enabled
     // because keys may be added after initialization.
 
-    if (serializedKeys.length === 0) {
-      this.log.warn(
-        { via: storeName },
-        "No OpenAI keys found. OpenAI API will not be available."
-      );
-      return;
+    if (loadedKeys.length === 0) {
+      return this.log.warn({ via: storeName }, "No OpenAI keys found.");
     }
 
-    this.keys.push(...serializedKeys.map(OpenAIKeySerializer.deserialize));
+    this.keys.push(...loadedKeys);
     this.log.info(
       { count: this.keys.length, via: storeName },
       "Loaded OpenAI keys."

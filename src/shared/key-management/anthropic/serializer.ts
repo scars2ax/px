@@ -1,15 +1,21 @@
 import crypto from "crypto";
-import type { AnthropicKey } from "../index";
-import type { KeySerializer, SerializedKey } from "../stores";
+import type { AnthropicKey, SerializedKey } from "../index";
+import { KeySerializerBase } from "../serializers";
 
-const SERIALIZABLE_FIELDS = ["key", "service", "hash", "claudeTokens"] as const;
+const SERIALIZABLE_FIELDS: (keyof AnthropicKey)[] = [
+  "key",
+  "service",
+  "hash",
+  "claudeTokens",
+];
 export type SerializedAnthropicKey = SerializedKey &
   Partial<Pick<AnthropicKey, (typeof SERIALIZABLE_FIELDS)[number]>>;
 
-export const AnthropicKeySerializer: KeySerializer<AnthropicKey> = {
-  serialize(key: AnthropicKey): SerializedAnthropicKey {
-    return { key: key.key }; // TODO: serialize other fields
-  },
+export class AnthropicKeySerializer extends KeySerializerBase<AnthropicKey> {
+  constructor() {
+    super(SERIALIZABLE_FIELDS);
+  }
+  
   deserialize({ key, ...rest }: SerializedAnthropicKey): AnthropicKey {
     return {
       key,
@@ -32,5 +38,5 @@ export const AnthropicKeySerializer: KeySerializer<AnthropicKey> = {
       claudeTokens: 0,
       ...rest,
     };
-  },
-};
+  }
+}

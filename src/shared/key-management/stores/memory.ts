@@ -1,6 +1,6 @@
 import { assertNever } from "../../utils";
-import { LLMService, Key } from "../index";
-import { KeySerializer, KeyStore } from ".";
+import { LLMService, Key, KeySerializer } from "../index";
+import { KeyStore } from ".";
 
 export class MemoryKeyStore<K extends Key> implements KeyStore<K> {
   private readonly env: string;

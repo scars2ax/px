@@ -59,16 +59,13 @@ export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
 
   public async init() {
     const storeName = this.store.constructor.name;
-    const serializedKeys = await this.store.load();
+    const loadedKeys = await this.store.load();
 
-    if (serializedKeys.length === 0) {
-      return this.log.warn(
-        { via: storeName },
-        "No Anthropic keys found. Anthropic API will not be available."
-      );
+    if (loadedKeys.length === 0) {
+      return this.log.warn({ via: storeName }, "No Anthropic keys found.");
     }
 
-    this.keys.push(...serializedKeys.map(AnthropicKeySerializer.deserialize));
+    this.keys.push(...loadedKeys);
     this.log.info(
       { count: this.keys.length, via: storeName },
       "Loaded Anthropic keys."

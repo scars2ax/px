@@ -4,7 +4,6 @@ import type { AwsBedrockModelFamily } from "../../models";
 import { Key, KeyProvider } from "../index";
 import { KeyStore } from "../stores";
 import { AwsKeyChecker } from "./checker";
-import { AwsBedrockKeySerializer } from "./serializer";
 
 const RATE_LIMIT_LOCKOUT = 2000;
 const KEY_REUSE_DELAY = 500;
@@ -51,16 +50,13 @@ export class AwsBedrockKeyProvider implements KeyProvider<AwsBedrockKey> {
 
   public async init() {
     const storeName = this.store.constructor.name;
-    const serializedKeys = await this.store.load();
+    const loadedKeys = await this.store.load();
 
-    if (serializedKeys.length === 0) {
-      return this.log.warn(
-        { via: storeName },
-        "No AWS credentials found. AWS Bedrock API will not be available."
-      );
+    if (loadedKeys.length === 0) {
+      return this.log.warn({ via: storeName }, "No AWS credentials found.");
     }
 
-    this.keys.push(...serializedKeys.map(AwsBedrockKeySerializer.deserialize));
+    this.keys.push(...loadedKeys);
     this.log.info(
       { count: this.keys.length, via: storeName },
       "Loaded AWS Bedrock keys."

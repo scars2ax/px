@@ -1,6 +1,6 @@
 import crypto from "crypto";
-import type { OpenAIKey } from "../index";
-import type { KeySerializer, SerializedKey } from "../stores";
+import type { OpenAIKey, SerializedKey } from "../index";
+import { KeySerializerBase } from "../serializers";
 
 const SERIALIZABLE_FIELDS: (keyof OpenAIKey)[] = [
   "key",
@@ -14,10 +14,11 @@ const SERIALIZABLE_FIELDS: (keyof OpenAIKey)[] = [
 export type SerializedOpenAIKey = SerializedKey &
   Partial<Pick<OpenAIKey, (typeof SERIALIZABLE_FIELDS)[number]>>;
 
-export const OpenAIKeySerializer: KeySerializer<OpenAIKey> = {
-  serialize(key: OpenAIKey): SerializedOpenAIKey {
-    return { key: key.key };
-  },
+export class OpenAIKeySerializer extends KeySerializerBase<OpenAIKey> {
+  constructor() {
+    super(SERIALIZABLE_FIELDS);
+  }
+
   deserialize({ key, ...rest }: SerializedOpenAIKey): OpenAIKey {
     return {
       key,
@@ -43,5 +44,5 @@ export const OpenAIKeySerializer: KeySerializer<OpenAIKey> = {
       "gpt4-32kTokens": 0,
       ...rest,
     };
-  },
-};
+  }
+}

@@ -1,7 +1,6 @@
 import crypto from "crypto";
-import type { GooglePalmKey } from "../index";
-import type { KeySerializer } from "../stores";
-import { SerializedKey } from "../stores";
+import type { GooglePalmKey, SerializedKey } from "../index";
+import { KeySerializerBase } from "../serializers";
 
 const SERIALIZABLE_FIELDS: (keyof GooglePalmKey)[] = [
   "key",
@@ -12,10 +11,11 @@ const SERIALIZABLE_FIELDS: (keyof GooglePalmKey)[] = [
 export type SerializedGooglePalmKey = SerializedKey &
   Partial<Pick<GooglePalmKey, (typeof SERIALIZABLE_FIELDS)[number]>>;
 
-export const GooglePalmKeySerializer: KeySerializer<GooglePalmKey> = {
-  serialize(key: GooglePalmKey): SerializedGooglePalmKey {
-    return { key: key.key };
-  },
+export class GooglePalmKeySerializer extends KeySerializerBase<GooglePalmKey> {
+  constructor() {
+    super(SERIALIZABLE_FIELDS);
+  }
+
   deserialize(serializedKey: SerializedGooglePalmKey): GooglePalmKey {
     const { key, ...rest } = serializedKey;
     return {
@@ -37,5 +37,5 @@ export const GooglePalmKeySerializer: KeySerializer<GooglePalmKey> = {
       bisonTokens: 0,
       ...rest,
     };
-  },
-};
+  }
+}
