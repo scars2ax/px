@@ -3,8 +3,7 @@ import { IncomingHttpHeaders } from "http";
 import { config } from "../../../config";
 import { logger } from "../../../logger";
 import { getOpenAIModelFamily, OpenAIModelFamily } from "../../models";
-import { Key, KeyProvider, Model } from "../index";
-import { KeyStore } from "../stores";
+import { Key, KeyProvider, KeyStore, Model } from "../types";
 import { OpenAIKeyChecker } from "./checker";
 
 const KEY_REUSE_DELAY = 1000;

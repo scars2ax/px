@@ -1,8 +1,7 @@
 import { config } from "../../../config";
 import { logger } from "../../../logger";
 import type { AwsBedrockModelFamily } from "../../models";
-import { Key, KeyProvider } from "../index";
-import { KeyStore } from "../stores";
+import { Key, KeyProvider, KeyStore } from "../types";
 import { AwsKeyChecker } from "./checker";
 
 const RATE_LIMIT_LOCKOUT = 2000;

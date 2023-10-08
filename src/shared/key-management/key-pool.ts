@@ -4,13 +4,21 @@ import os from "os";
 import schedule from "node-schedule";
 import { config } from "../../config";
 import { logger } from "../../logger";
-import { Key, KeyProvider, LLMService, Model, ServiceToKey } from "./index";
 import { getSerializer } from "./serializers";
-import { FirebaseKeyStore, KeyStore, MemoryKeyStore } from "./stores";
+import { FirebaseKeyStore, MemoryKeyStore } from "./stores";
 import { AnthropicKeyProvider } from "./anthropic/provider";
 import { OpenAIKeyProvider } from "./openai/provider";
 import { GooglePalmKeyProvider } from "./palm/provider";
 import { AwsBedrockKeyProvider } from "./aws/provider";
+
+import {
+  Key,
+  KeyProvider,
+  KeyStore,
+  LLMService,
+  Model,
+  ServiceToKey,
+} from "./types";
 
 export class KeyPool {
   private keyProviders: KeyProvider[] = [];
@@ -168,3 +176,9 @@ function createKeyStore<S extends LLMService>(
   }
 }
 
+export let keyPool: KeyPool;
+
+export async function init() {
+  keyPool = new KeyPool();
+  await keyPool.init();
+}

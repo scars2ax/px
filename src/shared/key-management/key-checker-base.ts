@@ -1,13 +1,14 @@
 import { AxiosError } from "axios";
 import pino from "pino";
 import { logger } from "../../logger";
-import { Key } from "./index";
+
+import { Key } from "./types";
 
 type KeyCheckerOptions = {
   service: string;
   keyCheckPeriod: number;
   minCheckInterval: number;
-}
+};
 
 export abstract class KeyCheckerBase<TKey extends Key> {
   protected readonly service: string;

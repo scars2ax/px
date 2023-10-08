@@ -5,9 +5,9 @@ import { RequestPreprocessor } from ".";
 export const setApiFormat = (api: {
   inApi: Request["inboundApi"];
   outApi: APIFormat;
-  service: LLMService,
+  service: LLMService;
 }): RequestPreprocessor => {
-  return function configureRequestApiFormat (req) {
+  return function configureRequestApiFormat(req) {
     req.inboundApi = api.inApi;
     req.outboundApi = api.outApi;
     req.service = api.service;

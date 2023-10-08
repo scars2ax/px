@@ -4,9 +4,9 @@ import showdown from "showdown";
 import { config, listConfig } from "./config";
 import {
   AnthropicKey,
+  AwsBedrockKey,
   GooglePalmKey,
   OpenAIKey,
-  AwsBedrockKey,
   keyPool,
 } from "./shared/key-management";
 import { ModelFamily, OpenAIModelFamily } from "./shared/models";

@@ -4,7 +4,7 @@ import {
   mergeEventsForAnthropic,
   mergeEventsForOpenAIChat,
   mergeEventsForOpenAIText,
-  OpenAIChatCompletionStreamEvent
+  OpenAIChatCompletionStreamEvent,
 } from "./index";
 
 /**

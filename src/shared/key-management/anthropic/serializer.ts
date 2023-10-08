@@ -1,11 +1,12 @@
 import crypto from "crypto";
 import type { AnthropicKey, SerializedKey } from "../index";
-import { KeySerializerBase } from "../serializers";
+import { KeySerializerBase } from "../key-serializer-base";
 
 const SERIALIZABLE_FIELDS: (keyof AnthropicKey)[] = [
   "key",
   "service",
   "hash",
+  "promptCount",
   "claudeTokens",
 ];
 export type SerializedAnthropicKey = SerializedKey &
@@ -15,7 +16,7 @@ export class AnthropicKeySerializer extends KeySerializerBase<AnthropicKey> {
   constructor() {
     super(SERIALIZABLE_FIELDS);
   }
-  
+
   deserialize({ key, ...rest }: SerializedAnthropicKey): AnthropicKey {
     return {
       key,

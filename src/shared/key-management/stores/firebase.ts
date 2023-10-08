@@ -1,14 +1,15 @@
 import firebase from "firebase-admin";
 import { config, getFirebaseApp } from "../../../config";
 import { logger } from "../../../logger";
-import {
-  assertSerializedKey,
+import { assertSerializedKey } from "../serializers";
+import type {
   Key,
   KeySerializer,
+  KeyStore,
   LLMService,
   SerializedKey,
-} from "../index";
-import { KeyStore, MemoryKeyStore } from "./index";
+} from "../types";
+import { MemoryKeyStore } from "./index";
 
 export class FirebaseKeyStore<K extends Key> implements KeyStore<K> {
   private readonly db: firebase.database.Database;
@@ -27,30 +28,30 @@ export class FirebaseKeyStore<K extends Key> implements KeyStore<K> {
   ) {
     this.db = firebase.database(app);
     this.log = logger.child({ module: "firebase-key-store", service });
-    this.root = `keys/${config.firebaseRtdbRoot}/${service}`;
+    this.root = `keys/${config.firebaseRtdbRoot.toLowerCase()}/${service}`;
     this.serializer = serializer;
     this.service = service;
     this.pendingUpdates = new Map();
     this.schedulePeriodicFlush();
   }
 
-  public async load() {
+  public async load(isMigrating = false): Promise<K[]> {
     const keysRef = this.db.ref(this.root);
     const snapshot = await keysRef.once("value");
     const keys = snapshot.val();
+    this.keysRef = keysRef;
 
     if (!keys) {
+      if (isMigrating) return [];
       this.log.warn("No keys found in Firebase. Migrating from environment.");
       await this.migrate();
+      return this.load(true);
     }
 
-    const values = Object.values(keys).map((k) => {
+    return Object.values(keys).map((k) => {
       assertSerializedKey(k);
       return this.serializer.deserialize(k);
     });
-
-    this.keysRef = keysRef;
-    return values;
   }
 
   public add(key: K) {
@@ -91,19 +92,21 @@ export class FirebaseKeyStore<K extends Key> implements KeyStore<K> {
     this.schedulePeriodicFlush();
   }
 
-  private async migrate() {
+  private async migrate(): Promise<SerializedKey[]> {
+    const keysRef = this.db.ref(this.root);
     const envStore = new MemoryKeyStore<K>(this.service, this.serializer);
     const keys = await envStore.load();
 
     if (keys.length === 0) {
       this.log.warn("No keys found in environment or Firebase.");
-      return;
+      return [];
     }
 
     const updates: Record<string, SerializedKey> = {};
     keys.forEach((k) => (updates[k.hash] = this.serializer.serialize(k)));
-    await this.db.ref(this.root).update(updates);
+    await keysRef.update(updates);
 
     this.log.info({ count: keys.length }, "Migrated keys from environment.");
+    return Object.values(updates);
   }
 }

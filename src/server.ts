@@ -11,7 +11,7 @@ import { adminRouter } from "./admin/routes";
 import { checkOrigin } from "./proxy/check-origin";
 import { start as startRequestQueue } from "./proxy/queue";
 import { proxyRouter } from "./proxy/routes";
-import { init as initKeyPool } from "./shared/key-management";
+import { init as initKeyPool } from "./shared/key-management/key-pool";
 import { logQueue } from "./shared/prompt-logging";
 import { init as initTokenizers } from "./shared/tokenization";
 import { init as initUserStore } from "./shared/users/user-store";

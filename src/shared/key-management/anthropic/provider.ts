@@ -1,10 +1,8 @@
-import { Key, KeyProvider } from "..";
 import { config } from "../../../config";
 import { logger } from "../../../logger";
 import type { AnthropicModelFamily } from "../../models";
-import { KeyStore } from "../stores";
+import { Key, KeyProvider, KeyStore } from "../types";
 import { AnthropicKeyChecker } from "./checker";
-import { AnthropicKeySerializer } from "./serializer";
 
 const RATE_LIMIT_LOCKOUT = 2000;
 const KEY_REUSE_DELAY = 500;

@@ -1,11 +1,12 @@
 import crypto from "crypto";
 import type { GooglePalmKey, SerializedKey } from "../index";
-import { KeySerializerBase } from "../serializers";
+import { KeySerializerBase } from "../key-serializer-base";
 
 const SERIALIZABLE_FIELDS: (keyof GooglePalmKey)[] = [
   "key",
   "service",
   "hash",
+  "promptCount",
   "bisonTokens",
 ];
 export type SerializedGooglePalmKey = SerializedKey &

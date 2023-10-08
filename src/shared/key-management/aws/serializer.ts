@@ -1,11 +1,12 @@
 import crypto from "crypto";
 import type { AwsBedrockKey, SerializedKey } from "../index";
-import { KeySerializerBase } from "../serializers";
+import { KeySerializerBase } from "../key-serializer-base";
 
 const SERIALIZABLE_FIELDS: (keyof AwsBedrockKey)[] = [
   "key",
   "service",
   "hash",
+  "promptCount",
   "aws-claudeTokens",
 ];
 export type SerializedAwsBedrockKey = SerializedKey &
@@ -29,7 +30,7 @@ export class AwsBedrockKeySerializer extends KeySerializerBase<AwsBedrockKey> {
       rateLimitedAt: 0,
       rateLimitedUntil: 0,
       awsLoggingStatus: "unknown",
-      hash: `plm-${crypto
+      hash: `aws-${crypto
         .createHash("sha256")
         .update(key)
         .digest("hex")

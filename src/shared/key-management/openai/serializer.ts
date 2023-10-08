@@ -1,12 +1,13 @@
 import crypto from "crypto";
 import type { OpenAIKey, SerializedKey } from "../index";
-import { KeySerializerBase } from "../serializers";
+import { KeySerializerBase } from "../key-serializer-base";
 
 const SERIALIZABLE_FIELDS: (keyof OpenAIKey)[] = [
   "key",
   "service",
   "hash",
   "organizationId",
+  "promptCount",
   "gpt4Tokens",
   "gpt4-32kTokens",
   "turboTokens",
