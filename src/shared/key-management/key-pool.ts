@@ -4,7 +4,7 @@ import os from "os";
 import schedule from "node-schedule";
 import { config } from "../../config";
 import { logger } from "../../logger";
-import { Key, Model, KeyProvider, LLMService } from "./index";
+import { Key, KeyProvider, LLMService, Model, ServiceToKey } from "./index";
 import { getSerializer } from "./serializers";
 import { FirebaseKeyStore, KeyStore, MemoryKeyStore } from "./stores";
 import { AnthropicKeyProvider } from "./anthropic/provider";
@@ -153,7 +153,9 @@ export class KeyPool {
   }
 }
 
-function createKeyStore(service: LLMService): KeyStore<Key> {
+function createKeyStore<S extends LLMService>(
+  service: S
+): KeyStore<ServiceToKey[S]> {
   const serializer = getSerializer(service);
 
   switch (config.persistenceProvider) {
@@ -165,3 +167,4 @@ function createKeyStore(service: LLMService): KeyStore<Key> {
       throw new Error(`Unknown store type: ${config.persistenceProvider}`);
   }
 }
+

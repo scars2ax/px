@@ -1,12 +1,25 @@
-import { OPENAI_SUPPORTED_MODELS, OpenAIModel } from "./openai/provider";
+import type { ModelFamily } from "../models";
+import { KeyPool } from "./key-pool";
+import {
+  OPENAI_SUPPORTED_MODELS,
+  OpenAIKey,
+  OpenAIModel,
+} from "./openai/provider";
 import {
   ANTHROPIC_SUPPORTED_MODELS,
+  AnthropicKey,
   AnthropicModel,
 } from "./anthropic/provider";
-import { GOOGLE_PALM_SUPPORTED_MODELS, GooglePalmModel } from "./palm/provider";
-import { AWS_BEDROCK_SUPPORTED_MODELS, AwsBedrockModel } from "./aws/provider";
-import { KeyPool } from "./key-pool";
-import type { ModelFamily } from "../models";
+import {
+  GOOGLE_PALM_SUPPORTED_MODELS,
+  GooglePalmKey,
+  GooglePalmModel,
+} from "./palm/provider";
+import {
+  AWS_BEDROCK_SUPPORTED_MODELS,
+  AwsBedrockKey,
+  AwsBedrockModel,
+} from "./aws/provider";
 
 /** The request and response format used by a model's API. */
 export type APIFormat = "openai" | "anthropic" | "google-palm" | "openai-text";
@@ -17,6 +30,11 @@ export type Model =
   | AnthropicModel
   | GooglePalmModel
   | AwsBedrockModel;
+
+type AllKeys = OpenAIKey | AnthropicKey | GooglePalmKey | AwsBedrockKey;
+export type ServiceToKey = {
+  [K in AllKeys["service"]]: Extract<AllKeys, { service: K }>;
+};
 
 export interface Key {
   /** The API key itself. Never log this, use `hash` instead. */

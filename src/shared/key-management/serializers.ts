@@ -1,5 +1,5 @@
-import { Key, LLMService } from ".";
 import { assertNever } from "../utils";
+import { Key, LLMService, ServiceToKey } from "./index";
 import { OpenAIKeySerializer } from "./openai/serializer";
 import { AnthropicKeySerializer } from "./anthropic/serializer";
 import { GooglePalmKeySerializer } from "./palm/serializer";
@@ -41,6 +41,9 @@ export function assertSerializedKey(k: any): asserts k is SerializedKey {
   }
 }
 
+export function getSerializer<S extends LLMService>(
+  service: S
+): KeySerializer<ServiceToKey[S]>;
 export function getSerializer(service: LLMService): KeySerializer<Key> {
   switch (service) {
     case "openai":
