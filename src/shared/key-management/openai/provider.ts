@@ -3,8 +3,9 @@ import { IncomingHttpHeaders } from "http";
 import { config } from "../../../config";
 import { logger } from "../../../logger";
 import { getOpenAIModelFamily, OpenAIModelFamily } from "../../models";
-import { Key, KeyProvider, KeyStore, Model } from "../types";
+import { Key, Model } from "../types";
 import { OpenAIKeyChecker } from "./checker";
+import { KeyProviderBase } from "../key-provider-base";
 
 const KEY_REUSE_DELAY = 1000;
 
@@ -60,17 +61,12 @@ export interface OpenAIKey extends Key, OpenAIKeyUsage {
   rateLimitTokensReset: number;
 }
 
-export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
+export class OpenAIKeyProvider extends KeyProviderBase<OpenAIKey> {
   readonly service = "openai" as const;
 
-  private readonly keys: OpenAIKey[] = [];
-  private store: KeyStore<OpenAIKey>;
+  protected readonly keys: OpenAIKey[] = [];
   private checker?: OpenAIKeyChecker;
-  private log = logger.child({ module: "key-provider", service: this.service });
-
-  constructor(store: KeyStore<OpenAIKey>) {
-    this.store = store;
-  }
+  protected log = logger.child({ module: "key-provider", service: this.service });
 
   public async init() {
     const storeName = this.store.constructor.name;
@@ -95,14 +91,6 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
       this.checker = new OpenAIKeyChecker(this.keys, cloneFn, updateFn);
       this.checker.start();
     }
-  }
-
-  /**
-   * Returns a list of all keys, with the key field removed.
-   * Don't mutate returned keys, use a KeyPool method instead.
-   **/
-  public list() {
-    return this.keys.map((key) => Object.freeze({ ...key, key: undefined }));
   }
 
   public get(model: Model) {
@@ -193,12 +181,6 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
     return { ...selectedKey };
   }
 
-  /** Called by the key checker to update key information. */
-  public update(keyHash: string, update: Partial<OpenAIKey>) {
-    const keyFromPool = this.keys.find((k) => k.hash === keyHash)!;
-    Object.assign(keyFromPool, { lastChecked: Date.now(), ...update });
-  }
-
   /** Called by the key checker to create clones of keys for the given orgs. */
   public clone(keyHash: string, newOrgIds: string[]) {
     const keyFromPool = this.keys.find((k) => k.hash === keyHash)!;
@@ -220,19 +202,7 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
       );
       return clone;
     });
-    this.keys.push(...clones);
-  }
-
-  /** Disables a key, or does nothing if the key isn't in this pool. */
-  public disable(key: Key) {
-    const keyFromPool = this.keys.find((k) => k.hash === key.hash);
-    if (!keyFromPool || keyFromPool.isDisabled) return;
-    this.update(key.hash, { isDisabled: true });
-    this.log.warn({ key: key.hash }, "Key disabled");
-  }
-
-  public available() {
-    return this.keys.filter((k) => !k.isDisabled).length;
+    clones.forEach((clone) => this.addKey(clone));
   }
 
   /**

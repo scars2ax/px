@@ -1,5 +1,4 @@
-import { KeySerializer, SerializedKey } from "./index";
-import { Key } from "./types";
+import { Key, KeySerializer, SerializedKey } from "./types";
 
 export abstract class KeySerializerBase<K extends Key>
   implements KeySerializer<K>

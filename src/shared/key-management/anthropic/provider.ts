@@ -1,7 +1,8 @@
 import { config } from "../../../config";
 import { logger } from "../../../logger";
 import type { AnthropicModelFamily } from "../../models";
-import { Key, KeyProvider, KeyStore } from "../types";
+import { KeyProviderBase } from "../key-provider-base";
+import { Key } from "../types";
 import { AnthropicKeyChecker } from "./checker";
 
 const RATE_LIMIT_LOCKOUT = 2000;
@@ -43,17 +44,12 @@ export interface AnthropicKey extends Key, AnthropicKeyUsage {
   isPozzed: boolean;
 }
 
-export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
+export class AnthropicKeyProvider extends KeyProviderBase<AnthropicKey> {
   readonly service = "anthropic" as const;
 
-  private readonly keys: AnthropicKey[] = [];
-  private store: KeyStore<AnthropicKey>;
+  protected readonly keys: AnthropicKey[] = [];
   private checker?: AnthropicKeyChecker;
-  private log = logger.child({ module: "key-provider", service: this.service });
-
-  constructor(store: KeyStore<AnthropicKey>) {
-    this.store = store;
-  }
+  protected log = logger.child({ module: "key-provider", service: this.service });
 
   public async init() {
     const storeName = this.store.constructor.name;
@@ -73,10 +69,6 @@ export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
       this.checker = new AnthropicKeyChecker(this.keys, this.update.bind(this));
       this.checker.start();
     }
-  }
-
-  public list() {
-    return this.keys.map((k) => Object.freeze({ ...k, key: undefined }));
   }
 
   public get(_model: AnthropicModel) {
@@ -121,22 +113,6 @@ export class AnthropicKeyProvider implements KeyProvider<AnthropicKey> {
     // going to get a rate limit error on this key.
     selectedKey.rateLimitedUntil = now + KEY_REUSE_DELAY;
     return { ...selectedKey };
-  }
-
-  public disable(key: AnthropicKey) {
-    const keyFromPool = this.keys.find((k) => k.hash === key.hash);
-    if (!keyFromPool || keyFromPool.isDisabled) return;
-    keyFromPool.isDisabled = true;
-    this.log.warn({ key: key.hash }, "Key disabled");
-  }
-
-  public update(hash: string, update: Partial<AnthropicKey>) {
-    const keyFromPool = this.keys.find((k) => k.hash === hash)!;
-    Object.assign(keyFromPool, { lastChecked: Date.now(), ...update });
-  }
-
-  public available() {
-    return this.keys.filter((k) => !k.isDisabled).length;
   }
 
   public incrementUsage(hash: string, _model: string, tokens: number) {

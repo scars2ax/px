@@ -1,25 +1,65 @@
-import { Key, KeyProvider, LLMService, Model } from "./types";
+import { logger } from "../../logger";
+import { Key, KeyStore, LLMService, Model } from "./types";
 
-export abstract class KeyProvierBase<K extends Key> implements KeyProvider<K> {
-  abstract readonly service: LLMService;
+export abstract class KeyProviderBase<K extends Key = Key> {
+  public abstract readonly service: LLMService;
 
-  abstract init(): Promise<void>;
+  protected abstract readonly keys: K[];
+  protected abstract log: typeof logger;
+  protected readonly store: KeyStore<K>;
 
-  abstract get(model: Model): K;
+  public constructor(keyStore: KeyStore<K>) {
+    this.store = keyStore;
+  }
 
-  abstract list(): Omit<K, "key">[];
+  public abstract init(): Promise<void>;
 
-  abstract disable(key: K): void;
+  public addKey(key: K): void {
+    this.keys.push(key);
+    this.store.add(key);
+  }
 
-  abstract update(hash: string, update: Partial<K>): void;
+  public abstract get(model: Model): K;
 
-  abstract available(): number;
+  /**
+   * Returns a list of all keys, with the actual key value removed. Don't
+   * mutate the returned objects; use `update` instead to ensure the changes
+   * are synced to the key store.
+   */
+  public list(): Omit<K, "key">[] {
+    return this.keys.map((k) => Object.freeze({ ...k, key: undefined }));
+  }
 
-  abstract incrementUsage(hash: string, model: string, tokens: number): void;
+  public disable(key: K): void {
+    const keyFromPool = this.keys.find((k) => k.hash === key.hash);
+    if (!keyFromPool || keyFromPool.isDisabled) return;
+    this.update(key.hash, { isDisabled: true } as Partial<K>, true);
+    this.log.warn({ key: key.hash }, "Key disabled");
+  }
 
-  abstract getLockoutPeriod(model: Model): number;
+  public update(hash: string, update: Partial<K>, force = false): void {
+    const key = this.keys.find((k) => k.hash === hash);
+    if (!key) {
+      throw new Error(`No key with hash ${hash}`);
+    }
 
-  abstract markRateLimited(hash: string): void;
+    Object.assign(key, { lastChecked: Date.now(), ...update });
+    this.store.update(hash, update, force);
+  }
 
-  abstract recheck(): void;
+  public available(): number {
+    return this.keys.filter((k) => !k.isDisabled).length;
+  }
+
+  public abstract incrementUsage(
+    hash: string,
+    model: string,
+    tokens: number
+  ): void;
+
+  public abstract getLockoutPeriod(model: Model): number;
+
+  public abstract markRateLimited(hash: string): void;
+
+  public abstract recheck(): void;
 }

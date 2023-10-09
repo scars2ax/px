@@ -1,8 +1,4 @@
 import { assertNever } from "../utils";
-import { OpenAIKeySerializer } from "./openai/serializer";
-import { AnthropicKeySerializer } from "./anthropic/serializer";
-import { GooglePalmKeySerializer } from "./palm/serializer";
-import { AwsBedrockKeySerializer } from "./aws/serializer";
 import {
   Key,
   KeySerializer,
@@ -10,6 +6,10 @@ import {
   SerializedKey,
   ServiceToKey,
 } from "./types";
+import { OpenAIKeySerializer } from "./openai/serializer";
+import { AnthropicKeySerializer } from "./anthropic/serializer";
+import { GooglePalmKeySerializer } from "./palm/serializer";
+import { AwsBedrockKeySerializer } from "./aws/serializer";
 
 export function assertSerializedKey(k: any): asserts k is SerializedKey {
   if (typeof k !== "object" || !k || typeof (k as any).key !== "string") {

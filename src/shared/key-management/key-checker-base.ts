@@ -1,7 +1,6 @@
 import { AxiosError } from "axios";
 import pino from "pino";
 import { logger } from "../../logger";
-
 import { Key } from "./types";
 
 type KeyCheckerOptions = {

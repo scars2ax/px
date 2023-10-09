@@ -32,7 +32,7 @@ export class FirebaseKeyStore<K extends Key> implements KeyStore<K> {
     this.serializer = serializer;
     this.service = service;
     this.pendingUpdates = new Map();
-    this.schedulePeriodicFlush();
+    this.scheduleFlush();
   }
 
   public async load(isMigrating = false): Promise<K[]> {
@@ -55,17 +55,24 @@ export class FirebaseKeyStore<K extends Key> implements KeyStore<K> {
   }
 
   public add(key: K) {
-    throw new Error("Method not implemented.");
+    const serialized = this.serializer.serialize(key);
+    this.pendingUpdates.set(key.hash, serialized);
+    this.forceFlush();
   }
 
   public update(id: string, update: Partial<K>, force = false) {
     const existing = this.pendingUpdates.get(id) ?? {};
     Object.assign(existing, this.serializer.partialSerialize(id, update));
     this.pendingUpdates.set(id, existing);
-    if (force) setTimeout(() => this.flush(), 0);
+    if (force) this.forceFlush();
   }
 
-  private schedulePeriodicFlush() {
+  private forceFlush() {
+    if (this.flushInterval) clearInterval(this.flushInterval);
+    this.flushInterval = setTimeout(() => this.flush(), 0);
+  }
+
+  private scheduleFlush() {
     if (this.flushInterval) clearInterval(this.flushInterval);
     this.flushInterval = setInterval(() => this.flush(), 1000 * 60 * 5);
   }
@@ -76,7 +83,7 @@ export class FirebaseKeyStore<K extends Key> implements KeyStore<K> {
         { pendingUpdates: this.pendingUpdates.size },
         "Database not loaded yet. Skipping flush."
       );
-      return;
+      return this.scheduleFlush();
     }
 
     const updates: Record<string, Partial<SerializedKey>> = {};
@@ -85,11 +92,11 @@ export class FirebaseKeyStore<K extends Key> implements KeyStore<K> {
 
     await this.keysRef.update(updates);
 
-    this.log.info(
+    this.log.debug(
       { count: Object.keys(updates).length },
       "Flushed pending key updates."
     );
-    this.schedulePeriodicFlush();
+    this.scheduleFlush();
   }
 
   private async migrate(): Promise<SerializedKey[]> {

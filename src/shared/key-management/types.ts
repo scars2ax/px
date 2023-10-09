@@ -32,9 +32,14 @@ export interface Key {
   service: LLMService;
   /** The model families that this key has access to. */
   modelFamilies: ModelFamily[];
-  /** Whether this key is currently disabled, meaning its quota has been exceeded or it has been revoked. */
+  /** Whether this key is currently disabled for some reason. */
   isDisabled: boolean;
-  /** Whether this key specifically has been revoked. */
+  /**
+   * Whether this key specifically has been revoked. This is different from
+   * `isDisabled` because a key can be disabled for other reasons, such as
+   * exceeding its quota. A revoked key is assumed to be permanently disabled,
+   * and KeyStore implementations should not return it when loading keys.
+   */
   isRevoked: boolean;
   /** The number of prompts that have been sent with this key. */
   promptCount: number;
@@ -46,42 +51,14 @@ export interface Key {
   hash: string;
 }
 
-export interface KeyProvider<T extends Key = Key> {
-  readonly service: LLMService;
-
-  init(): Promise<void>;
-
-  get(model: Model): T;
-
-  list(): Omit<T, "key">[];
-
-  disable(key: T): void;
-
-  update(hash: string, update: Partial<T>): void;
-
-  available(): number;
-
-  incrementUsage(hash: string, model: string, tokens: number): void;
-
-  getLockoutPeriod(model: Model): number;
-
-  markRateLimited(hash: string): void;
-
-  recheck(): void;
-}
-
 export interface KeySerializer<K> {
   serialize(keyObj: K): SerializedKey;
-
   deserialize(serializedKey: SerializedKey): K;
-
   partialSerialize(key: string, update: Partial<K>): Partial<SerializedKey>;
 }
 
 export interface KeyStore<K extends Key> {
   load(): Promise<K[]>;
-
   add(key: K): void;
-
   update(id: string, update: Partial<K>, force?: boolean): void;
 }

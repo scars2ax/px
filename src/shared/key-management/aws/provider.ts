@@ -1,7 +1,8 @@
 import { config } from "../../../config";
 import { logger } from "../../../logger";
 import type { AwsBedrockModelFamily } from "../../models";
-import { Key, KeyProvider, KeyStore } from "../types";
+import { KeyProviderBase } from "../key-provider-base";
+import { Key } from "../types";
 import { AwsKeyChecker } from "./checker";
 
 const RATE_LIMIT_LOCKOUT = 2000;
@@ -35,17 +36,12 @@ export interface AwsBedrockKey extends Key, AwsBedrockKeyUsage {
   awsLoggingStatus: "unknown" | "disabled" | "enabled";
 }
 
-export class AwsBedrockKeyProvider implements KeyProvider<AwsBedrockKey> {
+export class AwsBedrockKeyProvider extends KeyProviderBase<AwsBedrockKey> {
   readonly service = "aws" as const;
 
-  private readonly keys: AwsBedrockKey[] = [];
-  private store: KeyStore<AwsBedrockKey>;
+  protected readonly keys: AwsBedrockKey[] = [];
   private checker?: AwsKeyChecker;
-  private log = logger.child({ module: "key-provider", service: this.service });
-
-  constructor(store: KeyStore<AwsBedrockKey>) {
-    this.store = store;
-  }
+  protected log = logger.child({ module: "key-provider", service: this.service });
 
   public async init() {
     const storeName = this.store.constructor.name;
@@ -65,10 +61,6 @@ export class AwsBedrockKeyProvider implements KeyProvider<AwsBedrockKey> {
       this.checker = new AwsKeyChecker(this.keys, this.update.bind(this));
       this.checker.start();
     }
-  }
-
-  public list() {
-    return this.keys.map((k) => Object.freeze({ ...k, key: undefined }));
   }
 
   public get(_model: AwsBedrockModel) {
@@ -110,22 +102,6 @@ export class AwsBedrockKeyProvider implements KeyProvider<AwsBedrockKey> {
     // going to get a rate limit error on this key.
     selectedKey.rateLimitedUntil = now + KEY_REUSE_DELAY;
     return { ...selectedKey };
-  }
-
-  public disable(key: AwsBedrockKey) {
-    const keyFromPool = this.keys.find((k) => k.hash === key.hash);
-    if (!keyFromPool || keyFromPool.isDisabled) return;
-    keyFromPool.isDisabled = true;
-    this.log.warn({ key: key.hash }, "Key disabled");
-  }
-
-  public update(hash: string, update: Partial<AwsBedrockKey>) {
-    const keyFromPool = this.keys.find((k) => k.hash === hash)!;
-    Object.assign(keyFromPool, { lastChecked: Date.now(), ...update });
-  }
-
-  public available() {
-    return this.keys.filter((k) => !k.isDisabled).length;
   }
 
   public incrementUsage(hash: string, _model: string, tokens: number) {

@@ -4,24 +4,17 @@ import os from "os";
 import schedule from "node-schedule";
 import { config } from "../../config";
 import { logger } from "../../logger";
+import { KeyProviderBase } from "./key-provider-base";
 import { getSerializer } from "./serializers";
 import { FirebaseKeyStore, MemoryKeyStore } from "./stores";
 import { AnthropicKeyProvider } from "./anthropic/provider";
 import { OpenAIKeyProvider } from "./openai/provider";
 import { GooglePalmKeyProvider } from "./palm/provider";
 import { AwsBedrockKeyProvider } from "./aws/provider";
-
-import {
-  Key,
-  KeyProvider,
-  KeyStore,
-  LLMService,
-  Model,
-  ServiceToKey,
-} from "./types";
+import { Key, KeyStore, LLMService, Model, ServiceToKey } from "./types";
 
 export class KeyPool {
-  private keyProviders: KeyProvider[] = [];
+  private keyProviders: KeyProviderBase[] = [];
   private recheckJobs: Partial<Record<LLMService, schedule.Job | null>> = {
     openai: null,
   };
@@ -131,7 +124,7 @@ export class KeyPool {
     throw new Error(`Unknown service for model '${model}'`);
   }
 
-  private getKeyProvider(service: LLMService): KeyProvider {
+  private getKeyProvider(service: LLMService): KeyProviderBase {
     return this.keyProviders.find((provider) => provider.service === service)!;
   }
 

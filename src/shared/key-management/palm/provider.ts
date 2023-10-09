@@ -1,6 +1,7 @@
 import { logger } from "../../../logger";
 import type { GooglePalmModelFamily } from "../../models";
-import { Key, KeyProvider, KeyStore } from "../types";
+import { KeyProviderBase } from "../key-provider-base";
+import { Key } from "../types";
 
 const RATE_LIMIT_LOCKOUT = 2000;
 const KEY_REUSE_DELAY = 500;
@@ -22,16 +23,11 @@ export interface GooglePalmKey extends Key, GooglePalmKeyUsage {
   rateLimitedUntil: number;
 }
 
-export class GooglePalmKeyProvider implements KeyProvider<GooglePalmKey> {
+export class GooglePalmKeyProvider extends KeyProviderBase<GooglePalmKey> {
   readonly service = "google-palm";
 
-  private keys: GooglePalmKey[] = [];
-  private store: KeyStore<GooglePalmKey>;
-  private log = logger.child({ module: "key-provider", service: this.service });
-
-  constructor(store: KeyStore<GooglePalmKey>) {
-    this.store = store;
-  }
+  protected keys: GooglePalmKey[] = [];
+  protected log = logger.child({ module: "key-provider", service: this.service });
 
   public async init() {
     const storeName = this.store.constructor.name;
@@ -46,10 +42,6 @@ export class GooglePalmKeyProvider implements KeyProvider<GooglePalmKey> {
       { count: this.keys.length, via: storeName },
       "Loaded PaLM keys."
     );
-  }
-
-  public list() {
-    return this.keys.map((k) => Object.freeze({ ...k, key: undefined }));
   }
 
   public get(_model: GooglePalmModel) {
@@ -88,22 +80,6 @@ export class GooglePalmKeyProvider implements KeyProvider<GooglePalmKey> {
     // going to get a rate limit error on this key.
     selectedKey.rateLimitedUntil = now + KEY_REUSE_DELAY;
     return { ...selectedKey };
-  }
-
-  public disable(key: GooglePalmKey) {
-    const keyFromPool = this.keys.find((k) => k.hash === key.hash);
-    if (!keyFromPool || keyFromPool.isDisabled) return;
-    keyFromPool.isDisabled = true;
-    this.log.warn({ key: key.hash }, "Key disabled");
-  }
-
-  public update(hash: string, update: Partial<GooglePalmKey>) {
-    const keyFromPool = this.keys.find((k) => k.hash === hash)!;
-    Object.assign(keyFromPool, { lastChecked: Date.now(), ...update });
-  }
-
-  public available() {
-    return this.keys.filter((k) => !k.isDisabled).length;
   }
 
   public incrementUsage(hash: string, _model: string, tokens: number) {
