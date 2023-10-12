@@ -86,9 +86,15 @@ export class FirebaseKeyStore<K extends Key> implements KeyStore<K> {
       return this.scheduleFlush();
     }
 
+    if (this.pendingUpdates.size === 0) {
+      this.log.debug("No pending key updates to flush.");
+      return this.scheduleFlush();
+    }
+
     const updates: Record<string, Partial<SerializedKey>> = {};
     this.pendingUpdates.forEach((v, k) => (updates[k] = v));
     this.pendingUpdates.clear();
+    console.log(updates);
 
     await this.keysRef.update(updates);
 
