@@ -81,9 +81,8 @@ export const addKey: ProxyRequestMiddleware = (proxyReq, req) => {
       );
       break;
     case "aws":
-      throw new Error(
-        "add-key should not be used for AWS security credentials. Use sign-aws-request instead."
-      );
+    case "azure":
+      throw new Error("addKey should not be called for AWS or Azure requests.");
     default:
       assertNever(assignedKey.service);
   }

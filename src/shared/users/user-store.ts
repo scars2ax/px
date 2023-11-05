@@ -12,6 +12,7 @@ import schedule from "node-schedule";
 import { v4 as uuid } from "uuid";
 import { config, getFirebaseApp } from "../../config";
 import {
+  getAzureOpenAIModelFamily,
   getClaudeModelFamily,
   getGooglePalmModelFamily,
   getOpenAIModelFamily,
@@ -385,6 +386,9 @@ function getModelFamilyForQuotaUsage(
   model: string,
   api: APIFormat
 ): ModelFamily {
+  // TODO: this seems incorrect
+  if (model.includes("azure")) return getAzureOpenAIModelFamily(model);
+
   switch (api) {
     case "openai":
     case "openai-text":
