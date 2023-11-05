@@ -6,11 +6,13 @@ export type OpenAIModelFamily = "turbo" | "gpt4" | "gpt4-32k" | "gpt4-turbo" | "
 export type AnthropicModelFamily = "claude";
 export type GooglePalmModelFamily = "bison";
 export type AwsBedrockModelFamily = "aws-claude";
+export type AzureOpenAIModelFamily = `azure-${Exclude<OpenAIModelFamily, "dall-e">}`;
 export type ModelFamily =
   | OpenAIModelFamily
   | AnthropicModelFamily
   | GooglePalmModelFamily
-  | AwsBedrockModelFamily;
+  | AwsBedrockModelFamily
+  | AzureOpenAIModelFamily;
 
 export const MODEL_FAMILIES = (<A extends readonly ModelFamily[]>(
   arr: A & ([ModelFamily] extends [A[number]] ? unknown : never)
@@ -23,6 +25,10 @@ export const MODEL_FAMILIES = (<A extends readonly ModelFamily[]>(
   "claude",
   "bison",
   "aws-claude",
+  "azure-turbo",
+  "azure-gpt4",
+  "azure-gpt4-32k",
+  "azure-gpt4-turbo",
 ] as const);
 
 export const OPENAI_MODEL_FAMILY_MAP: { [regex: string]: OpenAIModelFamily } = {
@@ -63,6 +69,15 @@ export function getGooglePalmModelFamily(model: string): ModelFamily {
 export function getAwsBedrockModelFamily(_model: string): ModelFamily {
   return "aws-claude";
 }
+
+export function getAzureOpenAIModelFamily(model: string): ModelFamily {
+  const trimmed = model.replace(/^azure-/, "");
+  for (const [regex, family] of Object.entries(OPENAI_MODEL_FAMILY_MAP)) {
+    if (trimmed.match(regex)) return `azure-${family}` as ModelFamily;
+  }
+  return "azure-gpt4";
+}
+
 
 export function assertIsKnownModelFamily(
   modelFamily: string
