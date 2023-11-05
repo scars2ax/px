@@ -70,14 +70,15 @@ export function getAwsBedrockModelFamily(_model: string): ModelFamily {
   return "aws-claude";
 }
 
-export function getAzureOpenAIModelFamily(model: string): ModelFamily {
+export function getAzureOpenAIModelFamily(
+  model: string
+): AzureOpenAIModelFamily {
   const trimmed = model.replace(/^azure-/, "");
   for (const [regex, family] of Object.entries(OPENAI_MODEL_FAMILY_MAP)) {
     if (trimmed.match(regex)) return `azure-${family}` as ModelFamily;
   }
   return "azure-gpt4";
 }
-
 
 export function assertIsKnownModelFamily(
   modelFamily: string
