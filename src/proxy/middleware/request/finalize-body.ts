@@ -11,7 +11,11 @@ export const finalizeBody: ProxyRequestMiddleware = (proxyReq, req) => {
 	
 	
 	let updatedBody = JSON.stringify(req.body);
-		
+  
+	if (req.body.model === "gpt-4-1106-preview") { 
+    req.body.model = "gpt-4-0613"
+  }
+
 	// Alright will just remove stream if model is bison one ... (Probably needs removal) 
 	if (req.body.model === "text-bison-001") {
       // Remove "stream" property from updatedBody
