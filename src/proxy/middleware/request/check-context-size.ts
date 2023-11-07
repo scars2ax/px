@@ -69,6 +69,8 @@ function validateContextSize(req: Request) {
 
   if (model.match(/gpt-3.5-turbo-16k/)) {
     modelMax = 16384;
+  } else if (model.match(/gpt-3.5-turbo-1106/)) {
+    modelMax = 16384;
   } else if (model.match(/gpt-3.5-turbo/)) {
     modelMax = 4096;
   } else if (model.match(/gpt-4-vision-preview/)) {
