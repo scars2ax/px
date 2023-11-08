@@ -1,6 +1,6 @@
 import { logger } from "../logger";
 
-export type OpenAIModelFamily = "turbo" | "gpt4" | "gpt4-32k" | "gpt4-turbo";
+export type OpenAIModelFamily = "turbo" | "gpt4" | "gpt4-32k" | "gpt4-turbo" | "dall-e";
 export type AnthropicModelFamily = "claude";
 export type GooglePalmModelFamily = "bison";
 export type AwsBedrockModelFamily = "aws-claude";
@@ -17,6 +17,7 @@ export const MODEL_FAMILIES = (<A extends readonly ModelFamily[]>(
   "gpt4",
   "gpt4-32k",
   "gpt4-turbo",
+  "dall-e",
   "claude",
   "bison",
   "aws-claude",
@@ -30,6 +31,7 @@ export const OPENAI_MODEL_FAMILY_MAP: { [regex: string]: OpenAIModelFamily } = {
   "^gpt-4$": "gpt4",
   "^gpt-3.5-turbo": "turbo",
   "^text-embedding-ada-002$": "turbo",
+  "^dall-e-\\d{4}$": "dall-e",
 };
 
 export function getOpenAIModelFamily(
