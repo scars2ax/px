@@ -156,7 +156,7 @@ export class AwsBedrockKeyProvider implements KeyProvider<AwsBedrockKey> {
     key["aws-claudeTokens"] += tokens;
   }
 
-  public getLockoutPeriod(_model: AwsBedrockModel) {
+  public getLockoutPeriod() {
     // TODO: same exact behavior for three providers, should be refactored
     const activeKeys = this.keys.filter((k) => !k.isDisabled);
     // Don't lock out if there are no keys available or the queue will stall.

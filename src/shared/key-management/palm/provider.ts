@@ -145,7 +145,7 @@ export class GooglePalmKeyProvider implements KeyProvider<GooglePalmKey> {
     key.bisonTokens += tokens;
   }
 
-  public getLockoutPeriod(_model: GooglePalmModel) {
+  public getLockoutPeriod() {
     const activeKeys = this.keys.filter((k) => !k.isDisabled);
     // Don't lock out if there are no keys available or the queue will stall.
     // Just let it through so the add-key middleware can throw an error.

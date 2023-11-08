@@ -124,6 +124,7 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
         gpt4Tokens: 0,
         "gpt4-32kTokens": 0,
         "gpt4-turboTokens": 0,
+        "dall-eTokens": 0,
         gpt4Rpm: 0,
       };
       this.keys.push(newKey);
@@ -281,10 +282,9 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
    * Given a model, returns the period until a key will be available to service
    * the request, or returns 0 if a key is ready immediately.
    */
-  public getLockoutPeriod(model: Model = "gpt-4"): number {
-    const neededFamily = getOpenAIModelFamily(model);
+  public getLockoutPeriod(family: OpenAIModelFamily): number {
     const activeKeys = this.keys.filter(
-      (key) => !key.isDisabled && key.modelFamilies.includes(neededFamily)
+      (key) => !key.isDisabled && key.modelFamilies.includes(family)
     );
 
     if (activeKeys.length === 0) {

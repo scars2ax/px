@@ -62,7 +62,7 @@ export interface KeyProvider<T extends Key = Key> {
   update(hash: string, update: Partial<T>): void;
   available(): number;
   incrementUsage(hash: string, model: string, tokens: number): void;
-  getLockoutPeriod(model: Model): number;
+  getLockoutPeriod(model: ModelFamily): number;
   markRateLimited(hash: string): void;
   recheck(): void;
 }

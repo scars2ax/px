@@ -16,7 +16,7 @@ import { keyPool } from "../shared/key-management";
 import {
   getClaudeModelFamily,
   getGooglePalmModelFamily,
-  getOpenAIModelFamily,
+  getOpenAIModelFamily, MODEL_FAMILIES,
   ModelFamily,
 } from "../shared/models";
 import { buildFakeSse, initializeSseStream } from "../shared/streaming";
@@ -207,40 +207,15 @@ export function dequeue(partition: ModelFamily): Request | undefined {
 function processQueue() {
   // This isn't completely correct, because a key can service multiple models.
   // Currently if a key is locked out on one model it will also stop servicing
-  // the others, because we only track one rate limit per key.
-
-  // TODO: `getLockoutPeriod` uses model names instead of model families
-  // TODO: genericize this it's really ugly
-  const gpt4TurboLockout = keyPool.getLockoutPeriod("gpt-4-1106");
-  const gpt432kLockout = keyPool.getLockoutPeriod("gpt-4-32k");
-  const gpt4Lockout = keyPool.getLockoutPeriod("gpt-4");
-  const turboLockout = keyPool.getLockoutPeriod("gpt-3.5-turbo");
-  const claudeLockout = keyPool.getLockoutPeriod("claude-v1");
-  const palmLockout = keyPool.getLockoutPeriod("text-bison-001");
-  const awsClaudeLockout = keyPool.getLockoutPeriod("anthropic.claude-v2");
+  // the others, because we only track rate limits for the key as a whole.
 
   const reqs: (Request | undefined)[] = [];
-  if (gpt4TurboLockout === 0) {
-    reqs.push(dequeue("gpt4-turbo"));
-  }
-  if (gpt432kLockout === 0) {
-    reqs.push(dequeue("gpt4-32k"));
-  }
-  if (gpt4Lockout === 0) {
-    reqs.push(dequeue("gpt4"));
-  }
-  if (turboLockout === 0) {
-    reqs.push(dequeue("turbo"));
-  }
-  if (claudeLockout === 0) {
-    reqs.push(dequeue("claude"));
-  }
-  if (palmLockout === 0) {
-    reqs.push(dequeue("bison"));
-  }
-  if (awsClaudeLockout === 0) {
-    reqs.push(dequeue("aws-claude"));
-  }
+  MODEL_FAMILIES.forEach((modelFamily) => {
+    const lockout = keyPool.getLockoutPeriod(modelFamily);
+    if (lockout === 0) {
+      reqs.push(dequeue(modelFamily));
+    }
+  });
 
   reqs.filter(Boolean).forEach((req) => {
     if (req?.proceed) {
