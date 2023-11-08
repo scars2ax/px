@@ -22,6 +22,7 @@ const INITIAL_TOKENS: Required<UserTokenCounts> = {
   gpt4: 0,
   "gpt4-32k": 0,
   "gpt4-turbo": 0,
+  "dall-e": 0,
   claude: 0,
   bison: 0,
   "aws-claude": 0,
