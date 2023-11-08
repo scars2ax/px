@@ -173,6 +173,8 @@ export function getCompletionFromBody(req: Request, body: Record<string, any>) {
       return body.completion.trim();
     case "google-palm":
       return body.candidates[0].output;
+    case "openai-image":
+      throw new Error("getCompletionFromBody called for non-text format");
     default:
       assertNever(format);
   }
@@ -183,6 +185,7 @@ export function getModelFromBody(req: Request, body: Record<string, any>) {
   switch (format) {
     case "openai":
     case "openai-text":
+    case "openai-image":
       return body.model;
     case "anthropic":
       // Anthropic confirms the model in the response, but AWS Claude doesn't.

@@ -54,6 +54,7 @@ const getPromptForRequest = (req: Request): string | OaiMessage[] => {
     case "openai":
       return req.body.messages;
     case "openai-text":
+    case "openai-image":
       return req.body.prompt;
     case "anthropic":
       return req.body.prompt;

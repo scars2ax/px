@@ -27,6 +27,7 @@ type TokenCountRequest = { req: Request } & (
       service: "openai-text" | "anthropic" | "google-palm";
     }
   | { prompt?: never; completion: string; service: APIFormat }
+  | { prompt?: never; completion?: never; service: "openai-image" }
 );
 
 type TokenCountResult = {

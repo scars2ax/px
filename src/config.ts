@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 import type firebase from "firebase-admin";
 import pino from "pino";
 import type { ModelFamily } from "./shared/models";
+import { MODEL_FAMILIES } from "./shared/models";
 dotenv.config();
 
 const startupLogger = pino({ level: "debug" }).child({ module: "startup" });
@@ -225,15 +226,13 @@ export const config: Config = {
     "You must be over the age of majority in your country to use this service."
   ),
   blockRedirect: getEnvWithDefault("BLOCK_REDIRECT", "https://www.9gag.com"),
-  tokenQuota: {
-    turbo: getEnvWithDefault("TOKEN_QUOTA_TURBO", 0),
-    gpt4: getEnvWithDefault("TOKEN_QUOTA_GPT4", 0),
-    "gpt4-32k": getEnvWithDefault("TOKEN_QUOTA_GPT4_32K", 0),
-    "gpt4-turbo": getEnvWithDefault("TOKEN_QUOTA_GPT4_TURBO", 0),
-    claude: getEnvWithDefault("TOKEN_QUOTA_CLAUDE", 0),
-    bison: getEnvWithDefault("TOKEN_QUOTA_BISON", 0),
-    "aws-claude": getEnvWithDefault("TOKEN_QUOTA_AWS_CLAUDE", 0),
-  },
+  tokenQuota: MODEL_FAMILIES.reduce((acc, family: ModelFamily) => {
+    acc[family] = getEnvWithDefault(
+      `TOKEN_QUOTA_${family.toUpperCase().replace(/-/g, "_")}`,
+      0
+    ) as number;
+    return acc;
+  }, {} as { [key in ModelFamily]: number }),
   quotaRefreshPeriod: getEnvWithDefault("QUOTA_REFRESH_PERIOD", undefined),
   allowNicknameChanges: getEnvWithDefault("ALLOW_NICKNAME_CHANGES", true),
   useInsecureCookies: getEnvWithDefault("USE_INSECURE_COOKIES", isDev),

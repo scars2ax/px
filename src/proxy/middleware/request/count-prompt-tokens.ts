@@ -35,6 +35,11 @@ export const countPromptTokens: RequestPreprocessor = async (req) => {
       result = await countTokens({ req, prompt, service });
       break;
     }
+    case "openai-image": {
+      req.outputTokens = 0;
+      result = await countTokens({ req, service });
+      break;
+    }
     default:
       assertNever(service);
   }
