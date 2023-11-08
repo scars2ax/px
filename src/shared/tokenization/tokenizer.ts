@@ -8,6 +8,7 @@ import {
   init as initOpenAi,
   getTokenCount as getOpenAITokenCount,
   OpenAIPromptMessage,
+  getOpenAIImageCost,
 } from "./openai";
 import { APIFormat } from "../key-management";
 
@@ -51,6 +52,15 @@ export async function countTokens({
     case "openai-text":
       return {
         ...getOpenAITokenCount(prompt ?? completion, req.body.model),
+        tokenization_duration_ms: getElapsedMs(time),
+      };
+    case "openai-image":
+      return {
+        ...getOpenAIImageCost({
+          model: req.body.model,
+          quality: req.body.quality,
+          resolution: req.body.size,
+        }),
         tokenization_duration_ms: getElapsedMs(time),
       };
     case "google-palm":
