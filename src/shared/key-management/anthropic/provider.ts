@@ -6,14 +6,12 @@ import type { AnthropicModelFamily } from "../../models";
 import { AnthropicKeyChecker } from "./checker";
 
 // https://docs.anthropic.com/claude/reference/selecting-a-model
-export const ANTHROPIC_SUPPORTED_MODELS = [
-  "claude-instant-v1",
-  "claude-instant-v1-100k",
-  "claude-v1",
-  "claude-v1-100k",
-  "claude-2",
-] as const;
-export type AnthropicModel = (typeof ANTHROPIC_SUPPORTED_MODELS)[number];
+export type AnthropicModel =
+  | "claude-instant-v1"
+  | "claude-instant-v1-100k"
+  | "claude-v1"
+  | "claude-v1-100k"
+  | "claude-2";
 
 export type AnthropicKeyUpdate = Omit<
   Partial<AnthropicKey>,

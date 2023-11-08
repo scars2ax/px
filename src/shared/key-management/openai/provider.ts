@@ -15,12 +15,9 @@ export type OpenAIModel =
   | "gpt-4"
   | "gpt-4-32k"
   | "gpt-4-1106"
-  | "text-embedding-ada-002";
-export const OPENAI_SUPPORTED_MODELS: readonly OpenAIModel[] = [
-  "gpt-3.5-turbo",
-  "gpt-3.5-turbo-instruct",
-  "gpt-4",
-] as const;
+  | "text-embedding-ada-002"
+  | "dall-e-2"
+  | "dall-e-3"
 
 // Flattening model families instead of using a nested object for easier
 // cloning.

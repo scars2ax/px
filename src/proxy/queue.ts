@@ -12,7 +12,7 @@
  */
 
 import type { Handler, Request } from "express";
-import { keyPool, SupportedModel } from "../shared/key-management";
+import { keyPool } from "../shared/key-management";
 import {
   getClaudeModelFamily,
   getGooglePalmModelFamily,
@@ -132,7 +132,7 @@ function getPartitionForRequest(req: Request): ModelFamily {
   // There is a single request queue, but it is partitioned by model family.
   // Model families are typically separated on cost/rate limit boundaries so
   // they should be treated as separate queues.
-  const model = (req.body.model as SupportedModel) ?? "gpt-3.5-turbo";
+  const model = req.body.model ?? "gpt-3.5-turbo";
 
   // Weird special case for AWS because they serve multiple models from
   // different vendors, even if currently only one is supported.
