@@ -281,7 +281,7 @@ export const CountTokenPrompt: ProxyResHandlerWithBody = async (
 	  const tokenCount = await countTokens(request);
 	  
 
-		incrementGlobalTokenCount(tokenCount.token_count,"openai");
+	  incrementGlobalTokenCount(tokenCount.token_count,"openai");
 	  if (config.gatekeeper == "user_token") {
 		  if (req.user !== undefined) {
 	         incrementTokenCount(req.user.token,tokenCount.token_count,"openai");
