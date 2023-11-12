@@ -286,7 +286,11 @@ const handleUpstreamErrors: ProxyResHandlerWithBody = async (
     switch (service) {
       case "openai":
       case "google-palm":
-        errorPayload.proxy_note = `Upstream service rejected the request as invalid. Your prompt may be too long for ${req.body?.model}.`;
+        if (errorPayload.error?.code === "content_policy_violation") {
+          errorPayload.proxy_note = `Request was filtered by OpenAI's content moderation system. Try another prompt.`;
+        } else {
+          errorPayload.proxy_note = `Upstream service rejected the request as invalid. Your prompt may be too long for ${req.body?.model}.`;
+        }
         break;
       case "anthropic":
       case "aws":

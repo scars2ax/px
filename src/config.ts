@@ -9,7 +9,8 @@ dotenv.config();
 const startupLogger = pino({ level: "debug" }).child({ module: "startup" });
 const isDev = process.env.NODE_ENV !== "production";
 
-export const ASSETS_DIR = path.join(__dirname, "..", "assets");
+export const DATA_DIR = path.join(__dirname, "..", "data");
+export const USER_ASSETS_DIR = path.join(DATA_DIR, "user-files");
 
 type Config = {
   /** The port the proxy server will listen on. */

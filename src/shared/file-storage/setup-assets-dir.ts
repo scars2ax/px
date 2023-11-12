@@ -1,6 +1,6 @@
 import { promises as fs } from "fs";
-import { USER_ASSETS_DIR } from "./index";
 import { logger } from "../../logger";
+import { USER_ASSETS_DIR } from "../../config";
 
 const log = logger.child({ module: "file-storage" });
 
@@ -15,6 +15,6 @@ export async function setupAssetsDir() {
     }
   } catch (e) {
     log.error(e);
-    throw new Error("Could not create user assets directory");
+    throw new Error("Could not create user assets directory for DALL-E image generation. You may need to update your Dockerfile to `chown` the working directory to user 1000. See the proxy docs for more information.");
   }
 }

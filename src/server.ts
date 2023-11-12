@@ -1,4 +1,4 @@
-import { assertConfigIsValid, ASSETS_DIR, config } from "./config";
+import { assertConfigIsValid, config, USER_ASSETS_DIR } from "./config";
 import "source-map-support/register";
 import express from "express";
 import cors from "cors";
@@ -59,7 +59,7 @@ app.set("views", [
   path.join(__dirname, "shared/views"),
 ]);
 
-app.use('/user_content', express.static(path.join(ASSETS_DIR, "ugc")));
+app.use('/user_content', express.static(USER_ASSETS_DIR));
 
 app.get("/health", (_req, res) => res.sendStatus(200));
 app.use(cors());
@@ -102,7 +102,9 @@ async function start() {
 
   await initTokenizers();
 
-  await setupAssetsDir();
+  if (config.allowedModelFamilies.includes("dall-e")) {
+    await setupAssetsDir();
+  }
 
   if (config.gatekeeper === "user_token") {
     await initUserStore();

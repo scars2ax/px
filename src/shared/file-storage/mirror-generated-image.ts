@@ -2,8 +2,8 @@ import axios from "axios";
 import { promises as fs } from "fs";
 import path from "path";
 import { v4 } from "uuid";
+import { USER_ASSETS_DIR } from "../../config";
 import { logger } from "../../logger";
-import { USER_ASSETS_DIR } from "./index";
 
 const log = logger.child({ module: "file-storage" });
 
@@ -15,7 +15,7 @@ export type OpenAIImageGenerationResult = {
   }[];
 };
 
-async function downloadImage(url: string, created: number) {
+async function downloadImage(url: string) {
   const { data } = await axios.get(url, { responseType: "arraybuffer" });
   const buffer = Buffer.from(data, "binary");
   const newFilename = `${v4()}.png`;
@@ -37,7 +37,7 @@ export async function mirrorGeneratedImage(
 ): Promise<OpenAIImageGenerationResult> {
   for (const item of result.data) {
     const original = item.url;
-    const mirror = await downloadImage(original, result.created);
+    const mirror = await downloadImage(original);
     item.url = `${host}/user_content/${path.basename(mirror)}`;
   }
   return result;
