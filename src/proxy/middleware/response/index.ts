@@ -518,8 +518,8 @@ const countResponseTokens: ProxyResHandlerWithBody = async (
       { service, tokens, prevOutputTokens: req.outputTokens },
       `Counted tokens for completion`
     );
-    if (req.debug) {
-      req.debug.completion_tokens = tokens;
+    if (req.tokenizerInfo) {
+      req.tokenizerInfo.completion_tokens = tokens;
     }
 
     req.outputTokens = tokens.token_count;

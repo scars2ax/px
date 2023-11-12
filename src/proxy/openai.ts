@@ -125,9 +125,8 @@ const openaiResponseHandler: ProxyResHandlerWithBody = async (
     body = transformTurboInstructResponse(body);
   }
 
-  // TODO: Remove once tokenization is stable
-  if (req.debug) {
-    body.proxy_tokenizer_debug_info = req.debug;
+  if (req.tokenizerInfo) {
+    body.proxy_tokenizer = req.tokenizerInfo;
   }
 
   res.status(200).json(body);

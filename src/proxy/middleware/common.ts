@@ -53,8 +53,8 @@ export function writeErrorResponse(
     res.write(`data: [DONE]\n\n`);
     res.end();
   } else {
-    if (req.debug && errorPayload.error) {
-      errorPayload.error.proxy_tokenizer_debug_info = req.debug;
+    if (req.tokenizerInfo && errorPayload.error) {
+      errorPayload.error.proxy_tokenizer = req.tokenizerInfo;
     }
     res.status(statusCode).json(errorPayload);
   }
