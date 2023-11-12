@@ -4,6 +4,7 @@ import path from "path";
 import { v4 } from "uuid";
 import { USER_ASSETS_DIR } from "../../config";
 import { logger } from "../../logger";
+import { addToImageHistory } from "./image-history";
 
 const log = logger.child({ module: "file-storage" });
 
@@ -26,20 +27,34 @@ async function downloadImage(url: string) {
   return filepath;
 }
 
+async function saveB64Image(b64: string) {
+  const buffer = Buffer.from(b64, "base64");
+  const newFilename = `${v4()}.png`;
+
+  const filepath = path.join(USER_ASSETS_DIR, newFilename);
+  await fs.writeFile(filepath, buffer);
+  return filepath;
+}
+
 /**
  * Downloads generated images and mirrors them to the user_content directory.
  * Mutates the result object.
- * @param host The hostname of the proxy server
- * @param result The OpenAI image generation result
  */
 export async function mirrorGeneratedImage(
   host: string,
+  prompt: string,
   result: OpenAIImageGenerationResult
 ): Promise<OpenAIImageGenerationResult> {
   for (const item of result.data) {
-    const original = item.url;
-    const mirror = await downloadImage(original);
-    item.url = `${host}/user_content/${path.basename(mirror)}`;
+    if (item.b64_json) {
+      const original = await saveB64Image(item.b64_json);
+      item.url = `${host}/user_content/${path.basename(original)}`;
+    } else {
+      const original = item.url;
+      const mirror = await downloadImage(original);
+      item.url = `${host}/user_content/${path.basename(mirror)}`;
+    }
+    addToImageHistory({ url: item.url, prompt });
   }
   return result;
 }

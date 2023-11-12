@@ -66,3 +66,6 @@ IMAGE_MODEL_RATE_LIMIT=2
 ```
 
 If a prompt is filtered by OpenAI's content filter, it won't count towards the rate limit.
+
+## Hiding recent images
+By default, the proxy shows the last 12 recently generated images by users. You can hide this section by setting `SHOW_RECENT_IMAGES` to `false`.

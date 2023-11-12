@@ -135,6 +135,6 @@ export function getOpenAIImageCost(params: {
 
   return {
     tokenizer: `openai-image cost`,
-    token_count: tokens,
+    token_count: Math.ceil(tokens),
   };
 }

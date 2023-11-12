@@ -164,6 +164,8 @@ type Config = {
   quotaRefreshPeriod?: "hourly" | "daily" | string;
   /** Whether to allow users to change their own nicknames via the UI. */
   allowNicknameChanges: boolean;
+  /** Whether to show recent DALL-E image generations on the homepage. */
+  showRecentImages: boolean;
   /**
    * If true, cookies will be set without the `Secure` attribute, allowing
    * the admin UI to used over HTTP.
@@ -245,6 +247,7 @@ export const config: Config = {
   ),
   quotaRefreshPeriod: getEnvWithDefault("QUOTA_REFRESH_PERIOD", undefined),
   allowNicknameChanges: getEnvWithDefault("ALLOW_NICKNAME_CHANGES", true),
+  showRecentImages: getEnvWithDefault("SHOW_RECENT_IMAGES", true),
   useInsecureCookies: getEnvWithDefault("USE_INSECURE_COOKIES", isDev),
 } as const;
 

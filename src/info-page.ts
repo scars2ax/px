@@ -14,6 +14,7 @@ import { getUniqueIps } from "./proxy/rate-limit";
 import { getEstimatedWaitTime, getQueueLength } from "./proxy/queue";
 import { getTokenCostUsd, prettyTokens } from "./shared/stats";
 import { assertNever } from "./shared/utils";
+import { getLastNImages } from "./shared/file-storage/image-history";
 
 const INFO_PAGE_TTL = 2000;
 let infoPageHtml: string | undefined;
@@ -461,6 +462,9 @@ Logs are anonymous and do not contain IP addresses or timestamps. [You can see t
   if (customGreeting) {
     infoBody += `\n## Server Greeting\n${customGreeting}`;
   }
+
+  infoBody += buildRecentImageSection();
+
   return converter.makeHtml(infoBody);
 }
 
@@ -501,6 +505,32 @@ function getServerTitle() {
   }
 
   return "OAI Reverse Proxy";
+}
+
+function buildRecentImageSection() {
+  if (
+    !config.allowedModelFamilies.includes("dall-e") ||
+    !config.showRecentImages
+  ) {
+    return "";
+  }
+
+  let html = `<h2>Recent DALL-E Generations</h2>`;
+  const recentImages = getLastNImages(12).reverse();
+  if (recentImages.length === 0) {
+    html += `<p>No images yet.</p>`;
+    return html;
+  }
+
+  html += `<div style="display: flex; flex-wrap: wrap;" id="recent-images">`;
+  for (const { url, prompt } of recentImages) {
+    html += `<div style="margin: 0.5em;" class="recent-image">
+<a href="${url}" target="_blank"><img src="${url}" title="${prompt}" alt="${prompt}" style="max-width: 150px; max-height: 150px;" /></a>
+</div>`;
+  }
+  html += `</div>`;
+
+  return html;
 }
 
 function getExternalUrlForHuggingfaceSpaceId(spaceId: string) {
