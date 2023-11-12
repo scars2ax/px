@@ -280,9 +280,9 @@ export const CountTokenPrompt: ProxyResHandlerWithBody = async (
 		};
 	  const tokenCount = await countTokens(request);
 	  
-	  if (config.gatekeeper == "proxy_key") {
-		  incrementGlobalTokenCount(tokenCount.token_count,"openai")
-	  } else if (config.gatekeeper == "user_token") {
+
+		incrementGlobalTokenCount(tokenCount.token_count,"openai");
+	  if (config.gatekeeper == "user_token") {
 		  if (req.user !== undefined) {
 	         incrementTokenCount(req.user.token,tokenCount.token_count,"openai");
 		  }
@@ -296,9 +296,9 @@ export const CountTokenPrompt: ProxyResHandlerWithBody = async (
 		  service: "anthropic"
 		};
 	  const tokenCount = await countTokens(request);
-	  if (config.gatekeeper == "proxy_key") {
-		  incrementGlobalTokenCount(tokenCount.token_count,"anthropic")
-	  } else if (config.gatekeeper == "user_token") {
+
+	  incrementGlobalTokenCount(tokenCount.token_count,"anthropic");
+	  if (config.gatekeeper == "user_token") {
 		  if (req.user !== undefined) {
 				incrementTokenCount(req.user.token,tokenCount.token_count,"anthropic");
 		  }
