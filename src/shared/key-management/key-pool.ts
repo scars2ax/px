@@ -107,7 +107,11 @@ export class KeyPool {
   }
 
   private getServiceForModel(model: Model): LLMService {
-    if (model.startsWith("gpt") || model.startsWith("text-embedding-ada")) {
+    if (
+      model.startsWith("gpt") ||
+      model.startsWith("text-embedding-ada") ||
+      model.startsWith("dall-e")
+    ) {
       // https://platform.openai.com/docs/models/model-endpoint-compatibility
       return "openai";
     } else if (model.startsWith("claude-")) {

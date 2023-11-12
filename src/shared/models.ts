@@ -1,5 +1,7 @@
 // Don't import anything here, this is imported by config.ts
 
+import pino from "pino";
+
 export type OpenAIModelFamily = "turbo" | "gpt4" | "gpt4-32k" | "gpt4-turbo" | "dall-e";
 export type AnthropicModelFamily = "claude";
 export type GooglePalmModelFamily = "bison";
@@ -34,6 +36,8 @@ export const OPENAI_MODEL_FAMILY_MAP: { [regex: string]: OpenAIModelFamily } = {
   "^dall-e-\\d{4}$": "dall-e",
 };
 
+const modelLogger = pino({ level: "debug" }).child({ module: "startup" });
+
 export function getOpenAIModelFamily(
   model: string,
   defaultFamily: OpenAIModelFamily = "gpt4"
@@ -41,15 +45,18 @@ export function getOpenAIModelFamily(
   for (const [regex, family] of Object.entries(OPENAI_MODEL_FAMILY_MAP)) {
     if (model.match(regex)) return family;
   }
+  modelLogger.warn({ model }, "Could not determine OpenAI model family");
   return defaultFamily;
 }
 
-export function getClaudeModelFamily(_model: string): ModelFamily {
+export function getClaudeModelFamily(model: string): ModelFamily {
+  if (model.startsWith("anthropic.")) return getAwsBedrockModelFamily(model);
   return "claude";
 }
 
 export function getGooglePalmModelFamily(model: string): ModelFamily {
   if (model.match(/^\w+-bison-\d{3}$/)) return "bison";
+  modelLogger.warn({ model }, "Could not determine Google PaLM model family");
   return "bison";
 }
 

@@ -88,19 +88,22 @@ export type OpenAIPromptMessage = {
 // 512×512	$0.018 / image
 // 256×256	$0.016 / image
 
+export const DALLE_TOKENS_PER_DOLLAR = 100000;
+
 /**
  * OpenAI image generation with DALL-E doesn't use tokens but everything else
  * in the application does. There is a fixed cost for each image generation
  * request depending on the model and selected quality/resolution parameters,
- * which we convert to tokens at a rate of 10000 tokens per dollar.
+ * which we convert to tokens at a rate of 100000 tokens per dollar.
  */
 export function getOpenAIImageCost(params: {
   model: "dall-e-2" | "dall-e-3";
   quality: "standard" | "hd";
   resolution: "512x512" | "256x256" | "1024x1024" | "1024x1792" | "1792x1024";
+  n: number | null;
 }) {
-  const { model, quality, resolution } = params;
-  const cost = (() => {
+  const { model, quality, resolution, n } = params;
+  const usd = (() => {
     switch (model) {
       case "dall-e-2":
         switch (resolution) {
@@ -124,12 +127,14 @@ export function getOpenAIImageCost(params: {
             throw new Error("Invalid resolution");
         }
       default:
-        throw new Error("Invalid model");
+        throw new Error("Invalid image generation model");
     }
   })();
 
+  const tokens = (n ?? 1) * (usd * DALLE_TOKENS_PER_DOLLAR);
+
   return {
-    tokenizer: "openai-image",
-    token_count: Math.round(cost * 100000),
+    tokenizer: `openai-image cost`,
+    token_count: tokens,
   };
 }

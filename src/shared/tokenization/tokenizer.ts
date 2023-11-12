@@ -61,6 +61,7 @@ export async function countTokens({
           model: req.body.model,
           quality: req.body.quality,
           resolution: req.body.size,
+          n: parseInt(req.body.n, 10) || null,
         }),
         tokenization_duration_ms: getElapsedMs(time),
       };
