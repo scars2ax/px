@@ -104,7 +104,6 @@ export class OpenAIKeyProvider implements KeyProvider<OpenAIKey> {
           "turbo" as const,
           "gpt4" as const,
           "gpt4-turbo" as const,
-          "dall-e" as const,
         ],
         isTrial: false,
         isDisabled: false,

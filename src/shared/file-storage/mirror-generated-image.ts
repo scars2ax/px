@@ -12,6 +12,7 @@ export type OpenAIImageGenerationResult = {
   data: {
     revised_prompt?: string;
     url: string;
+    b64_json: string;
   }[];
 };
 

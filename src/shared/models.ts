@@ -45,8 +45,6 @@ export function getOpenAIModelFamily(
   for (const [regex, family] of Object.entries(OPENAI_MODEL_FAMILY_MAP)) {
     if (model.match(regex)) return family;
   }
-  const stack = new Error().stack;
-  modelLogger.warn({ model, stack }, "Could not determine OpenAI model family");
   return defaultFamily;
 }
 

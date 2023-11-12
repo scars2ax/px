@@ -43,9 +43,8 @@ export const addKey: ProxyRequestMiddleware = (proxyReq, req) => {
           "OpenAI Chat as an API translation target is not supported"
         );
       case "openai-image":
-        throw new Error(
-          "OpenAI Image as an API translation target is not supported"
-        );
+        assignedKey = keyPool.get("dall-e-3");
+        break;
       default:
         assertNever(req.outboundApi);
     }

@@ -165,6 +165,12 @@ export const transformOutboundPayload: RequestPreprocessor = async (req) => {
     return;
   }
 
+  if (req.inboundApi === "openai" && req.outboundApi === "openai-image") {
+    req.body = openaiToOpenaiImage(req);
+    console.log(req.body);
+    return;
+  }
+
   throw new Error(
     `'${req.inboundApi}' -> '${req.outboundApi}' request proxying is not supported. Make sure your client is configured to use the correct API.`
   );
@@ -238,6 +244,32 @@ function openaiToOpenaiText(req: Request) {
 
   const transformed = { ...rest, prompt: prompt, stop: stops };
   return OpenAIV1TextCompletionSchema.parse(transformed);
+}
+
+// Takes the last chat message and uses it verbatim as the image prompt.
+function openaiToOpenaiImage(req: Request) {
+  const { body } = req;
+  const result = OpenAIV1ChatCompletionSchema.safeParse(body);
+  if (!result.success) {
+    req.log.warn(
+      { issues: result.error.issues, body },
+      "Invalid OpenAI-to-OpenAI-image request"
+    );
+    throw result.error;
+  }
+
+  const { messages } = result.data;
+  const prompt = messages.filter((m) => m.role === "user").pop()?.content;
+
+  // TODO: Add some way to specify parameters via chat message
+  const transformed = {
+    model: "dall-e-3",
+    quality: "standard",
+    size: "1024x1024",
+    response_format: "url",
+    prompt: prompt
+  };
+  return OpenAIV1ImagesGenerationSchema.parse(transformed);
 }
 
 function openaiToPalm(req: Request): z.infer<typeof PalmV1GenerateTextSchema> {
