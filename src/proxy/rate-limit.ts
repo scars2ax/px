@@ -74,6 +74,17 @@ setInterval(clearOldExemptions, 10 * 1000);
 
 export const getUniqueIps = () => lastAttempts.size;
 
+/**
+ * Can be used to manually remove the most recent attempt from an IP address,
+ * ie. in case a prompt triggered OpenAI's content filter and therefore did not
+ * result in a generation.
+ */
+export const refundLastAttempt = (req: Request) => {
+  const key = req.user?.token || req.risuToken || req.ip;
+  const attempts = lastAttempts.get(key) || [];
+  attempts.pop();
+}
+
 export const ipLimiter = async (
   req: Request,
   res: Response,

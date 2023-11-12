@@ -13,6 +13,7 @@ import {
   incrementTokenCount,
 } from "../../../shared/users/user-store";
 import { assertNever } from "../../../shared/utils";
+import { refundLastAttempt } from "../../rate-limit";
 import {
   getCompletionFromBody,
   isImageGenerationRequest,
@@ -288,6 +289,7 @@ const handleUpstreamErrors: ProxyResHandlerWithBody = async (
       case "google-palm":
         if (errorPayload.error?.code === "content_policy_violation") {
           errorPayload.proxy_note = `Request was filtered by OpenAI's content moderation system. Try another prompt.`;
+          refundLastAttempt(req);
         } else {
           errorPayload.proxy_note = `Upstream service rejected the request as invalid. Your prompt may be too long for ${req.body?.model}.`;
         }
