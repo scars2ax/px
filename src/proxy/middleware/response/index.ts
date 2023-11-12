@@ -491,6 +491,15 @@ const incrementUsage: ProxyResHandlerWithBody = async (_proxyRes, req) => {
   if (isTextGenerationRequest(req) || isImageGenerationRequest(req)) {
     const model = req.body.model;
     const tokensUsed = req.promptTokens! + req.outputTokens!;
+    req.log.debug(
+      {
+        model,
+        tokensUsed,
+        promptTokens: req.promptTokens,
+        outputTokens: req.outputTokens,
+      },
+      `Incrementing usage for model`
+    );
     keyPool.incrementUsage(req.key!, model, tokensUsed);
     if (req.user) {
       incrementPromptCount(req.user.token);
@@ -505,6 +514,12 @@ const countResponseTokens: ProxyResHandlerWithBody = async (
   _res,
   body
 ) => {
+  if (req.outboundApi === "openai-image") {
+    req.outputTokens = req.promptTokens;
+    req.promptTokens = 0;
+    return;
+  }
+
   // This function is prone to breaking if the upstream API makes even minor
   // changes to the response format, especially for SSE responses. If you're
   // seeing errors in this function, check the reassembled response body from
