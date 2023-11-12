@@ -76,8 +76,10 @@ type Config = {
    * `maxIpsPerUser` limit, or if only connections from new IPs are be rejected.
    */
   maxIpsAutoBan: boolean;
-  /** Per-IP limit for requests per minute to OpenAI's completions endpoint. */
-  modelRateLimit: number;
+  /** Per-IP limit for requests per minute to text and chat models. */
+  textModelRateLimit: number;
+  /** Per-IP limit for requests per minute to image generation models. */
+  imageModelRateLimit: number;
   /**
    * For OpenAI, the maximum number of context tokens (prompt + max output) a
    * user can request before their request is rejected.
@@ -181,7 +183,8 @@ export const config: Config = {
   maxIpsAutoBan: getEnvWithDefault("MAX_IPS_AUTO_BAN", true),
   firebaseRtdbUrl: getEnvWithDefault("FIREBASE_RTDB_URL", undefined),
   firebaseKey: getEnvWithDefault("FIREBASE_KEY", undefined),
-  modelRateLimit: getEnvWithDefault("MODEL_RATE_LIMIT", 4),
+  textModelRateLimit: getEnvWithDefault("TEXT_MODEL_RATE_LIMIT", 4),
+  imageModelRateLimit: getEnvWithDefault("IMAGE_MODEL_RATE_LIMIT", 4),
   maxContextTokensOpenAI: getEnvWithDefault("MAX_CONTEXT_TOKENS_OPENAI", 16384),
   maxContextTokensAnthropic: getEnvWithDefault(
     "MAX_CONTEXT_TOKENS_ANTHROPIC",
@@ -226,13 +229,16 @@ export const config: Config = {
     "You must be over the age of majority in your country to use this service."
   ),
   blockRedirect: getEnvWithDefault("BLOCK_REDIRECT", "https://www.9gag.com"),
-  tokenQuota: MODEL_FAMILIES.reduce((acc, family: ModelFamily) => {
-    acc[family] = getEnvWithDefault(
-      `TOKEN_QUOTA_${family.toUpperCase().replace(/-/g, "_")}`,
-      0
-    ) as number;
-    return acc;
-  }, {} as { [key in ModelFamily]: number }),
+  tokenQuota: MODEL_FAMILIES.reduce(
+    (acc, family: ModelFamily) => {
+      acc[family] = getEnvWithDefault(
+        `TOKEN_QUOTA_${family.toUpperCase().replace(/-/g, "_")}`,
+        0
+      ) as number;
+      return acc;
+    },
+    {} as { [key in ModelFamily]: number }
+  ),
   quotaRefreshPeriod: getEnvWithDefault("QUOTA_REFRESH_PERIOD", undefined),
   allowNicknameChanges: getEnvWithDefault("ALLOW_NICKNAME_CHANGES", true),
   useInsecureCookies: getEnvWithDefault("USE_INSECURE_COOKIES", isDev),
@@ -251,6 +257,19 @@ function generateCookieSecret() {
 export const COOKIE_SECRET = generateCookieSecret();
 
 export async function assertConfigIsValid() {
+  if (process.env.MODEL_RATE_LIMIT !== undefined) {
+    const limit =
+      parseInt(process.env.MODEL_RATE_LIMIT, 10) || config.textModelRateLimit;
+
+    config.textModelRateLimit = limit;
+    config.imageModelRateLimit = Math.max(Math.floor(limit / 2), 1);
+
+    startupLogger.warn(
+      { textLimit: limit, imageLimit: config.imageModelRateLimit },
+      "MODEL_RATE_LIMIT is deprecated. Use TEXT_MODEL_RATE_LIMIT and IMAGE_MODEL_RATE_LIMIT instead."
+    );
+  }
+
   if (!["none", "proxy_key", "user_token"].includes(config.gatekeeper)) {
     throw new Error(
       `Invalid gatekeeper mode: ${config.gatekeeper}. Must be one of: none, proxy_key, user_token.`
@@ -427,5 +446,5 @@ function parseCsv(val: string): string[] {
 
   const regex = /(".*?"|[^",]+)(?=\s*,|\s*$)/g;
   const matches = val.match(regex) || [];
-  return matches.map(item => item.replace(/^"|"$/g, '').trim());
+  return matches.map((item) => item.replace(/^"|"$/g, "").trim());
 }

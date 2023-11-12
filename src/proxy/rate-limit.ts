@@ -9,8 +9,11 @@ export const SHARED_IP_ADDRESSES = new Set([
   "209.97.162.44",
 ]);
 
-const RATE_LIMIT_ENABLED = Boolean(config.modelRateLimit);
-const RATE_LIMIT = Math.max(1, config.modelRateLimit);
+const RATE_LIMIT_ENABLED = Boolean(
+  config.textModelRateLimit || config.imageModelRateLimit
+);
+const TEXT_RATE_LIMIT = Math.max(1, config.textModelRateLimit);
+const IMAGE_RATE_LIMIT = Math.max(1, config.imageModelRateLimit);
 const ONE_MINUTE_MS = 60 * 1000;
 
 type Timestamp = number;
@@ -22,12 +25,14 @@ const exemptedRequests: Timestamp[] = [];
 const isRecentAttempt = (now: Timestamp) => (attempt: Timestamp) =>
   attempt > now - ONE_MINUTE_MS;
 
-const getTryAgainInMs = (ip: string) => {
+const getTryAgainInMs = (ip: string, type: "text" | "image") => {
   const now = Date.now();
   const attempts = lastAttempts.get(ip) || [];
   const validAttempts = attempts.filter(isRecentAttempt(now));
 
-  if (validAttempts.length >= RATE_LIMIT) {
+  const limit = type === "text" ? TEXT_RATE_LIMIT : IMAGE_RATE_LIMIT;
+
+  if (validAttempts.length >= limit) {
     return validAttempts[0] - now + ONE_MINUTE_MS;
   } else {
     lastAttempts.set(ip, [...validAttempts, now]);
@@ -35,12 +40,15 @@ const getTryAgainInMs = (ip: string) => {
   }
 };
 
-const getStatus = (ip: string) => {
+const getStatus = (ip: string, type: "text" | "image") => {
   const now = Date.now();
   const attempts = lastAttempts.get(ip) || [];
   const validAttempts = attempts.filter(isRecentAttempt(now));
+
+  const limit = type === "text" ? TEXT_RATE_LIMIT : IMAGE_RATE_LIMIT;
+
   return {
-    remaining: Math.max(0, RATE_LIMIT - validAttempts.length),
+    remaining: Math.max(0, limit - validAttempts.length),
     reset: validAttempts.length > 0 ? validAttempts[0] + ONE_MINUTE_MS : now,
   };
 };
@@ -90,24 +98,25 @@ export const ipLimiter = async (
     return next();
   }
 
+  const type = req.url.includes("openai-image") ? "image" : "text";
+  const limit = type === "image" ? IMAGE_RATE_LIMIT : TEXT_RATE_LIMIT;
+
   // If user is authenticated, key rate limiting by their token. Otherwise, key
   // rate limiting by their IP address. Mitigates key sharing.
   const rateLimitKey = req.user?.token || req.risuToken || req.ip;
 
-  const { remaining, reset } = getStatus(rateLimitKey);
-  res.set("X-RateLimit-Limit", config.modelRateLimit.toString());
+  const { remaining, reset } = getStatus(rateLimitKey, type);
+  res.set("X-RateLimit-Limit", limit.toString());
   res.set("X-RateLimit-Remaining", remaining.toString());
   res.set("X-RateLimit-Reset", reset.toString());
 
-  const tryAgainInMs = getTryAgainInMs(rateLimitKey);
+  const tryAgainInMs = getTryAgainInMs(rateLimitKey, type);
   if (tryAgainInMs > 0) {
     res.set("Retry-After", tryAgainInMs.toString());
     res.status(429).json({
       error: {
         type: "proxy_rate_limited",
-        message: `This proxy is rate limited to ${
-          config.modelRateLimit
-        } prompts per minute. Please try again in ${Math.ceil(
+        message: `This model type is rate limited to ${limit} prompts per minute. Please try again in ${Math.ceil(
           tryAgainInMs / 1000
         )} seconds.`,
       },
