@@ -64,3 +64,5 @@ If you don't specify a `IMAGE_MODEL_RATE_LIMIT`, it defaults to half of the `TEX
 TEXT_MODEL_RATE_LIMIT=4
 IMAGE_MODEL_RATE_LIMIT=2
 ```
+
+If a prompt is filtered by OpenAI's content filter, it won't count towards the rate limit.
