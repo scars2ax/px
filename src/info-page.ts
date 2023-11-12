@@ -287,7 +287,6 @@ function getOpenAIInfo() {
       // Don't show trial/revoked keys for non-turbo families.
       // Generally those stats only make sense for the lowest-tier model.
       if (f !== "turbo") {
-        console.log("deleting", f);
         delete info[f]!.trialKeys;
         delete info[f]!.revokedKeys;
       }
