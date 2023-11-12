@@ -1,4 +1,4 @@
-import { logger } from "../logger";
+// Don't import anything here, this is imported by config.ts
 
 export type OpenAIModelFamily = "turbo" | "gpt4" | "gpt4-32k" | "gpt4-turbo" | "dall-e";
 export type AnthropicModelFamily = "claude";
@@ -50,8 +50,6 @@ export function getClaudeModelFamily(_model: string): ModelFamily {
 
 export function getGooglePalmModelFamily(model: string): ModelFamily {
   if (model.match(/^\w+-bison-\d{3}$/)) return "bison";
-  const stack = new Error().stack;
-  logger.warn({ model, stack }, "Unmapped PaLM model family");
   return "bison";
 }
 
