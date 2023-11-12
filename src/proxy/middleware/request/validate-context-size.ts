@@ -35,7 +35,7 @@ export const validateContextSize: RequestPreprocessor = async (req) => {
       proxyMax = BISON_MAX_CONTEXT;
       break;
     case "openai-image":
-      throw new Error("validateContextSize called for non-text format");
+      return;
     default:
       assertNever(req.outboundApi);
   }

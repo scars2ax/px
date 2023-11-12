@@ -88,6 +88,17 @@ const OpenAIV1TextCompletionSchema = z
   })
   .merge(OpenAIV1ChatCompletionSchema.omit({ messages: true }));
 
+// https://platform.openai.com/docs/api-reference/images/create
+const OpenAIV1ImagesGenerationSchema = z.object({
+  prompt: z.string().max(4000),
+  model: z.string().optional(),
+  quality: z.enum(['standard', 'hd']).optional(),
+  response_format: z.enum(['url', 'b64_json']).optional(),
+  size: z.enum(['256x256', '512x512', '1024x1024', '1792x1024', '1024x1792']).optional(),
+  style: z.enum(['vivid', 'natural']).optional(),
+  user: z.string().optional(),
+});
+
 // https://developers.generativeai.google/api/rest/generativelanguage/models/generateText
 const PalmV1GenerateTextSchema = z.object({
   model: z.string(),
@@ -110,6 +121,7 @@ const VALIDATORS: Record<APIFormat, z.ZodSchema<any>> = {
   anthropic: AnthropicV1CompleteSchema,
   openai: OpenAIV1ChatCompletionSchema,
   "openai-text": OpenAIV1TextCompletionSchema,
+  "openai-image": OpenAIV1ImagesGenerationSchema,
   "google-palm": PalmV1GenerateTextSchema,
 };
 
