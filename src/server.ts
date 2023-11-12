@@ -6,6 +6,7 @@ import path from "path";
 import pinoHttp from "pino-http";
 import childProcess from "child_process";
 import { logger } from "./logger";
+import { setupAssetsDir } from "./shared/file-storage/setup-assets-dir";
 import { keyPool } from "./shared/key-management";
 import { adminRouter } from "./admin/routes";
 import { proxyRouter } from "./proxy/routes";
@@ -101,13 +102,15 @@ async function start() {
 
   await initTokenizers();
 
+  await setupAssetsDir();
+
   if (config.gatekeeper === "user_token") {
     await initUserStore();
   }
 
   if (config.promptLogging) {
     logger.info("Starting prompt logging...");
-    logQueue.start();
+    await logQueue.start();
   }
 
   logger.info("Starting request queue...");

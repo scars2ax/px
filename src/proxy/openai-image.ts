@@ -22,7 +22,7 @@ import { generateModelList } from "./openai";
 import {
   mirrorGeneratedImage,
   OpenAIImageGenerationResult,
-} from "../shared/images/mirror-generated-image";
+} from "../shared/file-storage/mirror-generated-image";
 
 const KNOWN_MODELS = ["dall-e-2", "dall-e-3"];
 

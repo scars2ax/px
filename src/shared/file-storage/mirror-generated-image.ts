@@ -3,11 +3,9 @@ import { promises as fs } from "fs";
 import path from "path";
 import { v4 } from "uuid";
 import { logger } from "../../logger";
-import { ASSETS_DIR } from "../../config";
+import { USER_ASSETS_DIR } from "./index";
 
-const USER_ASSETS_DIR = path.join(ASSETS_DIR, "ugc");
-
-const log = logger.child({ module: "image-mirror" });
+const log = logger.child({ module: "file-storage" });
 
 export type OpenAIImageGenerationResult = {
   created: number;
@@ -21,8 +19,6 @@ async function downloadImage(url: string, created: number) {
   const { data } = await axios.get(url, { responseType: "arraybuffer" });
   const buffer = Buffer.from(data, "binary");
   const newFilename = `${v4()}.png`;
-
-  await fs.mkdir(USER_ASSETS_DIR, { recursive: true });
 
   const filepath = path.join(USER_ASSETS_DIR, newFilename);
   await fs.writeFile(filepath, buffer);
