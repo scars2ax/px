@@ -19,6 +19,10 @@ import {
   ProxyResHandlerWithBody,
 } from "./middleware/response";
 import { generateModelList } from "./openai";
+import {
+  mirrorGeneratedImage,
+  OpenAIImageGenerationResult,
+} from "../shared/images/mirror-generated-image";
 
 const KNOWN_MODELS = ["dall-e-2", "dall-e-3"];
 
@@ -40,6 +44,11 @@ const openaiImagesResponseHandler: ProxyResHandlerWithBody = async (
 ) => {
   if (typeof body !== "object") {
     throw new Error("Expected body to be an object");
+  }
+
+  if (body.data && body.data[0].url) {
+    const baseUrl = req.protocol + "://" + req.get("host");
+    await mirrorGeneratedImage(baseUrl, body as OpenAIImageGenerationResult);
   }
 
   if (config.promptLogging) {

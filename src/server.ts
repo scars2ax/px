@@ -1,4 +1,4 @@
-import { assertConfigIsValid, config } from "./config";
+import { assertConfigIsValid, ASSETS_DIR, config } from "./config";
 import "source-map-support/register";
 import express from "express";
 import cors from "cors";
@@ -58,10 +58,7 @@ app.set("views", [
   path.join(__dirname, "shared/views"),
 ]);
 
-app.use(
-  "/user_content",
-  express.static(path.join(__dirname, "public", "user_content"))
-);
+app.use('/user_content', express.static(path.join(ASSETS_DIR, "ugc")));
 
 app.get("/health", (_req, res) => res.sendStatus(200));
 app.use(cors());

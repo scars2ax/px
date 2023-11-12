@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
 import type firebase from "firebase-admin";
+import path from "path";
 import pino from "pino";
 import type { ModelFamily } from "./shared/models";
 import { MODEL_FAMILIES } from "./shared/models";
@@ -7,6 +8,8 @@ dotenv.config();
 
 const startupLogger = pino({ level: "debug" }).child({ module: "startup" });
 const isDev = process.env.NODE_ENV !== "production";
+
+export const ASSETS_DIR = path.join(__dirname, "..", "assets");
 
 type Config = {
   /** The port the proxy server will listen on. */

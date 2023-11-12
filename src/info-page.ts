@@ -107,7 +107,7 @@ function cacheInfoPageHtml(baseUrl: string) {
     },
     proompts,
     tookens: `${prettyTokens(tokens)}${getCostString(tokenCost)}`,
-    ...(config.modelRateLimit ? { proomptersNow: getUniqueIps() } : {}),
+    ...(config.textModelRateLimit ? { proomptersNow: getUniqueIps() } : {}),
     openaiKeys,
     anthropicKeys,
     palmKeys,

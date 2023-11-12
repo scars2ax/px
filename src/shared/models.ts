@@ -33,7 +33,7 @@ export const OPENAI_MODEL_FAMILY_MAP: { [regex: string]: OpenAIModelFamily } = {
   "^gpt-4$": "gpt4",
   "^gpt-3.5-turbo": "turbo",
   "^text-embedding-ada-002$": "turbo",
-  "^dall-e-\\d{4}$": "dall-e",
+  "^dall-e-\\d{1}$": "dall-e",
 };
 
 const modelLogger = pino({ level: "debug" }).child({ module: "startup" });
@@ -45,7 +45,8 @@ export function getOpenAIModelFamily(
   for (const [regex, family] of Object.entries(OPENAI_MODEL_FAMILY_MAP)) {
     if (model.match(regex)) return family;
   }
-  modelLogger.warn({ model }, "Could not determine OpenAI model family");
+  const stack = new Error().stack;
+  modelLogger.warn({ model, stack }, "Could not determine OpenAI model family");
   return defaultFamily;
 }
 
