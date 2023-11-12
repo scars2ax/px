@@ -92,7 +92,7 @@ export type OpenAIPromptMessage = {
  * OpenAI image generation with DALL-E doesn't use tokens but everything else
  * in the application does. There is a fixed cost for each image generation
  * request depending on the model and selected quality/resolution parameters,
- * which we convert to tokens at a rate of 1000 tokens per dollar.
+ * which we convert to tokens at a rate of 10000 tokens per dollar.
  */
 export function getOpenAIImageCost(params: {
   model: "dall-e-2" | "dall-e-3";
@@ -130,6 +130,6 @@ export function getOpenAIImageCost(params: {
 
   return {
     tokenizer: "openai-image",
-    token_count: Math.round(cost * 1000),
+    token_count: Math.round(cost * 100000),
   };
 }
