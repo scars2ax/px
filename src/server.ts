@@ -58,6 +58,11 @@ app.set("views", [
   path.join(__dirname, "shared/views"),
 ]);
 
+app.use(
+  "/user_content",
+  express.static(path.join(__dirname, "public", "user_content"))
+);
+
 app.get("/health", (_req, res) => res.sendStatus(200));
 app.use(cors());
 app.use(checkOrigin);
