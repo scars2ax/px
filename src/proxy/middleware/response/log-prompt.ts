@@ -4,7 +4,8 @@ import { logQueue } from "../../../shared/prompt-logging";
 import {
   getCompletionFromBody,
   getModelFromBody,
-  isCompletionRequest,
+  isImageGenerationRequest,
+  isTextGenerationRequest,
 } from "../common";
 import { ProxyResHandlerWithBody } from ".";
 import { assertNever } from "../../../shared/utils";
@@ -23,9 +24,9 @@ export const logPrompt: ProxyResHandlerWithBody = async (
     throw new Error("Expected body to be an object");
   }
 
-  if (!isCompletionRequest(req)) {
-    return;
-  }
+  const loggable =
+    isTextGenerationRequest(req) || isImageGenerationRequest(req);
+  if (!loggable) return;
 
   const promptPayload = getPromptForRequest(req);
   const promptFlattened = flattenMessages(promptPayload);

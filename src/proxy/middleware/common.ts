@@ -9,11 +9,10 @@ import { QuotaExceededError } from "./request/apply-quota-limits";
 const OPENAI_CHAT_COMPLETION_ENDPOINT = "/v1/chat/completions";
 const OPENAI_TEXT_COMPLETION_ENDPOINT = "/v1/completions";
 const OPENAI_EMBEDDINGS_ENDPOINT = "/v1/embeddings";
+const OPENAI_IMAGE_COMPLETION_ENDPOINT = "/v1/images/generations";
 const ANTHROPIC_COMPLETION_ENDPOINT = "/v1/complete";
 
-/** Returns true if we're making a request to a completion endpoint. */
-export function isCompletionRequest(req: Request) {
-  // 99% sure this function is not needed anymore
+export function isTextGenerationRequest(req: Request) {
   return (
     req.method === "POST" &&
     [
@@ -21,6 +20,13 @@ export function isCompletionRequest(req: Request) {
       OPENAI_TEXT_COMPLETION_ENDPOINT,
       ANTHROPIC_COMPLETION_ENDPOINT,
     ].some((endpoint) => req.path.startsWith(endpoint))
+  );
+}
+
+export function isImageGenerationRequest(req: Request) {
+  return (
+    req.method === "POST" &&
+    req.path.startsWith(OPENAI_IMAGE_COMPLETION_ENDPOINT)
   );
 }
 
@@ -103,7 +109,7 @@ function classifyError(err: Error): {
         code: { enabled: false },
         maxErrors: 3,
         transform: ({ issue, ...rest }) => {
-          return `At '${rest.pathComponent}', ${issue.message}`;
+          return `At '${rest.pathComponent}': ${issue.message}`;
         },
       });
       return { status: 400, userMessage, type: "proxy_validation_error" };
@@ -174,7 +180,7 @@ export function getCompletionFromBody(req: Request, body: Record<string, any>) {
     case "google-palm":
       return body.candidates[0].output;
     case "openai-image":
-      throw new Error("getCompletionFromBody called for non-text format");
+      return "";
     default:
       assertNever(format);
   }

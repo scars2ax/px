@@ -2,7 +2,7 @@ import { Request } from "express";
 import { z } from "zod";
 import { config } from "../../../config";
 import { OpenAIPromptMessage } from "../../../shared/tokenization";
-import { isCompletionRequest } from "../common";
+import { isTextGenerationRequest, isImageGenerationRequest } from "../common";
 import { RequestPreprocessor } from ".";
 import { APIFormat } from "../../../shared/key-management";
 
@@ -92,10 +92,13 @@ const OpenAIV1TextCompletionSchema = z
 const OpenAIV1ImagesGenerationSchema = z.object({
   prompt: z.string().max(4000),
   model: z.string().optional(),
-  quality: z.enum(['standard', 'hd']).optional(),
-  response_format: z.enum(['url', 'b64_json']).optional(),
-  size: z.enum(['256x256', '512x512', '1024x1024', '1792x1024', '1024x1792']).optional(),
-  style: z.enum(['vivid', 'natural']).optional(),
+  quality: z.enum(["standard", "hd"]).optional().default("standard"),
+  n: z.number().int().min(1).max(4).optional().default(1),
+  response_format: z.enum(["url", "b64_json"]).optional(),
+  size: z
+    .enum(["256x256", "512x512", "1024x1024", "1792x1024", "1024x1792"])
+    .optional(),
+  style: z.enum(["vivid", "natural"]).optional(),
   user: z.string().optional(),
 });
 
@@ -129,11 +132,10 @@ const VALIDATORS: Record<APIFormat, z.ZodSchema<any>> = {
 export const transformOutboundPayload: RequestPreprocessor = async (req) => {
   const sameService = req.inboundApi === req.outboundApi;
   const alreadyTransformed = req.retryCount > 0;
-  const notTransformable = !isCompletionRequest(req);
+  const notTransformable =
+    !isTextGenerationRequest(req) && !isImageGenerationRequest(req);
 
-  if (alreadyTransformed || notTransformable) {
-    return;
-  }
+  if (alreadyTransformed || notTransformable) return;
 
   if (sameService) {
     const result = VALIDATORS[req.inboundApi].safeParse(req.body);

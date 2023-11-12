@@ -15,7 +15,8 @@ import {
 import { assertNever } from "../../../shared/utils";
 import {
   getCompletionFromBody,
-  isCompletionRequest,
+  isImageGenerationRequest,
+  isTextGenerationRequest,
   writeErrorResponse,
 } from "../common";
 import { handleStreamedResponse } from "./handle-streamed-response";
@@ -487,13 +488,13 @@ function handleOpenAIRateLimitError(
 }
 
 const incrementUsage: ProxyResHandlerWithBody = async (_proxyRes, req) => {
-  if (isCompletionRequest(req)) {
+  if (isTextGenerationRequest(req) || isImageGenerationRequest(req)) {
     const model = req.body.model;
     const tokensUsed = req.promptTokens! + req.outputTokens!;
     keyPool.incrementUsage(req.key!, model, tokensUsed);
     if (req.user) {
       incrementPromptCount(req.user.token);
-      incrementTokenCount(req.user.token, model, tokensUsed);
+      incrementTokenCount(req.user.token, model, req.outboundApi, tokensUsed);
     }
   }
 };
