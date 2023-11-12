@@ -94,12 +94,17 @@ function cacheInfoPageHtml(baseUrl: string) {
   const tokens = serviceStats.get("tokens") || 0;
   const tokenCost = serviceStats.get("tokenCost") || 0;
 
+  const allowDalle = config.allowedModelFamilies.includes("dall-e");
+
   const info = {
     uptime: Math.floor(process.uptime()),
     endpoints: {
       ...(openaiKeys ? { openai: baseUrl + "/proxy/openai" } : {}),
       ...(openaiKeys
         ? { ["openai2"]: baseUrl + "/proxy/openai/turbo-instruct" }
+        : {}),
+      ...(openaiKeys && allowDalle
+        ? { ["openai-image"]: baseUrl + "/proxy/openai-image" }
         : {}),
       ...(anthropicKeys ? { anthropic: baseUrl + "/proxy/anthropic" } : {}),
       ...(palmKeys ? { "google-palm": baseUrl + "/proxy/google-palm" } : {}),

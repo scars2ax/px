@@ -83,7 +83,7 @@ const handleModelRequest: RequestHandler = (_req, res) => {
   const result = generateModelList();
   modelsCache = { object: "list", data: result };
   modelsCacheTime = new Date().getTime();
-  res.status(200).json();
+  res.status(200).json(modelsCache);
 };
 
 /** Handles some turbo-instruct special cases. */

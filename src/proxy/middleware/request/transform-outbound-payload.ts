@@ -167,7 +167,6 @@ export const transformOutboundPayload: RequestPreprocessor = async (req) => {
 
   if (req.inboundApi === "openai" && req.outboundApi === "openai-image") {
     req.body = openaiToOpenaiImage(req);
-    console.log(req.body);
     return;
   }
 
@@ -261,13 +260,25 @@ function openaiToOpenaiImage(req: Request) {
   const { messages } = result.data;
   const prompt = messages.filter((m) => m.role === "user").pop()?.content;
 
+  if (body.stream) {
+    throw new Error(
+      "Streaming is not supported for image generation requests."
+    );
+  }
+
+  if (!prompt || !prompt.startsWith("Image:")) {
+    throw new Error(
+      "Start your prompt with `Image:` followed by a description of the image you want to generate."
+    );
+  }
+
   // TODO: Add some way to specify parameters via chat message
   const transformed = {
-    model: "dall-e-3",
+    model: body.model.includes("dall-e") ? body.model : "dall-e-3",
     quality: "standard",
     size: "1024x1024",
     response_format: "url",
-    prompt: prompt
+    prompt: prompt.replace(/^Image:/, "").trim(),
   };
   return OpenAIV1ImagesGenerationSchema.parse(transformed);
 }

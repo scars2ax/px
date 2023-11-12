@@ -33,7 +33,7 @@ const handleModelRequest: RequestHandler = (_req, res) => {
   const result = generateModelList(KNOWN_MODELS);
   modelListCache = { object: "list", data: result };
   modelListValid = new Date().getTime();
-  res.status(200).json();
+  res.status(200).json(modelListCache);
 };
 
 const openaiImagesResponseHandler: ProxyResHandlerWithBody = async (
