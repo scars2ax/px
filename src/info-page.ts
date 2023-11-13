@@ -525,13 +525,23 @@ function buildRecentImageSection() {
   html += `<div style="display: flex; flex-wrap: wrap;" id="recent-images">`;
   for (const { url, prompt } of recentImages) {
     const thumbUrl = url.replace(/\.png$/, "_t.jpg");
+    const escapedPrompt = escapeHtml(prompt);
     html += `<div style="margin: 0.5em;" class="recent-image">
-<a href="${url}" target="_blank"><img src="${thumbUrl}" title="${prompt}" alt="${prompt}" style="max-width: 150px; max-height: 150px;" /></a>
+<a href="${url}" target="_blank"><img src="${thumbUrl}" title="${escapedPrompt}" alt="${escapedPrompt}" style="max-width: 150px; max-height: 150px;" /></a>
 </div>`;
   }
   html += `</div>`;
 
   return html;
+}
+
+function escapeHtml(unsafe: string) {
+  return unsafe
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function getExternalUrlForHuggingfaceSpaceId(spaceId: string) {
