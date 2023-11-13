@@ -38,7 +38,7 @@ async function saveB64Image(b64: string) {
 }
 
 async function createThumbnail(filepath: string) {
-  const thumbnailPath = filepath.replace(/(\.[\wd_-]+)$/i, "t.jpg");
+  const thumbnailPath = filepath.replace(/(\.[\wd_-]+)$/i, "_t.jpg");
 
   await sharp(filepath)
     .resize(150, 150, {

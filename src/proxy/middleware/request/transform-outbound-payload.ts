@@ -266,9 +266,14 @@ function openaiToOpenaiImage(req: Request) {
     );
   }
 
-  if (!prompt || !prompt.startsWith("Image:")) {
+  // Some frontends do weird things with the prompt, like prefixing it with a
+  // character name or wrapping the entire thing in quotes. We will look for
+  // the index of "Image:" and use everything after that as the prompt.
+
+  const index = prompt?.toLowerCase().indexOf("image:");
+  if (index === -1 || !prompt) {
     throw new Error(
-      "Start your prompt with `Image:` followed by a description of the image you want to generate."
+      `Start your prompt with 'Image:' followed by a description of the image you want to generate (received: ${prompt}).`
     );
   }
 
@@ -278,7 +283,7 @@ function openaiToOpenaiImage(req: Request) {
     quality: "standard",
     size: "1024x1024",
     response_format: "url",
-    prompt: prompt.replace(/^Image:/, "").trim(),
+    prompt: prompt.slice(index! + 6).trim(),
   };
   return OpenAIV1ImagesGenerationSchema.parse(transformed);
 }
