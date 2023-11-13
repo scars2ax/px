@@ -292,6 +292,10 @@ const handleUpstreamErrors: ProxyResHandlerWithBody = async (
         if (errorPayload.error?.code === "content_policy_violation") {
           errorPayload.proxy_note = `Request was filtered by OpenAI's content moderation system. Try another prompt.`;
           refundLastAttempt(req);
+        } else if (errorPayload.error?.code === "billing_hard_limit_reached") {
+          // For some reason, some models return this 400 error instead of the
+          // same 429 billing error that other models return.
+          handleOpenAIRateLimitError(req, tryAgainMessage, errorPayload);
         } else {
           errorPayload.proxy_note = `Upstream service rejected the request as invalid. Your prompt may be too long for ${req.body?.model}.`;
         }
@@ -462,6 +466,7 @@ function handleOpenAIRateLimitError(
   const type = errorPayload.error?.type;
   switch (type) {
     case "insufficient_quota":
+    case "invalid_request_error": // this is the billing_hard_limit_reached error seen in some cases
       // Billing quota exceeded (key is dead, disable it)
       keyPool.disable(req.key!, "quota");
       errorPayload.proxy_note = `Assigned key's quota has been exceeded. ${tryAgainMessage}`;
