@@ -46,16 +46,6 @@ const openaiImagesResponseHandler: ProxyResHandlerWithBody = async (
     throw new Error("Expected body to be an object");
   }
 
-  if (body.data) {
-    const baseUrl = req.protocol + "://" + req.get("host");
-    const prompt = body.data[0].revised_prompt ?? req.body.prompt;
-    await mirrorGeneratedImage(
-      baseUrl,
-      prompt,
-      body as OpenAIImageGenerationResult
-    );
-  }
-
   if (config.promptLogging) {
     const host = req.get("host");
     body.proxy_note = `Prompts are logged on this proxy instance. See ${host} for more information.`;

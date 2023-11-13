@@ -180,7 +180,7 @@ export function getCompletionFromBody(req: Request, body: Record<string, any>) {
     case "google-palm":
       return body.candidates[0].output;
     case "openai-image":
-      return "";
+      return body.data?.map((item: any) => item.url).join("\n");
     default:
       assertNever(format);
   }
@@ -191,8 +191,9 @@ export function getModelFromBody(req: Request, body: Record<string, any>) {
   switch (format) {
     case "openai":
     case "openai-text":
-    case "openai-image":
       return body.model;
+    case "openai-image":
+      return req.body.model;
     case "anthropic":
       // Anthropic confirms the model in the response, but AWS Claude doesn't.
       return body.model || req.body.model;

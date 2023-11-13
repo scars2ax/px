@@ -97,8 +97,9 @@ const OpenAIV1ImagesGenerationSchema = z.object({
   response_format: z.enum(["url", "b64_json"]).optional(),
   size: z
     .enum(["256x256", "512x512", "1024x1024", "1792x1024", "1024x1792"])
-    .optional(),
-  style: z.enum(["vivid", "natural"]).optional(),
+    .optional()
+    .default("1024x1024"),
+  style: z.enum(["vivid", "natural"]).optional().default("vivid"),
   user: z.string().optional(),
 });
 

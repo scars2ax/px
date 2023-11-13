@@ -22,6 +22,7 @@ import {
 } from "../common";
 import { handleStreamedResponse } from "./handle-streamed-response";
 import { logPrompt } from "./log-prompt";
+import { saveImage } from "./save-image";
 
 const DECODER_MAP = {
   gzip: util.promisify(zlib.gunzip),
@@ -108,6 +109,7 @@ export const createOnProxyResHandler = (apiMiddleware: ProxyResMiddleware) => {
           countResponseTokens,
           incrementUsage,
           copyHttpHeaders,
+          saveImage,
           logPrompt,
           ...apiMiddleware
         );
