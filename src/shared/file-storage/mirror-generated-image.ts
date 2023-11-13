@@ -5,6 +5,7 @@ import { v4 } from "uuid";
 import { USER_ASSETS_DIR } from "../../config";
 import { logger } from "../../logger";
 import { addToImageHistory } from "./image-history";
+import sharp from "sharp";
 
 const log = logger.child({ module: "file-storage" });
 
@@ -36,6 +37,20 @@ async function saveB64Image(b64: string) {
   return filepath;
 }
 
+async function createThumbnail(filepath: string) {
+  const thumbnailPath = filepath.replace(/(\.[\wd_-]+)$/i, "t.jpg");
+
+  await sharp(filepath)
+    .resize(150, 150, {
+      fit: "inside",
+      withoutEnlargement: true,
+    })
+    .toFormat("jpeg")
+    .toFile(thumbnailPath);
+
+  return thumbnailPath;
+}
+
 /**
  * Downloads generated images and mirrors them to the user_content directory.
  * Mutates the result object.
@@ -46,14 +61,14 @@ export async function mirrorGeneratedImage(
   result: OpenAIImageGenerationResult
 ): Promise<OpenAIImageGenerationResult> {
   for (const item of result.data) {
+    let mirror: string;
     if (item.b64_json) {
-      const original = await saveB64Image(item.b64_json);
-      item.url = `${host}/user_content/${path.basename(original)}`;
+      mirror = await saveB64Image(item.b64_json);
     } else {
-      const original = item.url;
-      const mirror = await downloadImage(original);
-      item.url = `${host}/user_content/${path.basename(mirror)}`;
+      mirror = await downloadImage(item.url);
     }
+    item.url = `${host}/user_content/${path.basename(mirror)}`;
+    await createThumbnail(mirror);
     addToImageHistory({ url: item.url, prompt });
   }
   return result;

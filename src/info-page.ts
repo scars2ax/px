@@ -524,8 +524,9 @@ function buildRecentImageSection() {
 
   html += `<div style="display: flex; flex-wrap: wrap;" id="recent-images">`;
   for (const { url, prompt } of recentImages) {
+    const thumbUrl = url.replace(/\.png$/, "t.jpg");
     html += `<div style="margin: 0.5em;" class="recent-image">
-<a href="${url}" target="_blank"><img src="${url}" title="${prompt}" alt="${prompt}" style="max-width: 150px; max-height: 150px;" /></a>
+<a href="${url}" target="_blank"><img src="${thumbUrl}" title="${prompt}" alt="${prompt}" style="max-width: 150px; max-height: 150px;" /></a>
 </div>`;
   }
   html += `</div>`;

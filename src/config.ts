@@ -357,6 +357,7 @@ export const OMITTED_KEYS: (keyof Config)[] = [
   "blockMessage",
   "blockRedirect",
   "allowNicknameChanges",
+  "showRecentImages",
   "useInsecureCookies",
 ];
 
