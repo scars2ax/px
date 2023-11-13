@@ -32,7 +32,7 @@ Add `dall-e` to the `ALLOWED_MODEL_FAMILIES` environment variable to enable DALL
 
 ```
 # GPT3.5 Turbo, GPT-4, GPT-4 Turbo, and DALL-E
-ALLOWED_MODEL_FAMILIES=turbo,gpt-4,gpt-4-turbo,dall-e
+ALLOWED_MODEL_FAMILIES=turbo,gpt-4,gpt-4turbo,dall-e
 
 # All models as of this writing
 ALLOWED_MODEL_FAMILIES=turbo,gpt4,gpt4-32k,gpt4-turbo,claude,bison,aws-claude,dall-e
