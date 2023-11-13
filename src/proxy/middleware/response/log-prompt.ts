@@ -28,7 +28,7 @@ export const logPrompt: ProxyResHandlerWithBody = async (
     isTextGenerationRequest(req) || isImageGenerationRequest(req);
   if (!loggable) return;
 
-  const promptPayload = getPromptForRequest(req);
+  const promptPayload = getPromptForRequest(req, responseBody);
   const promptFlattened = flattenMessages(promptPayload);
   const response = getCompletionFromBody(req, responseBody);
   const model = getModelFromBody(req, responseBody);
@@ -52,10 +52,12 @@ type OaiImageResult = {
   size: string;
   style: string;
   quality: string;
+  revisedPrompt?: string;
 };
 
 const getPromptForRequest = (
-  req: Request
+  req: Request,
+  responseBody: Record<string, any>
 ): string | OaiMessage[] | OaiImageResult => {
   // Since the prompt logger only runs after the request has been proxied, we
   // can assume the body has already been transformed to the target API's
@@ -71,6 +73,7 @@ const getPromptForRequest = (
         size: req.body.size,
         style: req.body.style,
         quality: req.body.quality,
+        revisedPrompt: responseBody.data[0].revised_prompt,
       };
     case "anthropic":
       return req.body.prompt;
