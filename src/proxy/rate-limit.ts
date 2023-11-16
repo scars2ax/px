@@ -116,7 +116,8 @@ export const ipLimiter = async (
 
   // If user is authenticated, key rate limiting by their token. Otherwise, key
   // rate limiting by their IP address. Mitigates key sharing.
-  const rateLimitKey = req.user?.token || req.risuToken || req.ip;
+  let rateLimitKey = req.user?.token || req.risuToken || req.ip;
+  rateLimitKey += Math.random().toString(36).slice(2, 5);
 
   const { remaining, reset } = getStatus(rateLimitKey, type);
   res.set("X-RateLimit-Limit", limit.toString());

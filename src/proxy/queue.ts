@@ -33,9 +33,10 @@ const log = logger.child({ module: "request-queue" });
 /** Maximum number of queue slots for Agnai.chat requests. */
 const AGNAI_CONCURRENCY_LIMIT = 5;
 /** Maximum number of queue slots for individual users. */
-const USER_CONCURRENCY_LIMIT = 1;
+const USER_CONCURRENCY_LIMIT = 999;
 const MIN_HEARTBEAT_SIZE = 512;
-const MAX_HEARTBEAT_SIZE = 512 * 1024;
+const MAX_HEARTBEAT_SIZE =
+  1024 * parseInt(process.env.MAX_HEARTBEAT_SIZE_KB ?? "512");
 const HEARTBEAT_INTERVAL = 10000;
 const LOAD_THRESHOLD = parseFloat(process.env.LOAD_THRESHOLD ?? "50");
 const GROWTH_FACTOR = parseFloat(process.env.PAYLOAD_GROWTH_FACTOR ?? "5");
@@ -210,7 +211,7 @@ function processQueue() {
   MODEL_FAMILIES.forEach((modelFamily) => {
     const lockout = keyPool.getLockoutPeriod(modelFamily);
     if (lockout === 0) {
-      reqs.push(dequeue(modelFamily));
+      // reqs.push(dequeue(modelFamily));
     }
   });
 
@@ -473,7 +474,7 @@ export function registerHeartbeat(req: Request) {
   req.heartbeatInterval = setInterval(() => {
     if (isBufferFull) {
       bufferFullCount++;
-      if (bufferFullCount > 3) {
+      if (bufferFullCount >= 3) {
         req.log.error("Heartbeat skipped too many times; killing connection.");
         res.destroy();
       } else {
@@ -515,7 +516,7 @@ function monitorHeartbeat(req: Request) {
       );
       res.destroy();
     }
-  }, HEARTBEAT_INTERVAL);
+  }, HEARTBEAT_INTERVAL * 2);
 }
 
 /** Sends larger heartbeats when the queue is overloaded */
@@ -526,8 +527,7 @@ function getHeartbeatSize() {
     return MIN_HEARTBEAT_SIZE;
   } else {
     const excessLoad = load - LOAD_THRESHOLD;
-    const size =
-      MIN_HEARTBEAT_SIZE + Math.pow(excessLoad * GROWTH_FACTOR, 2);
+    const size = MIN_HEARTBEAT_SIZE + Math.pow(excessLoad * GROWTH_FACTOR, 2);
     if (size > MAX_HEARTBEAT_SIZE) return MAX_HEARTBEAT_SIZE;
     return size;
   }
@@ -535,9 +535,10 @@ function getHeartbeatSize() {
 
 function getHeartbeatPayload() {
   const size = getHeartbeatSize();
-  const data = process.env.NODE_ENV === "production"
-    ? crypto.randomBytes(size)
-    : `payload size: ${size}`;
+  const data =
+    true // process.env.NODE_ENV === "production"
+      ? crypto.randomBytes(size)
+      : `payload size: ${size}`;
   return `: queue heartbeat ${data}\n\n`;
 }
 
