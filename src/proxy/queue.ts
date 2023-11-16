@@ -36,12 +36,12 @@ const AGNAI_CONCURRENCY_LIMIT = 5;
 const USER_CONCURRENCY_LIMIT = 1;
 const MIN_HEARTBEAT_SIZE = 512;
 const MAX_HEARTBEAT_SIZE =
-  1024 * parseInt(process.env.MAX_HEARTBEAT_SIZE_KB ?? "512");
+  1024 * parseInt(process.env.MAX_HEARTBEAT_SIZE_KB ?? "1024");
 const HEARTBEAT_INTERVAL =
-  1000 * parseInt(process.env.HEARTBEAT_INTERVAL_SEC ?? "10");
+  1000 * parseInt(process.env.HEARTBEAT_INTERVAL_SEC ?? "5");
 const LOAD_THRESHOLD = parseFloat(process.env.LOAD_THRESHOLD ?? "50");
 const PAYLOAD_SCALE_FACTOR = parseFloat(
-  process.env.PAYLOAD_SCALE_FACTOR ?? "8"
+  process.env.PAYLOAD_SCALE_FACTOR ?? "6"
 );
 
 /**
