@@ -33,13 +33,16 @@ const log = logger.child({ module: "request-queue" });
 /** Maximum number of queue slots for Agnai.chat requests. */
 const AGNAI_CONCURRENCY_LIMIT = 5;
 /** Maximum number of queue slots for individual users. */
-const USER_CONCURRENCY_LIMIT = 999;
+const USER_CONCURRENCY_LIMIT = 1;
 const MIN_HEARTBEAT_SIZE = 512;
 const MAX_HEARTBEAT_SIZE =
   1024 * parseInt(process.env.MAX_HEARTBEAT_SIZE_KB ?? "512");
-const HEARTBEAT_INTERVAL = 10000;
+const HEARTBEAT_INTERVAL =
+  1000 * parseInt(process.env.HEARTBEAT_INTERVAL_SEC ?? "10");
 const LOAD_THRESHOLD = parseFloat(process.env.LOAD_THRESHOLD ?? "50");
-const GROWTH_FACTOR = parseFloat(process.env.PAYLOAD_GROWTH_FACTOR ?? "5");
+const PAYLOAD_SCALE_FACTOR = parseFloat(
+  process.env.PAYLOAD_SCALE_FACTOR ?? "8"
+);
 
 /**
  * Returns an identifier for a request. This is used to determine if a
@@ -211,7 +214,7 @@ function processQueue() {
   MODEL_FAMILIES.forEach((modelFamily) => {
     const lockout = keyPool.getLockoutPeriod(modelFamily);
     if (lockout === 0) {
-      // reqs.push(dequeue(modelFamily));
+      reqs.push(dequeue(modelFamily));
     }
   });
 
@@ -381,6 +384,7 @@ export function createQueueMiddleware({
 function killQueuedRequest(req: Request) {
   if (!req.res || req.res.writableEnded) {
     req.log.warn(`Attempted to terminate request that has already ended.`);
+    queue.splice(queue.indexOf(req), 1);
     return;
   }
   const res = req.res;
@@ -527,7 +531,8 @@ function getHeartbeatSize() {
     return MIN_HEARTBEAT_SIZE;
   } else {
     const excessLoad = load - LOAD_THRESHOLD;
-    const size = MIN_HEARTBEAT_SIZE + Math.pow(excessLoad * GROWTH_FACTOR, 2);
+    const size =
+      MIN_HEARTBEAT_SIZE + Math.pow(excessLoad * PAYLOAD_SCALE_FACTOR, 2);
     if (size > MAX_HEARTBEAT_SIZE) return MAX_HEARTBEAT_SIZE;
     return size;
   }
@@ -536,7 +541,7 @@ function getHeartbeatSize() {
 function getHeartbeatPayload() {
   const size = getHeartbeatSize();
   const data =
-    true // process.env.NODE_ENV === "production"
+    process.env.NODE_ENV === "production"
       ? crypto.randomBytes(size)
       : `payload size: ${size}`;
   return `: queue heartbeat ${data}\n\n`;
