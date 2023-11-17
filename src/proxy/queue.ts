@@ -351,6 +351,7 @@ function initStreaming(req: Request) {
   res.flushHeaders();
   res.write("\n");
   res.write(": joining queue\n\n");
+  res.write(getHeartbeatPayload());
 }
 
 /**
