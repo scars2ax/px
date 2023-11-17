@@ -94,9 +94,6 @@ export function enqueue(req: Request) {
     }
   }
 
-  queue.push(req);
-  req.queueOutTime = 0;
-
   // shitty hack to remove hpm's event listeners on retried requests
   removeProxyMiddlewareEventListeners(req);
 
@@ -116,6 +113,9 @@ export function enqueue(req: Request) {
   } else {
     req.body.stream = false
   }
+
+  queue.push(req);
+  req.queueOutTime = 0;
 
   const removeFromQueue = () => {
     req.log.info(`Removing aborted request from queue.`);
