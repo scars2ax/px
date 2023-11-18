@@ -17,13 +17,13 @@ ARG GREETING_URL
 RUN if [ -n "$GREETING_URL" ]; then \
     curl -sL "$GREETING_URL" > greeting.md; \
     fi
-RUN chown -R 1000:1000 /app
-USER 1000
 COPY package*.json greeting.md* ./
 RUN npm install
 COPY . .
 RUN npm run build
 RUN --mount=type=secret,id=_env,dst=/etc/secrets/.env cat /etc/secrets/.env >> .env
 EXPOSE 10000
+RUN chown -R 1000:1000 /app
+USER 1000
 ENV NODE_ENV=production
 CMD [ "npm", "start" ]
