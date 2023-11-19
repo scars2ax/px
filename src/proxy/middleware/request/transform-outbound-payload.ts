@@ -250,7 +250,7 @@ function openaiToOpenaiText(req: Request) {
   }
 
   const { messages, ...rest } = result.data;
-  const prompt = flattenOpenAiChatMessages(messages);
+  const prompt = flattenOpenAIChatMessages(messages);
 
   let stops = rest.stop
     ? Array.isArray(rest.stop)
@@ -278,7 +278,7 @@ function openaiToOpenaiImage(req: Request) {
 
   const { messages } = result.data;
   const prompt = messages.filter((m) => m.role === "user").pop()?.content;
-  if (typeof prompt !== "string" || Array.isArray(prompt)) {
+  if (Array.isArray(prompt)) {
     throw new Error("Image generation prompt must be a text message.");
   }
 
@@ -292,8 +292,8 @@ function openaiToOpenaiImage(req: Request) {
   // character name or wrapping the entire thing in quotes. We will look for
   // the index of "Image:" and use everything after that as the prompt.
 
-  const index = prompt.toLowerCase().indexOf("image:");
-  if (index === -1) {
+  const index = prompt?.toLowerCase().indexOf("image:");
+  if (index === -1 || !prompt) {
     throw new Error(
       `Start your prompt with 'Image:' followed by a description of the image you want to generate (received: ${prompt}).`
     );
@@ -305,7 +305,7 @@ function openaiToOpenaiImage(req: Request) {
     quality: "standard",
     size: "1024x1024",
     response_format: "url",
-    prompt: prompt.slice(index + 6).trim(),
+    prompt: prompt.slice(index! + 6).trim(),
   };
   return OpenAIV1ImagesGenerationSchema.parse(transformed);
 }
@@ -325,7 +325,7 @@ function openaiToPalm(req: Request): z.infer<typeof PalmV1GenerateTextSchema> {
   }
 
   const { messages, ...rest } = result.data;
-  const prompt = flattenOpenAiChatMessages(messages);
+  const prompt = flattenOpenAIChatMessages(messages);
 
   let stops = rest.stop
     ? Array.isArray(rest.stop)
@@ -369,17 +369,17 @@ export function openAIMessagesToClaudePrompt(messages: OpenAIChatMessage[]) {
         } else if (role === "user") {
           role = "Human";
         }
+        const name = m.name?.trim();
+        const content = flattenOpenAIMessageContent(m.content);
         // https://console.anthropic.com/docs/prompt-design
         // `name` isn't supported by Anthropic but we can still try to use it.
-        return `\n\n${role}: ${m.name?.trim() ? `(as ${m.name}) ` : ""}${
-          m.content
-        }`;
+        return `\n\n${role}: ${name ? `(as ${name}) ` : ""}${content}`;
       })
       .join("") + "\n\nAssistant:"
   );
 }
 
-function flattenOpenAiChatMessages(messages: OpenAIChatMessage[]) {
+function flattenOpenAIChatMessages(messages: OpenAIChatMessage[]) {
   // Temporary to allow experimenting with prompt strategies
   const PROMPT_VERSION: number = 1;
   switch (PROMPT_VERSION) {
@@ -396,7 +396,7 @@ function flattenOpenAiChatMessages(messages: OpenAIChatMessage[]) {
             } else if (role === "user") {
               role = "User";
             }
-            return `\n\n${role}: ${m.content}`;
+            return `\n\n${role}: ${flattenOpenAIMessageContent(m.content)}`;
           })
           .join("") + "\n\nAssistant:"
       );
@@ -408,10 +408,23 @@ function flattenOpenAiChatMessages(messages: OpenAIChatMessage[]) {
           if (role === "system") {
             role = "System: ";
           }
-          return `\n\n${role}${m.content}`;
+          return `\n\n${role}${flattenOpenAIMessageContent(m.content)}`;
         })
         .join("");
     default:
       throw new Error(`Unknown prompt version: ${PROMPT_VERSION}`);
   }
+}
+
+function flattenOpenAIMessageContent(
+  content: OpenAIChatMessage["content"]
+): string {
+  return Array.isArray(content)
+    ? content
+        .map((contentItem) => {
+          if ("text" in contentItem) return contentItem.text;
+          if ("image_url" in contentItem) return "[ Uploaded Image Omitted ]";
+        })
+        .join("\n")
+    : content;
 }
