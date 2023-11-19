@@ -1,4 +1,3 @@
-import { z } from "zod";
 import { Tiktoken } from "tiktoken/lite";
 import cl100k_base from "tiktoken/encoders/cl100k_base.json";
 import { logger } from "../../logger";
@@ -6,6 +5,7 @@ import { libSharp } from "../file-storage";
 import type { OpenAIChatMessage } from "../../proxy/middleware/request/transform-outbound-payload";
 
 const log = logger.child({ module: "tokenizer", service: "openai" });
+const GPT4_VISION_SYSTEM_PROMPT_SIZE = 170;
 
 let encoder: Tiktoken;
 
@@ -30,11 +30,12 @@ export async function getTokenCount(
   }
 
   const gpt4 = model.startsWith("gpt-4");
+  const vision = model.includes("vision");
 
   const tokensPerMessage = gpt4 ? 3 : 4;
   const tokensPerName = gpt4 ? 1 : -1; // turbo omits role if name is present
 
-  let numTokens = 0;
+  let numTokens = vision ? GPT4_VISION_SYSTEM_PROMPT_SIZE : 0;
 
   for (const message of prompt) {
     numTokens += tokensPerMessage;
