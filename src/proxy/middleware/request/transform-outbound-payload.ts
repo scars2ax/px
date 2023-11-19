@@ -1,13 +1,14 @@
 import { Request } from "express";
 import { z } from "zod";
 import { config } from "../../../config";
-import { OpenAIPromptMessage } from "../../../shared/tokenization";
 import { isTextGenerationRequest, isImageGenerationRequest } from "../common";
 import { RequestPreprocessor } from ".";
 import { APIFormat } from "../../../shared/key-management";
 
 const CLAUDE_OUTPUT_MAX = config.maxOutputTokensAnthropic;
 const OPENAI_OUTPUT_MAX = config.maxOutputTokensOpenAI;
+
+// TODO: move schemas to shared
 
 // https://console.anthropic.com/docs/api/reference#-v1-complete
 export const AnthropicV1CompleteSchema = z.object({
@@ -29,12 +30,25 @@ export const AnthropicV1CompleteSchema = z.object({
 });
 
 // https://platform.openai.com/docs/api-reference/chat/create
-const OpenAIV1ChatCompletionSchema = z.object({
+const OpenAIV1ChatContentArraySchema = z.array(
+  z.union([
+    z.object({ type: z.literal("text"), text: z.string() }),
+    z.object({
+      type: z.literal("image_url"),
+      image_url: z.object({
+        url: z.string().url(),
+        detail: z.enum(["low", "auto", "high"]).optional().default("auto"),
+      }),
+    }),
+  ])
+);
+
+export const OpenAIV1ChatCompletionSchema = z.object({
   model: z.string(),
   messages: z.array(
     z.object({
       role: z.enum(["system", "user", "assistant"]),
-      content: z.string(),
+      content: z.union([z.string(), OpenAIV1ChatContentArraySchema]),
       name: z.string().optional(),
     }),
     {
@@ -67,6 +81,10 @@ const OpenAIV1ChatCompletionSchema = z.object({
   user: z.string().optional(),
   seed: z.number().int().optional(),
 });
+
+export type OpenAIChatMessage = z.infer<
+  typeof OpenAIV1ChatCompletionSchema
+>["messages"][0];
 
 const OpenAIV1TextCompletionSchema = z
   .object({
@@ -260,6 +278,9 @@ function openaiToOpenaiImage(req: Request) {
 
   const { messages } = result.data;
   const prompt = messages.filter((m) => m.role === "user").pop()?.content;
+  if (typeof prompt !== "string" || Array.isArray(prompt)) {
+    throw new Error("Image generation prompt must be a text message.");
+  }
 
   if (body.stream) {
     throw new Error(
@@ -271,8 +292,8 @@ function openaiToOpenaiImage(req: Request) {
   // character name or wrapping the entire thing in quotes. We will look for
   // the index of "Image:" and use everything after that as the prompt.
 
-  const index = prompt?.toLowerCase().indexOf("image:");
-  if (index === -1 || !prompt) {
+  const index = prompt.toLowerCase().indexOf("image:");
+  if (index === -1) {
     throw new Error(
       `Start your prompt with 'Image:' followed by a description of the image you want to generate (received: ${prompt}).`
     );
@@ -284,7 +305,7 @@ function openaiToOpenaiImage(req: Request) {
     quality: "standard",
     size: "1024x1024",
     response_format: "url",
-    prompt: prompt.slice(index! + 6).trim(),
+    prompt: prompt.slice(index + 6).trim(),
   };
   return OpenAIV1ImagesGenerationSchema.parse(transformed);
 }
@@ -336,7 +357,7 @@ function openaiToPalm(req: Request): z.infer<typeof PalmV1GenerateTextSchema> {
   };
 }
 
-export function openAIMessagesToClaudePrompt(messages: OpenAIPromptMessage[]) {
+export function openAIMessagesToClaudePrompt(messages: OpenAIChatMessage[]) {
   return (
     messages
       .map((m) => {
@@ -358,7 +379,7 @@ export function openAIMessagesToClaudePrompt(messages: OpenAIPromptMessage[]) {
   );
 }
 
-function flattenOpenAiChatMessages(messages: OpenAIPromptMessage[]) {
+function flattenOpenAiChatMessages(messages: OpenAIChatMessage[]) {
   // Temporary to allow experimenting with prompt strategies
   const PROMPT_VERSION: number = 1;
   switch (PROMPT_VERSION) {
