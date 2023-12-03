@@ -80,9 +80,14 @@ export const addKey: ProxyRequestMiddleware = (proxyReq, req) => {
         `?key=${assignedKey.key}`
       );
       break;
-    case "aws":
     case "azure":
-      throw new Error("addKey should not be called for AWS or Azure requests.");
+      const azureKey = assignedKey.key;
+      proxyReq.setHeader("api-key", azureKey);
+      break;
+    case "aws":
+      throw new Error(
+        "add-key should not be used for AWS security credentials. Use sign-aws-request instead."
+      );
     default:
       assertNever(assignedKey.service);
   }

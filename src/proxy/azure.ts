@@ -8,6 +8,7 @@ import {
   getAzureOpenAIModelFamily,
 } from "../shared/models";
 import { logger } from "../logger";
+import { KWOWN_OPENAI_MODELS } from "./openai";
 import { createQueueMiddleware } from "./queue";
 import { ipLimiter } from "./rate-limit";
 import { handleProxyError } from "./middleware/common";
@@ -16,10 +17,9 @@ import {
   blockZoomerOrigins,
   createPreprocessorMiddleware,
   finalizeBody,
-  forceModel, // TODO: what is this for?
   limitCompletions,
   stripHeaders,
-  createOnProxyReqHandler,
+  createOnProxyReqHandler, addKey,
 } from "./middleware/request";
 import {
   createOnProxyResHandler,
@@ -34,15 +34,6 @@ function getModelsResponse() {
     return modelsCache;
   }
 
-  // https://platform.openai.com/docs/models/overview
-  const knownModels = [
-    "gpt-4",
-    "gpt-4-32k",
-    "gpt-3.5-turbo",
-    "gpt-3.5-turbo-16k",
-    "gpt-3.5-turbo-instruct",
-  ];
-
   let available = new Set<AzureOpenAIModelFamily>();
   for (const key of keyPool.list()) {
     if (key.isDisabled || key.service !== "azure") continue;
@@ -53,7 +44,7 @@ function getModelsResponse() {
   const allowed = new Set<ModelFamily>(config.allowedModelFamilies);
   available = new Set([...available].filter((x) => allowed.has(x)));
 
-  const models = knownModels
+  const models = KWOWN_OPENAI_MODELS
     .map((id) => ({
       id,
       object: "model",
@@ -107,7 +98,6 @@ const azureOpenaiResponseHandler: ProxyResHandlerWithBody = async (
 };
 
 const azureOpenAIProxy = createQueueMiddleware({
-  beforeProxy: () => {}, // TODO: assign key
   proxyMiddleware: createProxyMiddleware({
     target: "will be set by router",
     router: (req) => {
@@ -120,6 +110,7 @@ const azureOpenAIProxy = createQueueMiddleware({
     on: {
       proxyReq: createOnProxyReqHandler({
         pipeline: [
+          addKey,
           applyQuotaLimits,
           limitCompletions,
           blockZoomerOrigins,
