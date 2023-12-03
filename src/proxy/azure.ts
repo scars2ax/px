@@ -112,7 +112,7 @@ const azureOpenAIProxy = createQueueMiddleware({
     target: "will be set by router",
     router: (req) => {
       const [resourceName, deploymentId] = req.key!.key.split(":");
-      return `https://${resourceName}.openai.azure.com/openai/deployments/${deploymentId}/chat/completions?api-version=2023-05-15`;
+      return `https://${resourceName}.openai.azure.com/openai/deployments/${deploymentId}/chat/completions?api-version=2023-09-01-preview`;
     },
     changeOrigin: true,
     selfHandleResponse: true,

@@ -79,15 +79,17 @@ export function getAwsBedrockModelFamily(_model: string): ModelFamily {
 }
 
 export function getAzureOpenAIModelFamily(
-  model: string
+  model: string,
+  defaultFamily: AzureOpenAIModelFamily = "azure-gpt4"
 ): AzureOpenAIModelFamily {
-  const trimmed = model.replace(/^azure-/, "");
+  // Azure model names omit periods
+  const modified = model.replace("gpt-35-turbo", "gpt-3.5-turbo");
   for (const [regex, family] of Object.entries(OPENAI_MODEL_FAMILY_MAP)) {
-    if (trimmed.match(regex)) {
+    if (modified.match(regex)) {
       return `azure-${family}` as AzureOpenAIModelFamily;
     }
   }
-  return "azure-gpt4";
+  return defaultFamily;
 }
 
 export function assertIsKnownModelFamily(

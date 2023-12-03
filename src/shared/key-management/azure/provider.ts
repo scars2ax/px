@@ -5,6 +5,8 @@ import { logger } from "../../../logger";
 import type { AzureOpenAIModelFamily } from "../../models";
 import { getAzureOpenAIModelFamily } from "../../models";
 import { OpenAIModel } from "../openai/provider";
+import { AzureOpenAIKeyChecker } from "./checker";
+import { AwsKeyChecker } from "../aws/checker";
 
 export type AzureOpenAIModel = Exclude<OpenAIModel, "dall-e">;
 
@@ -38,6 +40,7 @@ export class AzureOpenAIKeyProvider implements KeyProvider<AzureOpenAIKey> {
   readonly service = "azure";
 
   private keys: AzureOpenAIKey[] = [];
+  private checker?: AzureOpenAIKeyChecker;
   private log = logger.child({ module: "key-provider", service: this.service });
 
   constructor() {
@@ -54,7 +57,7 @@ export class AzureOpenAIKeyProvider implements KeyProvider<AzureOpenAIKey> {
       const newKey: AzureOpenAIKey = {
         key,
         service: this.service,
-        modelFamilies: ["azure-turbo", "azure-gpt4", "azure-gpt4-32k"],
+        modelFamilies: ["azure-gpt4"],
         isDisabled: false,
         isRevoked: false,
         promptCount: 0,
@@ -75,11 +78,17 @@ export class AzureOpenAIKeyProvider implements KeyProvider<AzureOpenAIKey> {
       };
       this.keys.push(newKey);
     }
-    this.log.info({ keyCount: this.keys.length }, "Loaded AWS Bedrock keys.");
+    this.log.info({ keyCount: this.keys.length }, "Loaded Azure OpenAI keys.");
   }
 
   public init() {
-    // TODO: add keychecker
+    if (config.checkKeys) {
+      this.checker = new AzureOpenAIKeyChecker(
+        this.keys,
+        this.update.bind(this)
+      );
+      this.checker.start();
+    }
   }
 
   public list() {
@@ -87,7 +96,7 @@ export class AzureOpenAIKeyProvider implements KeyProvider<AzureOpenAIKey> {
   }
 
   public get(_model: AzureOpenAIModel) {
-    const availableKeys = this.keys.filter(k => !k.isDisabled);
+    const availableKeys = this.keys.filter((k) => !k.isDisabled);
     if (availableKeys.length === 0) {
       throw new Error("No Azure OpenAI keys available");
     }

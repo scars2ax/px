@@ -290,8 +290,9 @@ const handleUpstreamErrors: ProxyResHandlerWithBody = async (
       case "openai":
       case "google-palm":
       case "azure":
-        if (errorPayload.error?.code === "content_policy_violation") {
-          errorPayload.proxy_note = `Request was filtered by OpenAI's content moderation system. Try another prompt.`;
+        const filteredCodes = ["content_policy_violation", "content_filter"];
+        if (filteredCodes.includes(errorPayload.error?.code)) {
+          errorPayload.proxy_note = `Request was filtered by the upstream API's content moderation system. Modify your prompt and try again.`;
           refundLastAttempt(req);
         } else if (errorPayload.error?.code === "billing_hard_limit_reached") {
           // For some reason, some models return this 400 error instead of the
