@@ -4,7 +4,7 @@ import showdown from "showdown";
 import { config, listConfig } from "./config";
 import {
   AnthropicKey,
-  AwsBedrockKey,
+  AwsBedrockKey, AzureOpenAIKey,
   GooglePalmKey,
   keyPool,
   OpenAIKey,
@@ -23,6 +23,8 @@ let infoPageLastUpdated = 0;
 type KeyPoolKey = ReturnType<typeof keyPool.list>[0];
 const keyIsOpenAIKey = (k: KeyPoolKey): k is OpenAIKey =>
   k.service === "openai";
+const keyIsAzureKey = (k: KeyPoolKey): k is AzureOpenAIKey =>
+  k.service === "azure";
 const keyIsAnthropicKey = (k: KeyPoolKey): k is AnthropicKey =>
   k.service === "anthropic";
 const keyIsGooglePalmKey = (k: KeyPoolKey): k is GooglePalmKey =>
@@ -201,17 +203,26 @@ function addKeyToAggregates(k: KeyPoolKey) {
         Boolean(k.lastChecked) ? 0 : 1
       );
 
-      // Technically this would not account for keys that have tokens recorded
-      // on models they aren't provisioned for, but that would be strange
       k.modelFamilies.forEach((f) => {
         const tokens = k[`${f}Tokens`];
         sumTokens += tokens;
         sumCost += getTokenCostUsd(f, tokens);
         increment(modelStats, `${f}__tokens`, tokens);
-        increment(modelStats, `${f}__trial`, k.isTrial ? 1 : 0);
         increment(modelStats, `${f}__revoked`, k.isRevoked ? 1 : 0);
-        increment(modelStats, `${f}__overQuota`, k.isOverQuota ? 1 : 0);
         increment(modelStats, `${f}__active`, k.isDisabled ? 0 : 1);
+        increment(modelStats, `${f}__trial`, k.isTrial ? 1 : 0);
+        increment(modelStats, `${f}__overQuota`, k.isOverQuota ? 1 : 0);
+      });
+      break;
+    case "azure":
+      if (!keyIsAzureKey(k)) throw new Error("Invalid key type");
+      k.modelFamilies.forEach((f) => {
+        const tokens = k[`${f}Tokens`];
+        sumTokens += tokens;
+        sumCost += getTokenCostUsd(f, tokens);
+        increment(modelStats, `${f}__tokens`, tokens);
+        increment(modelStats, `${f}__active`, k.isDisabled ? 0 : 1);
+        increment(modelStats, `${f}__revoked`, k.isRevoked ? 1 : 0);
       });
       break;
     case "anthropic": {

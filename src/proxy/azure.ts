@@ -12,14 +12,11 @@ import { createQueueMiddleware } from "./queue";
 import { ipLimiter } from "./rate-limit";
 import { handleProxyError } from "./middleware/common";
 import {
-  RequestPreprocessor,
-  addKey,
   applyQuotaLimits,
   blockZoomerOrigins,
   createPreprocessorMiddleware,
   finalizeBody,
-  forceModel,
-  languageFilter,
+  forceModel, // TODO: what is this for?
   limitCompletions,
   stripHeaders,
   createOnProxyReqHandler,
@@ -102,9 +99,8 @@ const azureOpenaiResponseHandler: ProxyResHandlerWithBody = async (
     body.proxy_note = `Prompts are logged on this proxy instance. See ${host} for more information.`;
   }
 
-  // TODO: Remove once tokenization is stable
-  if (req.debug) {
-    body.proxy_tokenizer_debug_info = req.debug;
+  if (req.tokenizerInfo) {
+    body.proxy_tokenizer = req.tokenizerInfo;
   }
 
   res.status(200).json(body);
@@ -125,7 +121,6 @@ const azureOpenAIProxy = createQueueMiddleware({
       proxyReq: createOnProxyReqHandler({
         pipeline: [
           applyQuotaLimits,
-          languageFilter,
           limitCompletions,
           blockZoomerOrigins,
           stripHeaders,

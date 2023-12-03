@@ -37,6 +37,7 @@ const INITIAL_TOKENS: Required<UserTokenCounts> = {
   "aws-claude": 0,
   "azure-turbo": 0,
   "azure-gpt4": 0,
+  "azure-gpt4-turbo": 0,
   "azure-gpt4-32k": 0,
 };
 

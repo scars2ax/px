@@ -142,6 +142,11 @@ export class KeyPool {
         return "google-palm";
       case "aws-claude":
         return "aws";
+      case "azure-turbo":
+      case "azure-gpt4":
+      case "azure-gpt4-32k":
+      case "azure-gpt4-turbo":
+        return "azure";
       default:
         assertNever(modelFamily);
     }

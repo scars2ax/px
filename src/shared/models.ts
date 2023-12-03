@@ -2,11 +2,19 @@
 
 import pino from "pino";
 
-export type OpenAIModelFamily = "turbo" | "gpt4" | "gpt4-32k" | "gpt4-turbo" | "dall-e";
+export type OpenAIModelFamily =
+  | "turbo"
+  | "gpt4"
+  | "gpt4-32k"
+  | "gpt4-turbo"
+  | "dall-e";
 export type AnthropicModelFamily = "claude";
 export type GooglePalmModelFamily = "bison";
 export type AwsBedrockModelFamily = "aws-claude";
-export type AzureOpenAIModelFamily = `azure-${Exclude<OpenAIModelFamily, "dall-e">}`;
+export type AzureOpenAIModelFamily = `azure-${Exclude<
+  OpenAIModelFamily,
+  "dall-e"
+>}`;
 export type ModelFamily =
   | OpenAIModelFamily
   | AnthropicModelFamily
@@ -75,7 +83,9 @@ export function getAzureOpenAIModelFamily(
 ): AzureOpenAIModelFamily {
   const trimmed = model.replace(/^azure-/, "");
   for (const [regex, family] of Object.entries(OPENAI_MODEL_FAMILY_MAP)) {
-    if (trimmed.match(regex)) return `azure-${family}` as ModelFamily;
+    if (trimmed.match(regex)) {
+      return `azure-${family}` as AzureOpenAIModelFamily;
+    }
   }
   return "azure-gpt4";
 }

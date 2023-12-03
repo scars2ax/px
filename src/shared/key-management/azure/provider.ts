@@ -1,12 +1,12 @@
 import crypto from "crypto";
-import { Key, KeyProvider, OPENAI_SUPPORTED_MODELS } from "..";
+import { Key, KeyProvider } from "..";
 import { config } from "../../../config";
 import { logger } from "../../../logger";
 import type { AzureOpenAIModelFamily } from "../../models";
 import { getAzureOpenAIModelFamily } from "../../models";
+import { OpenAIModel } from "../openai/provider";
 
-export const AZURE_OPENAI_SUPPORTED_MODELS = OPENAI_SUPPORTED_MODELS;
-export type AzureOpenAIModel = (typeof AZURE_OPENAI_SUPPORTED_MODELS)[number];
+export type AzureOpenAIModel = Exclude<OpenAIModel, "dall-e">;
 
 type AzureOpenAIKeyUsage = {
   [K in AzureOpenAIModelFamily as `${K}Tokens`]: number;
@@ -71,6 +71,7 @@ export class AzureOpenAIKeyProvider implements KeyProvider<AzureOpenAIKey> {
         "azure-turboTokens": 0,
         "azure-gpt4Tokens": 0,
         "azure-gpt4-32kTokens": 0,
+        "azure-gpt4-turboTokens": 0,
       };
       this.keys.push(newKey);
     }
@@ -144,7 +145,7 @@ export class AzureOpenAIKeyProvider implements KeyProvider<AzureOpenAIKey> {
 
   // TODO: all of this shit is duplicate code
 
-  public getLockoutPeriod(_model: AzureOpenAIModel) {
+  public getLockoutPeriod() {
     const activeKeys = this.keys.filter((k) => !k.isDisabled);
     // Don't lock out if there are no keys available or the queue will stall.
     // Just let it through so the add-key middleware can throw an error.
