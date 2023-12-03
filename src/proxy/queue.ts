@@ -34,7 +34,7 @@ const log = logger.child({ module: "request-queue" });
 const AGNAI_CONCURRENCY_LIMIT = 5;
 /** Maximum number of queue slots for individual users. */
 const USER_CONCURRENCY_LIMIT = 1;
-const MIN_HEARTBEAT_SIZE = 512;
+const MIN_HEARTBEAT_SIZE = parseInt(process.env.MIN_HEARTBEAT_SIZE_B ?? "512");
 const MAX_HEARTBEAT_SIZE =
   1024 * parseInt(process.env.MAX_HEARTBEAT_SIZE_KB ?? "1024");
 const HEARTBEAT_INTERVAL =
