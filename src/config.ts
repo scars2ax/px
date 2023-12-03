@@ -233,6 +233,7 @@ export const config: Config = {
     "aws-claude",
     "azure-turbo",
     "azure-gpt4",
+    "azure-gpt4-turbo",
     "azure-gpt4-32k",
   ]),
   rejectPhrases: parseCsv(getEnvWithDefault("REJECT_PHRASES", "")),
