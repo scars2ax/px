@@ -82,8 +82,12 @@ export function getAzureOpenAIModelFamily(
   model: string,
   defaultFamily: AzureOpenAIModelFamily = "azure-gpt4"
 ): AzureOpenAIModelFamily {
-  // Azure model names omit periods
-  const modified = model.replace("gpt-35-turbo", "gpt-3.5-turbo");
+  // Azure model names omit periods.  addAzureKey also prepends "azure-" to the
+  // model name to route the request the correct keyprovider, so we need to
+  // remove that as well.
+  const modified = model
+    .replace("gpt-35-turbo", "gpt-3.5-turbo")
+    .replace("azure-", "");
   for (const [regex, family] of Object.entries(OPENAI_MODEL_FAMILY_MAP)) {
     if (modified.match(regex)) {
       return `azure-${family}` as AzureOpenAIModelFamily;

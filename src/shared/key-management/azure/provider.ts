@@ -95,10 +95,13 @@ export class AzureOpenAIKeyProvider implements KeyProvider<AzureOpenAIKey> {
     return this.keys.map((k) => Object.freeze({ ...k, key: undefined }));
   }
 
-  public get(_model: AzureOpenAIModel) {
-    const availableKeys = this.keys.filter((k) => !k.isDisabled);
+  public get(model: AzureOpenAIModel) {
+    const neededFamily = getAzureOpenAIModelFamily(model);
+    const availableKeys = this.keys.filter(
+      (k) => !k.isDisabled && k.modelFamilies.includes(neededFamily)
+    );
     if (availableKeys.length === 0) {
-      throw new Error("No Azure OpenAI keys available");
+      throw new Error(`No keys available for model family '${neededFamily}'.`);
     }
 
     // (largely copied from the OpenAI provider, without trial key support)
