@@ -15,16 +15,17 @@ import { handleProxyError } from "./middleware/common";
 import {
   applyQuotaLimits,
   blockZoomerOrigins,
+  createOnProxyReqHandler,
   createPreprocessorMiddleware,
-  finalizeBody,
+  finalizeSignedRequest,
   limitCompletions,
   stripHeaders,
-  createOnProxyReqHandler, addKey,
 } from "./middleware/request";
 import {
   createOnProxyResHandler,
   ProxyResHandlerWithBody,
 } from "./middleware/response";
+import { addAzureKey } from "./middleware/request/add-azure-key";
 
 let modelsCache: any = null;
 let modelsCacheTime = 0;
@@ -44,26 +45,24 @@ function getModelsResponse() {
   const allowed = new Set<ModelFamily>(config.allowedModelFamilies);
   available = new Set([...available].filter((x) => allowed.has(x)));
 
-  const models = KNOWN_OPENAI_MODELS
-    .map((id) => ({
-      id,
-      object: "model",
-      created: new Date().getTime(),
-      owned_by: "azure",
-      permission: [
-        {
-          id: "modelperm-" + id,
-          object: "model_permission",
-          created: new Date().getTime(),
-          organization: "*",
-          group: null,
-          is_blocking: false,
-        },
-      ],
-      root: id,
-      parent: null,
-    }))
-    .filter((model) => available.has(getAzureOpenAIModelFamily(model.id)));
+  const models = KNOWN_OPENAI_MODELS.map((id) => ({
+    id,
+    object: "model",
+    created: new Date().getTime(),
+    owned_by: "azure",
+    permission: [
+      {
+        id: "modelperm-" + id,
+        object: "model_permission",
+        created: new Date().getTime(),
+        organization: "*",
+        group: null,
+        is_blocking: false,
+      },
+    ],
+    root: id,
+    parent: null,
+  })).filter((model) => available.has(getAzureOpenAIModelFamily(model.id)));
 
   modelsCache = { object: "list", data: models };
   modelsCacheTime = new Date().getTime();
@@ -98,11 +97,13 @@ const azureOpenaiResponseHandler: ProxyResHandlerWithBody = async (
 };
 
 const azureOpenAIProxy = createQueueMiddleware({
+  beforeProxy: addAzureKey,
   proxyMiddleware: createProxyMiddleware({
     target: "will be set by router",
     router: (req) => {
-      const [resourceName, deploymentId] = req.key!.key.split(":");
-      return `https://${resourceName}.openai.azure.com/openai/deployments/${deploymentId}/chat/completions?api-version=2023-09-01-preview`;
+      if (!req.signedRequest) throw new Error("signedRequest not set");
+      const { hostname, path } = req.signedRequest;
+      return `https://${hostname}${path}`;
     },
     changeOrigin: true,
     selfHandleResponse: true,
@@ -110,12 +111,11 @@ const azureOpenAIProxy = createQueueMiddleware({
     on: {
       proxyReq: createOnProxyReqHandler({
         pipeline: [
-          addKey,
           applyQuotaLimits,
           limitCompletions,
           blockZoomerOrigins,
           stripHeaders,
-          finalizeBody,
+          finalizeSignedRequest,
         ],
       }),
       proxyRes: createOnProxyResHandler([azureOpenaiResponseHandler]),

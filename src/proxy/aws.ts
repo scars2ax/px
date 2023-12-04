@@ -11,7 +11,7 @@ import {
   createPreprocessorMiddleware,
   stripHeaders,
   signAwsRequest,
-  finalizeAwsRequest,
+  finalizeSignedRequest,
   createOnProxyReqHandler,
   blockZoomerOrigins,
 } from "./middleware/request";
@@ -138,7 +138,7 @@ const awsProxy = createQueueMiddleware({
           applyQuotaLimits,
           blockZoomerOrigins,
           stripHeaders,
-          finalizeAwsRequest,
+          finalizeSignedRequest,
         ],
       }),
       proxyRes: createOnProxyResHandler([awsResponseHandler]),

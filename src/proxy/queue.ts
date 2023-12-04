@@ -26,6 +26,7 @@ import { assertNever } from "../shared/utils";
 import { logger } from "../logger";
 import { getUniqueIps, SHARED_IP_ADDRESSES } from "./rate-limit";
 import { RequestPreprocessor } from "./middleware/request";
+import { handleProxyError } from "./middleware/common";
 
 const queue: Request[] = [];
 const log = logger.child({ module: "request-queue" });
@@ -358,12 +359,16 @@ export function createQueueMiddleware({
   return (req, res, next) => {
     req.proceed = async () => {
       if (beforeProxy) {
-        // Hack to let us run asynchronous middleware before the
-        // http-proxy-middleware handler. This is used to sign AWS requests
-        // before they are proxied, as the signing is asynchronous.
-        // Unlike RequestPreprocessors, this runs every time the request is
-        // dequeued, not just the first time.
-        await beforeProxy(req);
+        try {
+          // Hack to let us run asynchronous middleware before the
+          // http-proxy-middleware handler. This is used to sign AWS requests
+          // before they are proxied, as the signing is asynchronous.
+          // Unlike RequestPreprocessors, this runs every time the request is
+          // dequeued, not just the first time.
+          await beforeProxy(req);
+        } catch (err) {
+          return handleProxyError(err, req, res);
+        }
       }
       proxyMiddleware(req, res, next);
     };
