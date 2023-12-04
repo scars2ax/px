@@ -8,7 +8,7 @@ import {
   getAzureOpenAIModelFamily,
 } from "../shared/models";
 import { logger } from "../logger";
-import { KWOWN_OPENAI_MODELS } from "./openai";
+import { KNOWN_OPENAI_MODELS } from "./openai";
 import { createQueueMiddleware } from "./queue";
 import { ipLimiter } from "./rate-limit";
 import { handleProxyError } from "./middleware/common";
@@ -44,7 +44,7 @@ function getModelsResponse() {
   const allowed = new Set<ModelFamily>(config.allowedModelFamilies);
   available = new Set([...available].filter((x) => allowed.has(x)));
 
-  const models = KWOWN_OPENAI_MODELS
+  const models = KNOWN_OPENAI_MODELS
     .map((id) => ({
       id,
       object: "model",
