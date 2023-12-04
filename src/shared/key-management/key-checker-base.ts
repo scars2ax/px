@@ -69,6 +69,7 @@ export abstract class KeyCheckerBase<TKey extends Key> {
     const numUnchecked = uncheckedKeys.length;
 
     clearTimeout(this.timeout);
+    this.timeout = undefined;
 
     if (!numEnabled) {
       checkLog.warn("All keys are disabled. Stopping.");
@@ -103,7 +104,7 @@ export abstract class KeyCheckerBase<TKey extends Key> {
 
     if (!this.RECURRING_CHECKS_ENABLED) {
       checkLog.info(
-        "Initial checks complete and recurring checks are disabled. Stopping."
+        "Initial checks complete and recurring checks are disabled for this service. Stopping."
       );
       return;
     }

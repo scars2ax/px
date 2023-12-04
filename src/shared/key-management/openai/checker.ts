@@ -114,6 +114,17 @@ export class OpenAIKeyChecker extends KeyCheckerBase<OpenAIKey> {
       .filter(({ is_default }) => !is_default)
       .map(({ id }) => id);
     this.cloneKey(key.hash, ids);
+
+    // It's possible that the keychecker may be stopped if all non-cloned keys
+    // happened to be unusable, in which case this clnoe will never be checked
+    // unless we restart the keychecker.
+    if (!this.timeout) {
+      this.log.warn(
+        { parent: key.hash },
+        "Restarting key checker to check cloned keys."
+      );
+      this.scheduleNextCheck();
+    }
   }
 
   protected handleAxiosError(key: OpenAIKey, error: AxiosError) {
