@@ -24,54 +24,23 @@ type AzureError = {
 type UpdateFn = typeof AzureOpenAIKeyProvider.prototype.update;
 
 export class AzureOpenAIKeyChecker extends KeyCheckerBase<AzureOpenAIKey> {
-  private readonly updateKey: UpdateFn;
-
   constructor(keys: AzureOpenAIKey[], updateKey: UpdateFn) {
     super(keys, {
       service: "azure",
       keyCheckPeriod: KEY_CHECK_PERIOD,
       minCheckInterval: MIN_CHECK_INTERVAL,
+      recurringChecksEnabled: false,
+      updateKey,
     });
-    this.updateKey = updateKey;
   }
 
-  protected async checkKey(key: AzureOpenAIKey) {
-    if (key.isDisabled) {
-      this.log.warn({ key: key.hash }, "Skipping check for disabled key.");
-      this.scheduleNextCheck();
-      return;
-    }
-
-    this.log.debug({ key: key.hash }, "Checking key...");
-    let isInitialCheck = !key.lastChecked;
-    try {
-      // Only check models on startup.  For now all models must be available to
-      // the proxy because we don't route requests to different keys.
-      if (isInitialCheck) {
-        const model = await this.testModel(key);
-        this.log.info(
-          { key: key.hash, deploymentModel: model },
-          "Key check complete."
-        );
-        this.updateKey(key.hash, { modelFamilies: [model] });
-      }
-
-      this.log.info(
-        { key: key.hash, models: key.modelFamilies },
-        "Key check complete."
-      );
-    } catch (error) {
-      this.handleAxiosError(key, error as AxiosError);
-    }
-
-    this.updateKey(key.hash, {});
-
-    this.lastCheck = Date.now();
-    // Only enqueue the next check if this wasn't a startup check, since those
-    // are batched together elsewhere.
-    if (!isInitialCheck) {
-      this.scheduleNextCheck();
-    }
+  protected async testKeyOrFail(key: AzureOpenAIKey) {
+    const model = await this.testModel(key);
+    this.log.info(
+      { key: key.hash, deploymentModel: model },
+      "Checked key."
+    );
+    this.updateKey(key.hash, { modelFamilies: [model] });
   }
 
   // provided api-key header isn't valid (401)
