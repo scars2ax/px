@@ -11,6 +11,7 @@ import { GooglePalmKeyProvider } from "./palm/provider";
 import { AwsBedrockKeyProvider } from "./aws/provider";
 import { ModelFamily } from "../models";
 import { assertNever } from "../utils";
+import { AzureOpenAIKeyProvider } from "./azure/provider";
 
 type AllowedPartial = OpenAIKeyUpdate | AnthropicKeyUpdate;
 
@@ -25,6 +26,7 @@ export class KeyPool {
     this.keyProviders.push(new AnthropicKeyProvider());
     this.keyProviders.push(new GooglePalmKeyProvider());
     this.keyProviders.push(new AwsBedrockKeyProvider());
+    this.keyProviders.push(new AzureOpenAIKeyProvider());
   }
 
   public init() {
@@ -124,6 +126,8 @@ export class KeyPool {
       // AWS offers models from a few providers
       // https://docs.aws.amazon.com/bedrock/latest/userguide/model-ids-arns.html
       return "aws";
+    } else if (model.startsWith("azure")) {
+      return "azure";
     }
     throw new Error(`Unknown service for model '${model}'`);
   }
