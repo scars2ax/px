@@ -137,4 +137,4 @@ azureOpenAIRouter.post(
   azureOpenAIProxy
 );
 
-export const openai = azureOpenAIRouter;
+export const azure = azureOpenAIRouter;
