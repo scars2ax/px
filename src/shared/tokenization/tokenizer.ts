@@ -1,5 +1,8 @@
 import { Request } from "express";
-import type { OpenAIChatMessage } from "../../proxy/middleware/request/preprocessors/transform-outbound-payload";
+import type {
+  GoogleAIChatMessage,
+  OpenAIChatMessage,
+} from "../../proxy/middleware/request/preprocessors/transform-outbound-payload";
 import { assertNever } from "../utils";
 import {
   init as initClaude,
@@ -9,6 +12,7 @@ import {
   init as initOpenAi,
   getTokenCount as getOpenAITokenCount,
   getOpenAIImageCost,
+  estimateGoogleAITokenCount,
 } from "./openai";
 import { APIFormat } from "../key-management";
 
@@ -26,6 +30,7 @@ type TokenCountRequest = { req: Request } & (
       completion?: never;
       service: "openai-text" | "anthropic" | "google-ai";
     }
+  | { prompt?: GoogleAIChatMessage[]; completion?: never; service: "google-ai" }
   | { prompt?: never; completion: string; service: APIFormat }
   | { prompt?: never; completion?: never; service: "openai-image" }
 );
@@ -69,7 +74,7 @@ export async function countTokens({
       // TODO: Can't find a tokenization library for Gemini. There is an API
       // endpoint for it but it adds significant latency to the request.
       return {
-        ...(await getOpenAITokenCount(prompt ?? completion, req.body.model)),
+        ...estimateGoogleAITokenCount(prompt ?? (completion || [])),
         tokenization_duration_ms: getElapsedMs(time),
       };
     default:

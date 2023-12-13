@@ -1,7 +1,7 @@
 import { RequestPreprocessor } from "../index";
 import { countTokens } from "../../../../shared/tokenization";
 import { assertNever } from "../../../../shared/utils";
-import type { OpenAIChatMessage } from "./transform-outbound-payload";
+import type { GoogleAIChatMessage, OpenAIChatMessage } from "./transform-outbound-payload";
 
 /**
  * Given a request with an already-transformed body, counts the number of
@@ -31,8 +31,8 @@ export const countPromptTokens: RequestPreprocessor = async (req) => {
       break;
     }
     case "google-ai": {
-      req.outputTokens = req.body.maxOutputTokens;
-      const prompt: string = req.body.prompt.text;
+      req.outputTokens = req.body.generationConfig.maxOutputTokens;
+      const prompt: GoogleAIChatMessage[] = req.body.contents;
       result = await countTokens({ req, prompt, service });
       break;
     }

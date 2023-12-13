@@ -26,10 +26,19 @@ export const createOnProxyReqHandler = ({
     ...pipeline,
   ];
   return (proxyReq, req, res, options) => {
+    req.log.debug(
+      {
+        isStreaming: req.body.stream === true || req.body.stream === "true",
+        bodyStream: req.body.stream,
+      },
+      "Running onProxyReq handlers."
+    );
     // The streaming flag must be set before any other onProxyReq handler runs,
     // as it may influence the behavior of subsequent handlers.
     // Image generation requests can't be streamed.
-    req.isStreaming = req.body.stream === true || req.body.stream === "true";
+    // TODO: this flag is set in too many places
+    req.isStreaming =
+      req.isStreaming || req.body.stream === true || req.body.stream === "true";
     req.body.stream = req.isStreaming;
 
     try {

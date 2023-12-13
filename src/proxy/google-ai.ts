@@ -84,7 +84,7 @@ function transformGoogleAIResponse(
 ): Record<string, any> {
   const totalTokens = (req.promptTokens ?? 0) + (req.outputTokens ?? 0);
   return {
-    id: "gga-" + v4(),
+    id: "goo-" + v4(),
     object: "chat.completion",
     created: Date.now(),
     model: req.body.model,

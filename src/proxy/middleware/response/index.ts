@@ -351,7 +351,7 @@ const handleUpstreamErrors: ProxyResHandlerWithBody = async (
         handleAzureRateLimitError(req, errorPayload);
         break;
       case "google-ai":
-        errorPayload.proxy_note = `Automatic rate limit retries are not supported for this service. Try again in a few seconds.`;
+        handleGoogleAIRateLimitError(req, errorPayload);
         break;
       default:
         assertNever(service);
@@ -525,6 +525,27 @@ function handleAzureRateLimitError(
       throw new RetryableError("Rate-limited request re-enqueued.");
     default:
       errorPayload.proxy_note = `Unrecognized rate limit error from Azure (${code}). Please report this.`;
+      break;
+  }
+}
+
+//{"error":{"code":429,"message":"Resource has been exhausted (e.g. check quota).","status":"RESOURCE_EXHAUSTED"}
+function handleGoogleAIRateLimitError(
+  req: Request,
+  errorPayload: ProxiedErrorPayload
+) {
+  const code = errorPayload.error?.code;
+  req.log.warn(
+    { errorPayload, code },
+    "Received Google AI rate limit error"
+  );
+  switch (code) {
+    case 429:
+      keyPool.markRateLimited(req.key!);
+      reenqueueRequest(req);
+      throw new RetryableError("Rate-limited request re-enqueued.");
+    default:
+      errorPayload.proxy_note = `Unrecognized rate limit error from Google AI (${code}). Please report this.`;
       break;
   }
 }

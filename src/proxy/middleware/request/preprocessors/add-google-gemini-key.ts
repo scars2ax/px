@@ -2,7 +2,7 @@ import { keyPool } from "../../../../shared/key-management";
 import { RequestPreprocessor } from "../index";
 
 export const addGoogleGeminiKey: RequestPreprocessor = (req) => {
-  const apisValid = req.inboundApi === "openai" && req.outboundApi === "openai";
+  const apisValid = req.inboundApi === "openai" && req.outboundApi === "google-ai";
   const serviceValid = req.service === "google-ai";
   if (!apisValid || !serviceValid) {
     throw new Error("addGoogleGeminiKey called on invalid request");
@@ -22,14 +22,15 @@ export const addGoogleGeminiKey: RequestPreprocessor = (req) => {
 
   // https://generativelanguage.googleapis.com/v1beta/models/$MODEL_ID:generateContent?key=$API_KEY
   // https://generativelanguage.googleapis.com/v1beta/models/$MODEL_ID:streamGenerateContent?key=${API_KEY}
-  
-  const isStreaming = req.isStreaming || req.body.stream;
+
+  req.isStreaming = req.isStreaming || req.body.stream;
+  delete req.body.stream;
 
   req.signedRequest = {
     method: "POST",
     protocol: "https:",
     hostname: "generativelanguage.googleapis.com",
-    path: `/v1beta/models/${model}:${isStreaming ? "streamGenerateContent" : "generateContent"}?key=${req.key.hash}`,
+    path: `/v1beta/models/${model}:${req.isStreaming ? "streamGenerateContent" : "generateContent"}?key=${req.key.key}`,
     headers: {
       ["host"]: `generativelanguage.googleapis.com`,
       ["content-type"]: "application/json",

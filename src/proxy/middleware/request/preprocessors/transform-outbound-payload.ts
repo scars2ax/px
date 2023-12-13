@@ -127,6 +127,7 @@ const OpenAIV1ImagesGenerationSchema = z.object({
 // https://developers.generativeai.google/api/rest/generativelanguage/models/generateContent
 const GoogleAIV1GenerateContentSchema = z.object({
   model: z.string(), //actually specified in path but we need it for the router
+  stream: z.boolean().optional().default(false), // also used for router
   contents: z.array(
     z.object({
       parts: z.array(z.object({ text: z.string() })),
@@ -149,6 +150,10 @@ const GoogleAIV1GenerateContentSchema = z.object({
     stopSequences: z.array(z.string()).max(5).optional(),
   }),
 });
+
+export type GoogleAIChatMessage = z.infer<
+  typeof GoogleAIV1GenerateContentSchema
+>["contents"][0];
 
 const VALIDATORS: Record<APIFormat, z.ZodSchema<any>> = {
   anthropic: AnthropicV1CompleteSchema,
@@ -356,6 +361,7 @@ function openaiToGoogleAI(
 
   return {
     model: "gemini-pro",
+    stream: rest.stream,
     contents,
     tools: [],
     generationConfig: {
@@ -366,13 +372,10 @@ function openaiToGoogleAI(
       temperature: rest.temperature,
     },
     safetySettings: [
-      { category: "HARM_CATEGORY_UNSPECIFIED", threshold: "BLOCK_NONE" },
-      { category: "HARM_CATEGORY_DEROGATORY", threshold: "BLOCK_NONE" },
-      { category: "HARM_CATEGORY_TOXICITY", threshold: "BLOCK_NONE" },
-      { category: "HARM_CATEGORY_VIOLENCE", threshold: "BLOCK_NONE" },
-      { category: "HARM_CATEGORY_SEXUAL", threshold: "BLOCK_NONE" },
-      { category: "HARM_CATEGORY_MEDICAL", threshold: "BLOCK_NONE" },
-      { category: "HARM_CATEGORY_DANGEROUS", threshold: "BLOCK_NONE" },
+      { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+      { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+      { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+      { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
     ],
   };
 }
@@ -448,3 +451,4 @@ function flattenOpenAIMessageContent(
         .join("\n")
     : content;
 }
+

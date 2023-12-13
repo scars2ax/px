@@ -58,7 +58,7 @@ export const handleStreamedResponse: RawResponseBodyHandler = async (
   const prefersNativeEvents = req.inboundApi === req.outboundApi;
   const contentType = proxyRes.headers["content-type"];
 
-  const adapter = new SSEStreamAdapter({ contentType });
+  const adapter = new SSEStreamAdapter({ contentType, api: req.outboundApi });
   const aggregator = new EventAggregator({ format: req.outboundApi });
   const transformer = new SSEMessageTransformer({
     inputFormat: req.outboundApi,
@@ -68,9 +68,11 @@ export const handleStreamedResponse: RawResponseBodyHandler = async (
     requestedModel: req.body.model,
   })
     .on("originalMessage", (msg: string) => {
+      req.log.debug({ key: hash }, `Original SSE message: ${msg}`);
       if (prefersNativeEvents) res.write(msg);
     })
     .on("data", (msg) => {
+      req.log.debug({ key: hash }, `Transformed SSE message: ${msg}`);
       if (!prefersNativeEvents) res.write(`data: ${JSON.stringify(msg)}\n\n`);
       aggregator.addEvent(msg);
     });
