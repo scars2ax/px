@@ -1,11 +1,11 @@
 import { keyPool } from "../../../../shared/key-management";
 import { RequestPreprocessor } from "../index";
 
-export const addGoogleGeminiKey: RequestPreprocessor = (req) => {
+export const addGoogleAIKey: RequestPreprocessor = (req) => {
   const apisValid = req.inboundApi === "openai" && req.outboundApi === "google-ai";
   const serviceValid = req.service === "google-ai";
   if (!apisValid || !serviceValid) {
-    throw new Error("addGoogleGeminiKey called on invalid request");
+    throw new Error("addGoogleAIKey called on invalid request");
   }
 
   if (!req.body?.model) {
@@ -17,7 +17,7 @@ export const addGoogleGeminiKey: RequestPreprocessor = (req) => {
 
   req.log.info(
     { key: req.key.hash, model },
-    "Assigned Google Gemini API key to request"
+    "Assigned Google AI API key to request"
   );
 
   // https://generativelanguage.googleapis.com/v1beta/models/$MODEL_ID:generateContent?key=$API_KEY

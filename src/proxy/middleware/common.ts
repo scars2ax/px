@@ -179,9 +179,6 @@ export function getCompletionFromBody(req: Request, body: Record<string, any>) {
       return body.completion.trim();
     case "google-ai":
       if ("choices" in body) {
-        req.log.info({
-          body: JSON.stringify(body),
-        }, "Received Google AI completion with choices");
         return body.choices[0].message.content;
       }
       return body.candidates[0].content.parts[0].text;

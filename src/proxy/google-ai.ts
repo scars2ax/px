@@ -16,7 +16,7 @@ import {
   createOnProxyResHandler,
   ProxyResHandlerWithBody,
 } from "./middleware/response";
-import { addGoogleGeminiKey } from "./middleware/request/preprocessors/add-google-gemini-key";
+import { addGoogleAIKey } from "./middleware/request/preprocessors/add-google-ai-key";
 
 let modelsCache: any = null;
 let modelsCacheTime = 0;
@@ -107,7 +107,7 @@ function transformGoogleAIResponse(
 }
 
 const googleAIProxy = createQueueMiddleware({
-  beforeProxy: addGoogleGeminiKey,
+  beforeProxy: addGoogleAIKey,
   proxyMiddleware: createProxyMiddleware({
     target: "bad-target-will-be-rewritten",
     router: ({ signedRequest }) => {

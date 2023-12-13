@@ -68,11 +68,9 @@ export const handleStreamedResponse: RawResponseBodyHandler = async (
     requestedModel: req.body.model,
   })
     .on("originalMessage", (msg: string) => {
-      req.log.debug({ key: hash }, `Original SSE message: ${msg}`);
       if (prefersNativeEvents) res.write(msg);
     })
     .on("data", (msg) => {
-      req.log.debug({ key: hash }, `Transformed SSE message: ${msg}`);
       if (!prefersNativeEvents) res.write(`data: ${JSON.stringify(msg)}\n\n`);
       aggregator.addEvent(msg);
     });
