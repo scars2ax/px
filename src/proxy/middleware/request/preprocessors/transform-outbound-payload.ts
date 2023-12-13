@@ -125,7 +125,7 @@ const OpenAIV1ImagesGenerationSchema = z.object({
 });
 
 // https://developers.generativeai.google/api/rest/generativelanguage/models/generateContent
-const GoogleGeminiV1GenerateContentSchema = z.object({
+const GoogleAIV1GenerateContentSchema = z.object({
   model: z.string(), //actually specified in path but we need it for the router
   contents: z.array(
     z.object({
@@ -155,7 +155,7 @@ const VALIDATORS: Record<APIFormat, z.ZodSchema<any>> = {
   openai: OpenAIV1ChatCompletionSchema,
   "openai-text": OpenAIV1TextCompletionSchema,
   "openai-image": OpenAIV1ImagesGenerationSchema,
-  "google-ai": GoogleGeminiV1GenerateContentSchema,
+  "google-ai": GoogleAIV1GenerateContentSchema,
 };
 
 /** Transforms an incoming request body to one that matches the target API. */
@@ -186,7 +186,7 @@ export const transformOutboundPayload: RequestPreprocessor = async (req) => {
   }
 
   if (req.inboundApi === "openai" && req.outboundApi === "google-ai") {
-    req.body = openaiToGoogleGemini(req);
+    req.body = openaiToGoogleAI(req);
     return;
   }
 
@@ -321,9 +321,9 @@ function openaiToOpenaiImage(req: Request) {
   return OpenAIV1ImagesGenerationSchema.parse(transformed);
 }
 
-function openaiToGoogleGemini(
+function openaiToGoogleAI(
   req: Request
-): z.infer<typeof GoogleGeminiV1GenerateContentSchema> {
+): z.infer<typeof GoogleAIV1GenerateContentSchema> {
   const { body } = req;
   const result = OpenAIV1ChatCompletionSchema.safeParse({
     ...body,
@@ -332,7 +332,7 @@ function openaiToGoogleGemini(
   if (!result.success) {
     req.log.warn(
       { issues: result.error.issues, body },
-      "Invalid OpenAI-to-GoogleGemini request"
+      "Invalid OpenAI-to-Google AI request"
     );
     throw result.error;
   }
@@ -362,7 +362,7 @@ function openaiToGoogleGemini(
       maxOutputTokens: rest.max_tokens,
       stopSequences: stops,
       topP: rest.top_p,
-      topK: 40, // openai schema doesn't have this, geminiapi defaults to 40
+      topK: 40, // openai schema doesn't have this, google ai defaults to 40
       temperature: rest.temperature,
     },
     safetySettings: [
