@@ -29,11 +29,11 @@ export async function getTokenCount(
     return getTextTokenCount(prompt);
   }
 
-  const gpt4 = model.startsWith("gpt-4");
+  const oldFormatting = model.startsWith("turbo-0301");
   const vision = model.includes("vision");
 
-  const tokensPerMessage = gpt4 ? 3 : 4;
-  const tokensPerName = gpt4 ? 1 : -1; // turbo omits role if name is present
+  const tokensPerMessage = oldFormatting ? 4 : 3;
+  const tokensPerName = oldFormatting ? -1 : 1; // older formatting replaces role with name if name is present
 
   let numTokens = vision ? GPT4_VISION_SYSTEM_PROMPT_SIZE : 0;
 

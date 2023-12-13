@@ -32,7 +32,7 @@ export class EventAggregator {
         return mergeEventsForOpenAIText(this.events);
       case "anthropic":
         return mergeEventsForAnthropic(this.events);
-      case "google-palm":
+      case "google-ai":
       case "openai-image":
         throw new Error(`SSE aggregation not supported for ${this.format}`);
       default:

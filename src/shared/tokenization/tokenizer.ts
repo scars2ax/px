@@ -24,7 +24,7 @@ type TokenCountRequest = { req: Request } & (
   | {
       prompt: string;
       completion?: never;
-      service: "openai-text" | "anthropic" | "google-palm";
+      service: "openai-text" | "anthropic" | "google-ai";
     }
   | { prompt?: never; completion: string; service: APIFormat }
   | { prompt?: never; completion?: never; service: "openai-image" }
@@ -65,8 +65,8 @@ export async function countTokens({
         }),
         tokenization_duration_ms: getElapsedMs(time),
       };
-    case "google-palm":
-      // TODO: Can't find a tokenization library for PaLM. There is an API
+    case "google-ai":
+      // TODO: Can't find a tokenization library for Gemini. There is an API
       // endpoint for it but it adds significant latency to the request.
       return {
         ...(await getOpenAITokenCount(prompt ?? completion, req.body.model)),

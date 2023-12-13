@@ -30,7 +30,7 @@ export const countPromptTokens: RequestPreprocessor = async (req) => {
       result = await countTokens({ req, prompt, service });
       break;
     }
-    case "google-palm": {
+    case "google-ai": {
       req.outputTokens = req.body.maxOutputTokens;
       const prompt: string = req.body.prompt.text;
       result = await countTokens({ req, prompt, service });

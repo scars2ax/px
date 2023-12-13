@@ -111,7 +111,7 @@ function getTransformer(
       return version === "2023-01-01"
         ? anthropicV1ToOpenAI
         : anthropicV2ToOpenAI;
-    case "google-palm":
+    case "google-ai":
     case "openai-image":
       throw new Error(`SSE transformation not supported for ${responseApi}`);
     default:

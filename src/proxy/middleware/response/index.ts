@@ -288,7 +288,7 @@ const handleUpstreamErrors: ProxyResHandlerWithBody = async (
     // For Anthropic, this is usually due to missing preamble.
     switch (service) {
       case "openai":
-      case "google-palm":
+      case "google-ai":
       case "azure":
         const filteredCodes = ["content_policy_violation", "content_filter"];
         if (filteredCodes.includes(errorPayload.error?.code)) {
@@ -350,7 +350,7 @@ const handleUpstreamErrors: ProxyResHandlerWithBody = async (
       case "azure":
         handleAzureRateLimitError(req, errorPayload);
         break;
-      case "google-palm":
+      case "google-ai":
         errorPayload.proxy_note = `Automatic rate limit retries are not supported for this service. Try again in a few seconds.`;
         break;
       default:
@@ -373,8 +373,8 @@ const handleUpstreamErrors: ProxyResHandlerWithBody = async (
       case "anthropic":
         errorPayload.proxy_note = `The requested Claude model might not exist, or the key might not be provisioned for it.`;
         break;
-      case "google-palm":
-        errorPayload.proxy_note = `The requested Google PaLM model might not exist, or the key might not be provisioned for it.`;
+      case "google-ai":
+        errorPayload.proxy_note = `The requested Google AI model might not exist, or the key might not be provisioned for it.`;
         break;
       case "aws":
         errorPayload.proxy_note = `The requested AWS resource might not exist, or the key might not have access to it.`;
