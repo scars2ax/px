@@ -54,6 +54,10 @@ app.use(
 // a load balancer/reverse proxy, which is necessary to determine request IP
 // addresses correctly.
 app.set("trust proxy", true);
+app.use((req, _res, next) => {
+  req.log.info({ ip: req.ip, forwardedFor: req.get("x-forwarded-for") });
+  next();
+});
 
 app.set("view engine", "ejs");
 app.set("views", [
