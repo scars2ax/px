@@ -163,7 +163,7 @@ function registerUncaughtExceptionHandler() {
 async function setBuildInfo() {
   // For CI builds, use the env vars set during the build process
   if (process.env.GITGUD_BRANCH) {
-    const sha = process.env.GITGUD_COMMIT;
+    const sha = process.env.GITGUD_COMMIT?.slice(0, 7) || "unknown SHA";
     const branch = process.env.GITGUD_BRANCH;
     const repo = process.env.GITGUD_PROJECT;
     const buildInfo = `[ci] ${sha} (${branch}@${repo})`;
