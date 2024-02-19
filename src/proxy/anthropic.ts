@@ -148,15 +148,29 @@ const anthropicProxy = createQueueMiddleware({
 
 const anthropicRouter = Router();
 anthropicRouter.get("/v1/models", handleModelRequest);
-// Native Anthropic chat completion endpoint.
+// Native Anthropic text completion endpoint.
 anthropicRouter.post(
   "/v1/complete",
   ipLimiter,
   createPreprocessorMiddleware({
-    inApi: "anthropic",
-    outApi: "anthropic",
+    inApi: "anthropic-text",
+    outApi: "anthropic-text",
     service: "anthropic",
   }),
+  anthropicProxy
+);
+// Native Anthropic chat completion endpoint.
+anthropicRouter.post(
+  "/v1/messages",
+  ipLimiter,
+  createPreprocessorMiddleware(
+    {
+      inApi: "anthropic-chat",
+      outApi: "anthropic-chat",
+      service: "anthropic",
+    },
+    { beforeTransform: [disallowStreaming] }
+  ),
   anthropicProxy
 );
 // OpenAI-to-Anthropic compatibility endpoint.
@@ -164,7 +178,7 @@ anthropicRouter.post(
   "/v1/chat/completions",
   ipLimiter,
   createPreprocessorMiddleware(
-    { inApi: "openai", outApi: "anthropic", service: "anthropic" },
+    { inApi: "openai", outApi: "anthropic-text", service: "anthropic" },
     { afterTransform: [maybeReassignModel] }
   ),
   anthropicProxy
@@ -174,6 +188,18 @@ function maybeReassignModel(req: Request) {
   const model = req.body.model;
   if (!model.startsWith("gpt-")) return;
   req.body.model = "claude-2.1";
+}
+
+function disallowStreaming(req: Request) {
+  if (
+    req.isStreaming ||
+    req.body.stream === true ||
+    req.body.stream === "true"
+  ) {
+    throw new Error(
+      "Streaming requests are not currently supported for the Anthropic chat completions. Use the legacy text completions endpoint instead."
+    );
+  }
 }
 
 export const anthropic = anthropicRouter;

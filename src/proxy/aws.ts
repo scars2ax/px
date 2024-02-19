@@ -145,7 +145,7 @@ awsRouter.post(
   "/v1/complete",
   ipLimiter,
   createPreprocessorMiddleware(
-    { inApi: "anthropic", outApi: "anthropic", service: "aws" },
+    { inApi: "anthropic-text", outApi: "anthropic-text", service: "aws" },
     { afterTransform: [maybeReassignModel] }
   ),
   awsProxy
@@ -155,7 +155,7 @@ awsRouter.post(
   "/v1/chat/completions",
   ipLimiter,
   createPreprocessorMiddleware(
-    { inApi: "openai", outApi: "anthropic", service: "aws" },
+    { inApi: "openai", outApi: "anthropic-text", service: "aws" },
     { afterTransform: [maybeReassignModel] }
   ),
   awsProxy

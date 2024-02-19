@@ -199,11 +199,24 @@ export function getCompletionFromBody(req: Request, body: Record<string, any>) {
       return body.choices[0].message.content || "";
     case "openai-text":
       return body.choices[0].text;
-    case "anthropic":
+    case "anthropic-chat":
+      if (!body.content) {
+        req.log.error(
+          { body: JSON.stringify(body) },
+          "Received empty Anthropic chat completion"
+        );
+        return "";
+      }
+      return body.content
+        .map(({ text, type }: { type: string; text: string }) =>
+          type === "text" ? text : `[Unsupported content type: ${type}]`
+        )
+        .join("\n");
+    case "anthropic-text":
       if (!body.completion) {
         req.log.error(
           { body: JSON.stringify(body) },
-          "Received empty Anthropic completion"
+          "Received empty Anthropic text completion"
         );
         return "";
       }
@@ -229,7 +242,8 @@ export function getModelFromBody(req: Request, body: Record<string, any>) {
       return body.model;
     case "openai-image":
       return req.body.model;
-    case "anthropic":
+    case "anthropic-chat":
+    case "anthropic-text":
       // Anthropic confirms the model in the response, but AWS Claude doesn't.
       return body.model || req.body.model;
     case "google-ai":

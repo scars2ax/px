@@ -41,7 +41,7 @@ export const transformOutboundPayload: RequestPreprocessor = async (req) => {
     return;
   }
 
-  if (req.inboundApi === "openai" && req.outboundApi === "anthropic") {
+  if (req.inboundApi === "openai" && req.outboundApi === "anthropic-text") {
     req.body = openAIToAnthropic(req);
     return;
   }

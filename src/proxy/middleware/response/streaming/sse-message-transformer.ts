@@ -108,12 +108,13 @@ function getTransformer(
       return passthroughToOpenAI;
     case "openai-text":
       return openAITextToOpenAIChat;
-    case "anthropic":
+    case "anthropic-text":
       return version === "2023-01-01"
         ? anthropicV1ToOpenAI
         : anthropicV2ToOpenAI;
     case "google-ai":
       return googleAIToOpenAI;
+    case "anthropic-chat":
     case "openai-image":
       throw new Error(`SSE transformation not supported for ${responseApi}`);
     default:

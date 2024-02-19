@@ -32,8 +32,9 @@ export class EventAggregator {
         return mergeEventsForOpenAIChat(this.events);
       case "openai-text":
         return mergeEventsForOpenAIText(this.events);
-      case "anthropic":
+      case "anthropic-text":
         return mergeEventsForAnthropic(this.events);
+      case "anthropic-chat":
       case "openai-image":
         throw new Error(`SSE aggregation not supported for ${this.format}`);
       default:
