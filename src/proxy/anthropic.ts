@@ -178,6 +178,9 @@ const anthropicProxy = createQueueMiddleware({
       if (isText && pathname === "/v1/chat/completions") {
         req.url = "/v1/complete";
       }
+      if (isChat && pathname === "/v1/claude-3/complete") {
+        req.url = "/v1/messages";
+      }
       return true;
     },
   }),
@@ -234,6 +237,24 @@ anthropicRouter.post(
   createPreprocessorMiddleware(
     { inApi: "openai", outApi: "anthropic-text", service: "anthropic" },
     { afterTransform: [maybeReassignModel] }
+  ),
+  anthropicProxy
+);
+// Temporary force Anthropic Text to Anthropic Chat for frontends which do not
+// yet support the new model. Forces claude-3. Will be removed once common
+// frontends have been updated.
+anthropicRouter.post(
+  "/v1/claude-3/complete",
+  ipLimiter,
+  createPreprocessorMiddleware(
+    { inApi: "anthropic-text", outApi: "anthropic-chat", service: "anthropic" },
+    {
+      beforeTransform: [
+        (req) => {
+          req.body.model = "claude-3-sonnet-20240229";
+        },
+      ],
+    }
   ),
   anthropicProxy
 );

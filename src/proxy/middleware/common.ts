@@ -12,6 +12,7 @@ const OPENAI_EMBEDDINGS_ENDPOINT = "/v1/embeddings";
 const OPENAI_IMAGE_COMPLETION_ENDPOINT = "/v1/images/generations";
 const ANTHROPIC_COMPLETION_ENDPOINT = "/v1/complete";
 const ANTHROPIC_MESSAGES_ENDPOINT = "/v1/messages";
+const ANTHROPIC_CLAUDE3_COMPAT_ENDPOINT = "/v1/claude-3/complete";
 
 export function isTextGenerationRequest(req: Request) {
   return (
@@ -21,6 +22,7 @@ export function isTextGenerationRequest(req: Request) {
       OPENAI_TEXT_COMPLETION_ENDPOINT,
       ANTHROPIC_COMPLETION_ENDPOINT,
       ANTHROPIC_MESSAGES_ENDPOINT,
+      ANTHROPIC_CLAUDE3_COMPAT_ENDPOINT,
     ].some((endpoint) => req.path.startsWith(endpoint))
   );
 }
