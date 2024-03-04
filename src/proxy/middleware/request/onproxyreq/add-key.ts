@@ -31,6 +31,7 @@ export const addKey: HPMRequestCallback = (proxyReq, req) => {
       case "anthropic-chat":
       case "anthropic-text":
         assignedKey = keyPool.get("claude-v1", req.service);
+        break;
       case "openai-text":
         assignedKey = keyPool.get("gpt-3.5-turbo-instruct", req.service);
         break;

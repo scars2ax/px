@@ -13,7 +13,7 @@ export type AnthropicChatCompletionResponse = {
 
 /**
  * Given a list of OpenAI chat completion events, compiles them into a single
- * finalized Anthropic completion response so that non-streaming middleware
+ * finalized Anthropic chat completion response so that non-streaming middleware
  * can operate on it as if it were a blocking response.
  */
 export function mergeEventsForAnthropicChat(
@@ -29,10 +29,6 @@ export function mergeEventsForAnthropicChat(
     stop_sequence: null,
     usage: { input_tokens: 0, output_tokens: 0 },
   };
-  console.log(
-    "mergeEventsForAnthropic: events",
-    JSON.stringify(events, null, 2)
-  );
   merged = events.reduce((acc, event, i) => {
     // The first event will only contain role assignment and response metadata
     if (i === 0) {
