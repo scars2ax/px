@@ -175,6 +175,15 @@ export function anthropicTextToAnthropicChat(req: Request) {
     if (nextIndex === -1) break;
   }
 
+  // fix "messages: final assistant content cannot end with trailing whitespace"
+  const lastMessage = messages[messages.length - 1];
+  if (
+    lastMessage.role === "assistant" &&
+    typeof lastMessage.content === "string"
+  ) {
+    messages[messages.length - 1].content = lastMessage.content.trimEnd();
+  }
+
   return {
     model,
     system,
