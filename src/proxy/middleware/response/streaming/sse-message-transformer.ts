@@ -5,12 +5,14 @@ import { assertNever } from "../../../../shared/utils";
 import {
   anthropicV1ToOpenAI,
   anthropicV2ToOpenAI,
+  anthropicChatToAnthropicV2,
   OpenAIChatCompletionStreamEvent,
   openAITextToOpenAIChat,
   googleAIToOpenAI,
   passthroughToOpenAI,
   StreamingCompletionTransformer,
 } from "./index";
+import { AnthropicV2StreamEvent } from "./transformers/anthropic-chat-to-anthropic-v2";
 
 type SSEMessageTransformerOptions = TransformOptions & {
   requestedModel: string;
@@ -26,9 +28,12 @@ type SSEMessageTransformerOptions = TransformOptions & {
  */
 export class SSEMessageTransformer extends Transform {
   private lastPosition: number;
+  private transformState: any;
   private msgCount: number;
   private readonly inputFormat: APIFormat;
-  private readonly transformFn: StreamingCompletionTransformer;
+  private readonly transformFn: StreamingCompletionTransformer<
+    OpenAIChatCompletionStreamEvent | AnthropicV2StreamEvent
+  >;
   private readonly log;
   private readonly fallbackId: string;
   private readonly fallbackModel: string;
@@ -58,15 +63,20 @@ export class SSEMessageTransformer extends Transform {
   _transform(chunk: Buffer, _encoding: BufferEncoding, callback: Function) {
     try {
       const originalMessage = chunk.toString();
-      const { event: transformedMessage, position: newPosition } =
-        this.transformFn({
-          data: originalMessage,
-          lastPosition: this.lastPosition,
-          index: this.msgCount++,
-          fallbackId: this.fallbackId,
-          fallbackModel: this.fallbackModel,
-        });
+      const {
+        event: transformedMessage,
+        position: newPosition,
+        state,
+      } = this.transformFn({
+        data: originalMessage,
+        lastPosition: this.lastPosition,
+        index: this.msgCount++,
+        fallbackId: this.fallbackId,
+        fallbackModel: this.fallbackModel,
+        state: this.transformState,
+      });
       this.lastPosition = newPosition;
+      this.transformState = state;
 
       // Special case for Azure OpenAI, which is 99% the same as OpenAI but
       // sometimes emits an extra event at the beginning of the stream with the
@@ -84,7 +94,7 @@ export class SSEMessageTransformer extends Transform {
       // Some events may not be transformed, e.g. ping events
       if (!transformedMessage) return callback();
 
-      if (this.msgCount === 1) {
+      if (this.msgCount === 1 && eventIsOpenAIEvent(transformedMessage)) {
         // TODO: does this need to be skipped for passthroughToOpenAI?
         this.push(createInitialMessage(transformedMessage));
       }
@@ -98,10 +108,18 @@ export class SSEMessageTransformer extends Transform {
   }
 }
 
+function eventIsOpenAIEvent(
+  event: any
+): event is OpenAIChatCompletionStreamEvent {
+  return event?.object === "chat.completion.chunk";
+}
+
 function getTransformer(
   responseApi: APIFormat,
   version?: string
-): StreamingCompletionTransformer {
+): StreamingCompletionTransformer<
+  OpenAIChatCompletionStreamEvent | AnthropicV2StreamEvent
+> {
   switch (responseApi) {
     case "openai":
     case "mistral-ai":
@@ -112,9 +130,10 @@ function getTransformer(
       return version === "2023-01-01"
         ? anthropicV1ToOpenAI
         : anthropicV2ToOpenAI;
+    case "anthropic-chat":
+      return anthropicChatToAnthropicV2;
     case "google-ai":
       return googleAIToOpenAI;
-    case "anthropic-chat":
     case "openai-image":
       throw new Error(`SSE transformation not supported for ${responseApi}`);
     default:
