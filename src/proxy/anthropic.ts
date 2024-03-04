@@ -189,11 +189,10 @@ const nativeTextPreprocessor = createPreprocessorMiddleware({
   service: "anthropic",
 });
 
-const textToChatPreprocessor = createPreprocessorMiddleware({
-  inApi: "anthropic-text",
-  outApi: "anthropic-chat",
-  service: "anthropic",
-});
+const textToChatPreprocessor = createPreprocessorMiddleware(
+  { inApi: "anthropic-text", outApi: "anthropic-chat", service: "anthropic" },
+  { beforeTransform: [disallowStreaming] }
+);
 
 /**
  * Routes text completion prompts to anthropic-chat if they need translation
@@ -220,11 +219,10 @@ anthropicRouter.post(
 anthropicRouter.post(
   "/v1/messages",
   ipLimiter,
-  createPreprocessorMiddleware({
-    inApi: "anthropic-chat",
-    outApi: "anthropic-chat",
-    service: "anthropic",
-  }),
+  createPreprocessorMiddleware(
+    { inApi: "anthropic-chat", outApi: "anthropic-chat", service: "anthropic" },
+    { beforeTransform: [disallowStreaming] }
+  ),
   anthropicProxy
 );
 // OpenAI-to-Anthropic Text compatibility endpoint.
