@@ -11,6 +11,7 @@ const OPENAI_TEXT_COMPLETION_ENDPOINT = "/v1/completions";
 const OPENAI_EMBEDDINGS_ENDPOINT = "/v1/embeddings";
 const OPENAI_IMAGE_COMPLETION_ENDPOINT = "/v1/images/generations";
 const ANTHROPIC_COMPLETION_ENDPOINT = "/v1/complete";
+const ANTHROPIC_MESSAGES_ENDPOINT = "/v1/messages";
 
 export function isTextGenerationRequest(req: Request) {
   return (
@@ -19,6 +20,7 @@ export function isTextGenerationRequest(req: Request) {
       OPENAI_CHAT_COMPLETION_ENDPOINT,
       OPENAI_TEXT_COMPLETION_ENDPOINT,
       ANTHROPIC_COMPLETION_ENDPOINT,
+      ANTHROPIC_MESSAGES_ENDPOINT,
     ].some((endpoint) => req.path.startsWith(endpoint))
   );
 }
@@ -91,6 +93,7 @@ export const classifyErrorAndSend = (
     });
   } catch (error) {
     req.log.error(error, `Error writing error response headers, giving up.`);
+    res.end();
   }
 };
 

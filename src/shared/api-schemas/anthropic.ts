@@ -6,6 +6,7 @@ import {
   OpenAIChatMessage,
   OpenAIV1ChatCompletionSchema,
 } from "./openai";
+import { logger } from "../../logger";
 
 const CLAUDE_OUTPUT_MAX = config.maxOutputTokensAnthropic;
 
@@ -60,7 +61,9 @@ export type AnthropicChatMessage = z.infer<
   typeof AnthropicV1MessagesSchema
 >["messages"][0];
 
-export function openAIMessagesToClaudePrompt(messages: OpenAIChatMessage[]) {
+export function openAIMessagesToClaudeTextPrompt(
+  messages: OpenAIChatMessage[]
+) {
   return (
     messages
       .map((m) => {
@@ -82,13 +85,13 @@ export function openAIMessagesToClaudePrompt(messages: OpenAIChatMessage[]) {
   );
 }
 
-export function openAIToAnthropic(req: Request) {
+export function openAIToAnthropicText(req: Request) {
   const { body } = req;
   const result = OpenAIV1ChatCompletionSchema.safeParse(body);
   if (!result.success) {
     req.log.warn(
       { issues: result.error.issues, body },
-      "Invalid OpenAI-to-Anthropic request"
+      "Invalid OpenAI-to-Anthropic Text request"
     );
     throw result.error;
   }
@@ -96,7 +99,7 @@ export function openAIToAnthropic(req: Request) {
   req.headers["anthropic-version"] = "2023-06-01";
 
   const { messages, ...rest } = result.data;
-  const prompt = openAIMessagesToClaudePrompt(messages);
+  const prompt = openAIMessagesToClaudeTextPrompt(messages);
 
   let stops = rest.stop
     ? Array.isArray(rest.stop)
@@ -120,6 +123,81 @@ export function openAIToAnthropic(req: Request) {
     temperature: rest.temperature,
     top_p: rest.top_p,
   };
+}
+
+/**
+ * Converts an older Anthropic Text Completion prompt to the newer Messages API
+ * by splitting the flat text into messages.
+ */
+export function anthropicTextToAnthropicChat(req: Request) {
+  const { body } = req;
+  const result = AnthropicV1TextSchema.safeParse(body);
+  if (!result.success) {
+    req.log.warn(
+      { issues: result.error.issues, body },
+      "Invalid Anthropic Text-to-Anthropic Chat request"
+    );
+    throw result.error;
+  }
+
+  req.headers["anthropic-version"] = "2023-06-01";
+
+  const { model, max_tokens_to_sample, prompt, ...rest } = result.data;
+  validateAnthropicTextPrompt(prompt);
+
+  // Iteratively slice the prompt into messages. Start from the beginning and
+  // look for the next `\n\nHuman:` or `\n\nAssistant:`. Anything before the
+  // first human message is a system message.
+  let index = prompt.indexOf("\n\nHuman:");
+  let remaining = prompt.slice(index);
+  const system = prompt.slice(0, index);
+  const messages: AnthropicChatMessage[] = [];
+  while (remaining) {
+    const isHuman = remaining.startsWith("\n\nHuman:");
+
+    // TODO: Are multiple consecutive human or assistant messages allowed?
+    // Currently we will enforce alternating turns.
+    const thisRole = isHuman ? "\n\nHuman:" : "\n\nAssistant:";
+    const nextRole = isHuman ? "\n\nAssistant:" : "\n\nHuman:";
+    const nextIndex = remaining.indexOf(nextRole);
+
+    // Collect text up to the next message, or the end of the prompt for the
+    // Assistant prefill if present.
+    const msg = remaining
+      .slice(0, nextIndex === -1 ? undefined : nextIndex)
+      .replace(thisRole, "")
+      .trimStart();
+
+    const role = isHuman ? "user" : "assistant";
+    messages.push({ role, content: msg });
+    remaining = remaining.slice(nextIndex);
+
+    if (nextIndex === -1) break;
+  }
+
+  return {
+    model,
+    system,
+    messages,
+    max_tokens: max_tokens_to_sample,
+    ...rest,
+  };
+}
+
+function validateAnthropicTextPrompt(prompt: string) {
+  if (!prompt.includes("\n\nHuman:") || !prompt.includes("\n\nAssistant:")) {
+    throw new Error(
+      "Prompt must contain at least one human and one assistant message."
+    );
+  }
+  // First human message must be before first assistant message
+  const firstHuman = prompt.indexOf("\n\nHuman:");
+  const firstAssistant = prompt.indexOf("\n\nAssistant:");
+  if (firstAssistant < firstHuman) {
+    throw new Error(
+      "First Assistant message must come after the first Human message."
+    );
+  }
 }
 
 export function flattenAnthropicMessages(

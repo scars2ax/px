@@ -43,7 +43,7 @@ const getModelsResponse = () => {
     "claude-2.0",
     "claude-2.1",
     "claude-3-opus-20240229",
-    "claude-3-sonnet-20240229"
+    "claude-3-sonnet-20240229",
   ];
 
   const models = claudeVariants.map((id) => ({
@@ -83,8 +83,16 @@ const anthropicResponseHandler: ProxyResHandlerWithBody = async (
   }
 
   if (req.inboundApi === "openai") {
-    req.log.info("Transforming Anthropic response to OpenAI format");
-    body = transformAnthropicResponse(body, req);
+    req.log.info("Transforming Anthropic text to OpenAI format");
+    body = transformAnthropicTextResponseToOpenAI(body, req);
+  }
+
+  if (
+    req.inboundApi === "anthropic-text" &&
+    req.outboundApi === "anthropic-chat"
+  ) {
+    req.log.info("Transforming Anthropic text to Anthropic chat format");
+    body = transformAnthropicChatResponseToAnthropicText(body, req);
   }
 
   if (req.tokenizerInfo) {
@@ -94,13 +102,32 @@ const anthropicResponseHandler: ProxyResHandlerWithBody = async (
   res.status(200).json(body);
 };
 
+function transformAnthropicChatResponseToAnthropicText(
+  anthropicBody: Record<string, any>,
+  req: Request
+): Record<string, any> {
+  return {
+    type: "completion",
+    id: "trans-" + anthropicBody.id,
+    completion: anthropicBody.content
+      .map((part: { type: string; text: string }) =>
+        part.type === "text" ? part.text : ""
+      )
+      .join(""),
+    stop_reason: anthropicBody.stop_reason,
+    stop: anthropicBody.stop_sequence,
+    model: anthropicBody.model,
+    usage: anthropicBody.usage,
+  };
+}
+
 /**
  * Transforms a model response from the Anthropic API to match those from the
  * OpenAI API, for users using Claude via the OpenAI-compatible endpoint. This
  * is only used for non-streaming requests as streaming requests are handled
  * on-the-fly.
  */
-function transformAnthropicResponse(
+function transformAnthropicTextResponseToOpenAI(
   anthropicBody: Record<string, any>,
   req: Request
 ): Record<string, any> {
@@ -141,41 +168,66 @@ const anthropicProxy = createQueueMiddleware({
       proxyRes: createOnProxyResHandler([anthropicResponseHandler]),
       error: handleProxyError,
     },
-    pathRewrite: {
-      // Send OpenAI-compat requests to the real Anthropic endpoint.
-      "^/v1/chat/completions": "/v1/complete",
+    // Abusing pathFilter to rewrite the paths dynamically.
+    pathFilter: (pathname, req) => {
+      const isText = req.outboundApi === "anthropic-text";
+      const isChat = req.outboundApi === "anthropic-chat";
+      if (isChat && pathname === "/v1/complete") {
+        req.url = "/v1/messages";
+      }
+      if (isText && pathname === "/v1/chat/completions") {
+        req.url = "/v1/complete";
+      }
+      return true;
     },
   }),
 });
 
+const nativeTextPreprocessor = createPreprocessorMiddleware({
+  inApi: "anthropic-text",
+  outApi: "anthropic-text",
+  service: "anthropic",
+});
+
+const textToChatPreprocessor = createPreprocessorMiddleware({
+  inApi: "anthropic-text",
+  outApi: "anthropic-chat",
+  service: "anthropic",
+});
+
+/**
+ * Routes text completion prompts to anthropic-chat if they need translation
+ * (claude-3 based models do not support the old text completion endpoint).
+ */
+const claudeTextCompletionRouter: RequestHandler = (req, res, next) => {
+  if (req.body.model?.startsWith("claude-3")) {
+    textToChatPreprocessor(req, res, next);
+  } else {
+    nativeTextPreprocessor(req, res, next);
+  }
+};
+
 const anthropicRouter = Router();
 anthropicRouter.get("/v1/models", handleModelRequest);
-// Native Anthropic text completion endpoint.
+// Anthropic text completion endpoint. Dynamic routing based on model.
 anthropicRouter.post(
   "/v1/complete",
   ipLimiter,
-  createPreprocessorMiddleware({
-    inApi: "anthropic-text",
-    outApi: "anthropic-text",
-    service: "anthropic",
-  }),
+  claudeTextCompletionRouter,
   anthropicProxy
 );
 // Native Anthropic chat completion endpoint.
 anthropicRouter.post(
   "/v1/messages",
   ipLimiter,
-  createPreprocessorMiddleware(
-    {
-      inApi: "anthropic-chat",
-      outApi: "anthropic-chat",
-      service: "anthropic",
-    },
-    { beforeTransform: [disallowStreaming] }
-  ),
+  createPreprocessorMiddleware({
+    inApi: "anthropic-chat",
+    outApi: "anthropic-chat",
+    service: "anthropic",
+  }),
   anthropicProxy
 );
-// OpenAI-to-Anthropic compatibility endpoint.
+// OpenAI-to-Anthropic Text compatibility endpoint.
 anthropicRouter.post(
   "/v1/chat/completions",
   ipLimiter,
