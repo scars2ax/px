@@ -36,4 +36,5 @@ export { googleAIToOpenAI } from "./transformers/google-ai-to-openai";
 export { passthroughToOpenAI } from "./transformers/passthrough-to-openai";
 export { mergeEventsForOpenAIChat } from "./aggregators/openai-chat";
 export { mergeEventsForOpenAIText } from "./aggregators/openai-text";
-export { mergeEventsForAnthropic } from "./aggregators/anthropic";
+export { mergeEventsForAnthropicText } from "./aggregators/anthropic-text";
+export { mergeEventsForAnthropicChat } from "./aggregators/anthropic-chat";

@@ -32,6 +32,7 @@ export class SSEMessageTransformer extends Transform {
   private msgCount: number;
   private readonly inputFormat: APIFormat;
   private readonly transformFn: StreamingCompletionTransformer<
+    // TODO: Refactor transformers to not assume only OpenAI events as output
     OpenAIChatCompletionStreamEvent | AnthropicV2StreamEvent
   >;
   private readonly log;

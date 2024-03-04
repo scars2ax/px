@@ -2,7 +2,8 @@ import { APIFormat } from "../../../../shared/key-management";
 import { assertNever } from "../../../../shared/utils";
 import {
   anthropicV2ToOpenAI,
-  mergeEventsForAnthropic,
+  mergeEventsForAnthropicChat,
+  mergeEventsForAnthropicText,
   mergeEventsForOpenAIChat,
   mergeEventsForOpenAIText,
   OpenAIChatCompletionStreamEvent,
@@ -31,12 +32,12 @@ export class EventAggregator {
       // events were in openai format.
       // now we have added anthropic-chat-to-text, so aggregator needs to know
       // how to collapse events from two formats.
-      // because that is annoying, we will simply transform all anthropic-chat
-      // events to openai (even if the client didn't ask for openai) so we don't
-      // have to write aggregation logic for anthropic chat (which is also an
-      // annoying format due to stateful deltas).
+      // because that is annoying, we will simply transform anthropic events to
+      // openai (even if the client didn't ask for openai) so we don't have to
+      // write aggregation logic for anthropic chat (which is also a troublesome
+      // stateful format).
       const openAIEvent = anthropicV2ToOpenAI({
-        data: JSON.stringify(event),
+        data: `event: completion\ndata: ${JSON.stringify(event)}\n\n`,
         lastPosition: -1,
         index: 0,
         fallbackId: event.log_id || "event-aggregator-fallback",
@@ -57,8 +58,9 @@ export class EventAggregator {
       case "openai-text":
         return mergeEventsForOpenAIText(this.events);
       case "anthropic-text":
-        return mergeEventsForAnthropic(this.events);
+        return mergeEventsForAnthropicText(this.events);
       case "anthropic-chat":
+        return mergeEventsForAnthropicChat(this.events);
       case "openai-image":
         throw new Error(`SSE aggregation not supported for ${this.format}`);
       default:
