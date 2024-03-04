@@ -3,16 +3,16 @@ import { logger } from "../../../../logger";
 import { APIFormat } from "../../../../shared/key-management";
 import { assertNever } from "../../../../shared/utils";
 import {
-  anthropicV1ToOpenAI,
-  anthropicV2ToOpenAI,
   anthropicChatToAnthropicV2,
+  anthropicV1ToOpenAI,
+  AnthropicV2StreamEvent,
+  anthropicV2ToOpenAI,
+  googleAIToOpenAI,
   OpenAIChatCompletionStreamEvent,
   openAITextToOpenAIChat,
-  googleAIToOpenAI,
   passthroughToOpenAI,
   StreamingCompletionTransformer,
 } from "./index";
-import { AnthropicV2StreamEvent } from "./transformers/anthropic-chat-to-anthropic-v2";
 
 type SSEMessageTransformerOptions = TransformOptions & {
   requestedModel: string;

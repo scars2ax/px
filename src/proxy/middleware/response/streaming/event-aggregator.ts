@@ -6,9 +6,9 @@ import {
   mergeEventsForAnthropicText,
   mergeEventsForOpenAIChat,
   mergeEventsForOpenAIText,
+  AnthropicV2StreamEvent,
   OpenAIChatCompletionStreamEvent,
 } from "./index";
-import { AnthropicV2StreamEvent } from "./transformers/anthropic-chat-to-anthropic-v2";
 
 /**
  * Collects SSE events containing incremental chat completion responses and

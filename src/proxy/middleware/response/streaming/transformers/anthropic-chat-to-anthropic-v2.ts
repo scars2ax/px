@@ -1,4 +1,7 @@
-import { StreamingCompletionTransformer } from "../index";
+import {
+  AnthropicV2StreamEvent,
+  StreamingCompletionTransformer,
+} from "../index";
 import { parseEvent, ServerSentEvent } from "../parse-sse";
 import { logger } from "../../../../../logger";
 
@@ -6,50 +9,6 @@ const log = logger.child({
   module: "sse-transformer",
   transformer: "anthropic-chat-to-anthropic-v2",
 });
-
-/*
-Event types
-Each server-sent event includes a named event type and associated JSON data. Each event will use an SSE event name (e.g. event: message_stop), and include the matching event type in its data.
-Each stream uses the following event flow:
-    message_start: contains a Message object with empty content.
-    A series of content blocks, each of which have a content_block_start, one or more content_block_delta events, and a content_block_stop event. Each content block will have an index that corresponds to its index in the final Message content array.
-    One or more message_delta events, indicating top-level changes to the final Message object.
-    A final message_stop event.
-
-Ping events
-Event streams may also include any number of ping events.
-
-event: message_start
-data: {"type": "message_start", "message": {"id": "msg_1nZdL29xx5MUA1yADyHTEsnR8uuvGzszyY", "type": "message", "role": "assistant", "content": [], "model": "claude-3-opus-20240229, "stop_reason": null, "stop_sequence": null, "usage": {"input_tokens": 25, "output_tokens": 1}}}
-
-event: content_block_start
-data: {"type": "content_block_start", "index":0, "content_block": {"type": "text", "text": ""}}
-
-event: ping
-data: {"type": "ping"}
-
-event: content_block_delta
-data: {"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": "Hello"}}
-
-event: content_block_delta
-data: {"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": "!"}}
-
-event: content_block_stop
-data: {"type": "content_block_stop", "index": 0}
-
-event: message_delta
-data: {"type": "message_delta", "delta": {"stop_reason": "end_turn", "stop_sequence":null, "usage":{"output_tokens": 15}}}
-
-event: message_stop
-data: {"type": "message_stop"}
- */
-
-export type AnthropicV2StreamEvent = {
-  log_id?: string;
-  model?: string;
-  completion: string;
-  stop_reason: string | null;
-};
 
 export type AnthropicChatEventType =
   | "message_start"

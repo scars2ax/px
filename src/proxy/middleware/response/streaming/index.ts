@@ -7,6 +7,13 @@ export type SSEResponseTransformArgs<S = Record<string, any>> = {
   state?: S;
 };
 
+export type AnthropicV2StreamEvent = {
+  log_id?: string;
+  model?: string;
+  completion: string;
+  stop_reason: string | null;
+};
+
 export type OpenAIChatCompletionStreamEvent = {
   id: string;
   object: "chat.completion.chunk";
