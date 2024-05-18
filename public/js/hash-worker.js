@@ -1,14 +1,14 @@
 importScripts(
-  "https://cdn.jsdelivr.net/npm/argon2-browser@1.18.0/dist/argon2-bundled.min.js"
+  "https://cdn.jsdelivr.net/npm/hash-wasm@4.11.0/dist/argon2.umd.min.js"
 );
-
-const argon2 = self.argon2;
 
 let active = false;
 let nonce = 0;
 let signature = "";
+let lastNotify = 0;
 let params = {
-  salt: "",
+  salt: null,
+  workers: 0,
   length: 0,
   time: 0,
   mem: 0,
@@ -18,54 +18,66 @@ let params = {
   expiry: 0,
   ip: "",
 };
+let argon2Hash = null;
 
 self.onmessage = async (event) => {
   const { data } = event;
+  console.log("Hash worker msg", data);
   switch (data.type) {
-    case "start":
+    case "toggle":
       if (active) {
+        active = false;
+        self.postMessage({ type: "paused", nonce });
         return;
       }
-      active = true;
 
+      active = true;
       signature = data.signature;
-      nonce = data.nonce || 0; // for resuming
-      const parsed = JSON.parse(data.challenge);
+      nonce = data.nonce;
+
+      const c = data.challenge;
       params = {
-        salt: parsed.s,
-        length: parsed.hl,
-        time: parsed.t,
-        mem: parsed.m,
-        parallelism: parsed.p,
-        type: parsed.at,
-        difficulty: parsed.d,
-        expiry: parsed.e,
-        ip: parsed.ip,
+        salt: new TextEncoder().encode(c.s),
+        workers: c.w,
+        length: c.hl,
+        time: c.t,
+        mem: c.m,
+        parallelism: c.p,
+        type: c.at,
+        difficulty: c.d,
+        expiry: c.e,
+        ip: c.ip,
       };
 
+      switch (params.type) {
+        case 0:
+          argon2Hash = self.hashwasm.argon2i;
+          break;
+        case 1:
+          argon2Hash = self.hashwasm.argon2d;
+          break;
+        case 2:
+          argon2Hash = self.hashwasm.argon2id;
+          break;
+      }
+
       console.log("Started", params);
-      self.postMessage({ type: "start" });
+      self.postMessage({ type: "started" });
       setTimeout(solve, 0);
-      break;
-    case "stop":
-      active = false;
-      console.log("Paused", nonce);
-      self.postMessage({ type: "stop", nonce });
       break;
   }
 };
 
 const doHash = async (password) => {
-  const { salt, length, time, mem, parallelism, type } = params;
-  const hash = await argon2.hash(password, {
-    salt: new TextEncoder().encode(salt),
+  const { salt, length, time, mem, parallelism } = params;
+  return await argon2Hash({
+    password,
+    salt,
     hashLength: length,
-    timeCost: time,
-    memoryCost: mem,
+    iterations: time,
+    memorySize: mem,
     parallelism,
-    type,
   });
-  return hash.hash;
 };
 
 const checkHash = (hash) => {
@@ -79,13 +91,37 @@ const solve = async () => {
     return;
   }
 
-  const password = signature + ":" + nonce;
-  const hash = await doHash(password);
-  if (checkHash(hash)) {
-    self.postMessage({ type: "solved", password });
+  const batchSize = 10;
+  const batch = [];
+  for (let i = 0; i < batchSize; i++) {
+    batch.push(nonce++);
+  }
+
+  try {
+    const results = await Promise.all(
+      batch.map(async (nonce) => {
+        const password = signature + ":" + nonce;
+        const hash = await doHash(password);
+        return { nonce, hash };
+      })
+    );
+
+    const solution = results.find(({ hash }) => checkHash(hash));
+    if (solution) {
+      console.log("Solution found", solution);
+      self.postMessage({ type: "solved", password: signature + ":" + solution.nonce, nonce: solution.nonce });
+      active = false;
+    } else {
+      if (nonce % batchSize === 0 && Date.now() - lastNotify > 1000) {
+        lastNotify = Date.now();
+        console.log("Notify progress", nonce);
+        self.postMessage({ type: "progress", nonce });
+      }
+      setTimeout(solve, 0);
+    }
+  } catch (error) {
+    console.error("Error", error);
+    self.postMessage({ type: "error", error: error.message });
     active = false;
-  } else {
-    nonce++;
-    setTimeout(solve, 0);
   }
 };
