@@ -12,7 +12,6 @@ import { setupAssetsDir } from "./shared/file-storage/setup-assets-dir";
 import { keyPool } from "./shared/key-management";
 import { adminRouter } from "./admin/routes";
 import { proxyRouter } from "./proxy/routes";
-import { powCaptchaRouter } from "./captcha/pow-captcha";
 import { infoPageRouter } from "./info-page";
 import { IMAGE_GEN_MODELS } from "./shared/models";
 import { userRouter } from "./user/routes";
@@ -63,6 +62,10 @@ app.set("views", [
 ]);
 
 app.use("/user_content", express.static(USER_ASSETS_DIR, { maxAge: "2h" }));
+app.use(
+  "/res",
+  express.static(path.join(__dirname, "..", "public"), { etag: true })
+);
 
 app.get("/health", (_req, res) => res.sendStatus(200));
 app.use(cors());
@@ -71,9 +74,6 @@ app.use(checkOrigin);
 app.use("/admin", adminRouter);
 app.use(config.proxyEndpointRoute, proxyRouter);
 app.use("/user", userRouter);
-if (config.captchaMode !== "none") {
-  app.use("/captcha", powCaptchaRouter);
-}
 if (config.staticServiceInfo) {
   app.get("/", (_req, res) => res.sendStatus(200));
 } else {
