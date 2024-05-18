@@ -455,6 +455,12 @@ export async function assertConfigIsValid() {
     );
   }
 
+  if (config.captchaMode === "proof_of_work" && config.gatekeeper !== "user_token") {
+    throw new Error(
+      "Captcha mode 'proof_of_work' requires gatekeeper mode 'user_token'."
+    );
+  }
+
   if (config.gatekeeper === "proxy_key" && !config.proxyKey) {
     throw new Error(
       "`proxy_key` gatekeeper mode requires a `PROXY_KEY` to be set."
