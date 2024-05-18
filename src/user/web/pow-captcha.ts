@@ -2,20 +2,20 @@ import argon2 from "argon2";
 import crypto from "crypto";
 import express from "express";
 import { z } from "zod";
-import { createUser, upsertUser } from "../shared/users/user-store";
-import { config, POW_HMAC_KEY } from "../config";
+import { createUser, upsertUser } from "../../shared/users/user-store";
+import { config, POW_HMAC_KEY } from "../../config";
 
 /** Number of leading zeros required for a valid solution */
-const CHALLENGE_DIFFICULTY = 8;
+const CHALLENGE_DIFFICULTY = 3;
 /** Expiry time for a challenge in milliseconds */
-const POW_EXPIRY = 1000 * 60 * 15; // 15 minutes
+const POW_EXPIRY = 1000 * 60 * 60; // 1 hour
 /** Lockout time after failed verification in milliseconds */
 const LOCKOUT_TIME = 1000 * 60; // 1 minute
 // Argon2 parameters, may be adjusted dynamically depending on resource usage
 const ARGON2_HASH_LENGTH = 32;
 const ARGON2_TIME_COST = 3;
-const ARGON2_MEMORY = 4096;
-const ARGON2_PARALLELISM = 4;
+const ARGON2_PARALLELISM = 2;
+const ARGON2_MEMORY_KB = 1024 * 32
 const ARGON2_TYPE = argon2.argon2id;
 
 type Challenge = {
@@ -84,10 +84,10 @@ setInterval(() => {
 
 function generateChallenge(clientIp?: string): Challenge {
   return {
-    s: crypto.randomBytes(64).toString("hex"),
+    s: crypto.randomBytes(32).toString("hex"),
     hl: ARGON2_HASH_LENGTH,
     t: ARGON2_TIME_COST,
-    m: ARGON2_MEMORY,
+    m: ARGON2_MEMORY_KB,
     p: ARGON2_PARALLELISM,
     at: ARGON2_TYPE,
     d: CHALLENGE_DIFFICULTY,
@@ -190,6 +190,13 @@ router.post("/verify", async (req, res) => {
 
   res.json({ token });
   // TODO: Issue jwt to let user refresh temp token or rebind IP
+});
+
+router.get("/", (_req, res) => {
+  res.render("user_request_token", {
+    tokenLifetime: config.captchaTokenHours,
+    tokenMaxIps: config.captchaTokenMaxIps,
+  });
 });
 
 export { router as powCaptchaRouter };
