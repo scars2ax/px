@@ -1,6 +1,32 @@
 <%- include("partials/shared_header", { title: "Request User Token" }) %>
 <h1>Request User Token</h1>
-<p>Y</p>
+<p>
+  You can request a user token to authenticate with this proxy. The token will be valid for <%= tokenLifetime %> hours.
+</p>
+<button id="request_token" onclick="requestChallenge()">Request verification</button>
+<%- include("partials/user_challenge_widget") %>
+<script>
+  function requestChallenge() {
+    fetch("/user/captcha/challenge", {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    })
+      .then(function (response) {
+        if (response.ok) {
+          return response.json();
+        } else {
+          throw new Error("Failed to request challenge");
+        }
+      })
+      .then(function (data) {
+        const { challenge, signature } = data;
+        loadNewChallenge(challenge, signature);
+      })
+      .catch(function (error) {
+        console.error(error);
+        alert("Failed to request verification challenge from server");
+      });
+  }
+</script>
 
-
-<% } %> <%- include("partials/user_footer") %>
+<%- include("partials/user_footer") %>

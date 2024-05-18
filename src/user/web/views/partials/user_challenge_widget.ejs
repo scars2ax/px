@@ -1,32 +1,234 @@
 <noscript>
-    <p style="color: darkorange; background-color: #ffeecc; padding: 1em">
-        JavaScript needs to be enabled to request a user token.
-    </p>
+  <p style="color: darkorange; background-color: #ffeecc; padding: 1em">
+    JavaScript needs to be enabled to complete verification.
+  </p>
 </noscript>
 <style>
-    body { font-family: Arial, sans-serif; }
-    #captcha-container { max-width: 400px; margin: 50px auto; text-align: center; }
-    #captcha-progress-container { margin: 20px 0; }
-    .progress-bar { width: 100%; height: 20px; background-color: #e0e0e0; border-radius: 5px; overflow: hidden; }
-    .progress { width: 0; height: 100%; background-color: #76c7c0; transition: width 0.2s; }
+  #captcha-container {
+    max-width: 500px;
+    margin: 50px auto;
+  }
+
+  #captcha-container p {
+    padding: 2px;
+    line-height: 1.5;
+  }
+
+  #captcha-container details {
+    margin: 10px 0;
+  }
+
+  #captcha-container details p {
+    margin-left: 20px;
+  }
+
+  #captcha-container details li {
+    margin: 2px 0 0 20px;
+    line-height: 1.5;
+  }
+
+  #captcha-control {
+    display: flex;
+    justify-content: space-between;
+  }
+
+  #captcha-control button {
+    flex-grow: 1;
+    margin: 10px;
+    padding: 10px 20px;
+  }
+
+  #captcha-progress-container {
+    margin: 20px 0;
+  }
+
+  .progress-bar {
+    width: 100%;
+    height: 20px;
+    background-color: #e0e0e0;
+    border-radius: 5px;
+    overflow: hidden;
+  }
+
+  .progress {
+    width: 0;
+    height: 100%;
+    background-color: #76c7c0;
+    transition: width 0.2s;
+  }
 </style>
 <div style="display: none" id="captcha-container">
-    <button id="workerControl">Start Captcha</button>
-    <div id="captcha-progress-container" style="display: none;">
-        <div id="captcha-progress" class="progress-bar">
-            <div class="progress"></div>
-        </div>
-        <p id="captcha-progress-text">Progress: 0%</p>
+  <p>
+    To prevent abuse, your browser needs to perform some calculations before a user token will be issued. This
+    verification process might take from a few seconds to a few minutes, depending on your device.
+  </p>
+  <p>Click the button below to start.</p>
+  <details>
+    <summary>What is this?</summary>
+    <p>
+      This is a proof-of-work captcha that requires your device's CPU to do some work to earn a user token. This helps
+      prevent mass registration and abuse of the service by increasing the cost of mass registration.
+    </p>
+  </details>
+  <details>
+    <summary>How long does verification take?</summary>
+    <p>
+      The exact time depends on the device you're using and the current load on the server. On a modern desktop PC or
+      newer smartphone, it should take less than a minute. It may take several minutes on older devices.
+    </p>
+  </details>
+  <details>
+    <summary>How often do I need to do this?</summary>
+    <p>
+      Once you've earned a user token, it will remain valid for <%= tokenLifetime %> hours. After that, you can return to this page
+      from the same device and browser to refresh your token.
+    </p>
+  </details>
+  <details>
+    <summary>Limitations</summary>
+    <ul>
+      <li>Verification must be submitted from the same device and IP address that started the verification.</li>
+      <li>Don't leave the page or close the browser tab while the verification is running.</li>
+      <li>You can pause and resume the process, but the verification must be finished within one hour.</li>
+      <li>
+        Once issued a user token, it will be bound to your current IP address. Up to
+        <strong><%= tokenMaxIps || "unlimited" %></strong> IP addresses can share a token.
+      </li>
+      <li>JavaScript is required to complete the process but can be disabled once a token is issued.</li>
+      <li>Cookies must be enabled if you want to refresh your token later.</li>
+    </ul>
+  </details>
+  <div id="captcha-progress-container" style="display: none">
+    <div id="captcha-progress" class="progress-bar">
+      <div class="progress"></div>
     </div>
-    <p id="result"></p>
+    <p id="captcha-progress-text">Progress: 0%</p>
+    <p id="captcha-runtime">Runtime: 0s</p>
+    <p id="captcha-hashrate">Hashrate: 0 H/s</p>
+    <p id="captcha-remaining">Estimated time remaining: calculating...</p>
+  </div>
+  <div id="captcha-result"></div>
+  <div id="captcha-control">
+    <button id="worker-control" onclick="toggleWorker()">Start verification</button>
+    <button disabled id="captcha-submit" onclick="verifyCaptcha()">Get user token</button>
+  </div>
+</div>
 <script>
-let worker = null;
-let challenge = null;
+  let worker = null;
+  let challenge = null;
+  let signature = null;
+  let solution = null;
+  let nonce = 0;
+  let startTime = 0;
+  let elapsedTime = 0;
 
-function loadChallenge() {
-  worker = new Worker('/res/js/hash-worker.js');
+  function loadNewChallenge(c, s) {
+    const btn = document.getElementById("worker-control");
+    btn.textContent = "Start verification";
+    document.getElementById("captcha-container").style.display = "block";
 
+    nonce = 0;
+    challenge = c;
+    signature = s;
+    worker = new Worker("/res/js/hash-worker.js");
+    worker.onmessage = function (e) {
+      switch (e.data.type) {
+        case "progress":
+          nonce = e.data.nonce;
+          estimateProgress();
+          break;
+        case "started":
+          btn.textContent = "Pause verification";
+          startTime = Date.now();
+          document.getElementById("captcha-progress-container").style.display = "block";
+          break;
+        case "paused":
+          nonce = e.data.nonce;
+          btn.textContent = "Start verification";
+          elapsedTime += Date.now() - startTime;
+          document.getElementById("captcha-progress-container").style.display = "none";
+          break;
+        case "solved":
+          solution = e.data.solution;
+          nonce = e.data.nonce;
+          document.getElementById("result").textContent =
+            "Verification completed. Click the button below to obtain a user token.";
+          document.getElementById("captcha-submit").disabled = false;
+          document.getElementById("worker-control").style.display = "none";
+          document.getElementById("captcha-progress-container").style.display = "none";
+          break;
+        case "error":
+          const msg = e.data.error || "An unknown error occurred.";
+          document.getElementById("captcha-result").innerHTML = `
+            <p style="color: darkred">Error: ${msg}</p>
+            <p>Try using another device or browser if the problem persists.</p>
+`;
+          break;
+      }
+    };
+  }
 
-}
+  function toggleWorker() {
+    if (!worker) {
+      return;
+    }
+    worker.postMessage({ type: "toggle", challenge: challenge, signature: signature, nonce: nonce });
+  }
 
+  function submitCaptcha() {
+    if (!solution) {
+      return;
+    }
+    const body = {
+      challenge: challenge,
+      signature: signature,
+      solution: solution,
+      _csrf: document.querySelector("meta[name=csrf-token]").getAttribute("content"),
+    };
+
+    fetch("/user/captcha/verify", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.error) {
+          document.getElementById("captcha-result").textContent = "Error: " + data.error;
+        } else {
+          document.getElementById("captcha-result").textContent = "User token: " + data.token;
+        }
+      });
+  }
+
+  function estimateProgress() {
+    const difficulty = challenge.d;
+    const hashes = Math.pow(16, difficulty);
+    const totalRuntime = (Date.now() - startTime + elapsedTime) / 1000;
+    const hashRate = nonce / totalRuntime;
+    const remaining = hashes - nonce;
+    const timeRemaining = remaining / hashRate;
+    const progress = 100 * (1 - remaining / hashes);
+
+    const prettyTime = (time) => {
+      if (time < 60) {
+        return time.toFixed(1) + "s";
+      } else if (time < 3600) {
+        const minutes = Math.floor(time / 60);
+        const seconds = Math.floor(time % 60);
+        return minutes + "m " + seconds + "s";
+      } else {
+        const hours = Math.floor(time / 3600);
+        const minutes = Math.floor((time % 3600) / 60);
+        return hours + "h " + minutes + "m";
+      }
+    };
+
+    document.getElementById("captcha-progress").style.width = progress + "%";
+    document.getElementById("captcha-progress-text").textContent = "Progress: " + progress.toFixed(2) + "%";
+    document.getElementById("captcha-runtime").textContent = "Runtime: " + totalRuntime.toFixed(2) + "s";
+    document.getElementById("captcha-hashrate").textContent = "Hashrate: " + hashRate.toFixed(2) + " H/s";
+    document.getElementById("captcha-remaining").textContent = "Estimated time remaining: " + prettyTime(timeRemaining);
+  }
 </script>
