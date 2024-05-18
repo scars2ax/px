@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import dotenv from "dotenv";
 import type firebase from "firebase-admin";
 import path from "path";
@@ -107,9 +108,23 @@ type Config = {
    * `maxIpsPerUser` limit, or if only connections from new IPs are be rejected.
    */
   maxIpsAutoBan: boolean;
-  /** Per-IP limit for requests per minute to text and chat models. */
+  /**
+   * Which captcha verification mode to use. Requires `user_token` gatekeeper.
+   * Allows users to automatically obtain a token by solving a captcha.
+   * - `none`: No captcha verification; tokens are issued manually.
+   * - `proof_of_work`: Users must solve an Argon2 PoW captcha to obtain a
+   *    temporary usertoken valid for a limited period.
+   */
+  captchaMode: "none" | "proof_of_work";
+  /**
+   * Duration in hours for which a captcha-issued temporary user token is valid.
+   */
+  captchaTokenHours: number;
+  /** Maximum number of IPs allowed per captcha-issued temporary user token. */
+  captchaTokenMaxIps: number;
+  /** Per-user limit for requests per minute to text and chat models. */
   textModelRateLimit: number;
-  /** Per-IP limit for requests per minute to image generation models. */
+  /** Per-user limit for requests per minute to image generation models. */
   imageModelRateLimit: number;
   /**
    * For OpenAI, the maximum number of context tokens (prompt + max output) a
@@ -283,7 +298,10 @@ export const config: Config = {
   gatekeeper: getEnvWithDefault("GATEKEEPER", "none"),
   gatekeeperStore: getEnvWithDefault("GATEKEEPER_STORE", "memory"),
   maxIpsPerUser: getEnvWithDefault("MAX_IPS_PER_USER", 0),
-  maxIpsAutoBan: getEnvWithDefault("MAX_IPS_AUTO_BAN", true),
+  maxIpsAutoBan: getEnvWithDefault("MAX_IPS_AUTO_BAN", false),
+  captchaMode: getEnvWithDefault("CAPTCHA_MODE", "none"),
+  captchaTokenHours: getEnvWithDefault("CAPTCHA_TOKEN_HOURS", 6),
+  captchaTokenMaxIps: getEnvWithDefault("CAPTCHA_TOKEN_MAX_IPS", 2),
   firebaseRtdbUrl: getEnvWithDefault("FIREBASE_RTDB_URL", undefined),
   firebaseKey: getEnvWithDefault("FIREBASE_KEY", undefined),
   textModelRateLimit: getEnvWithDefault("TEXT_MODEL_RATE_LIMIT", 4),
@@ -320,7 +338,7 @@ export const config: Config = {
     "azure-gpt4",
     "azure-gpt4-32k",
     "azure-gpt4-turbo",
-    "azure-gpt4o"
+    "azure-gpt4o",
   ]),
   rejectPhrases: parseCsv(getEnvWithDefault("REJECT_PHRASES", "")),
   rejectMessage: getEnvWithDefault(
@@ -369,17 +387,41 @@ export const config: Config = {
   proxyEndpointRoute: getEnvWithDefault("PROXY_ENDPOINT_ROUTE", "/proxy"),
 } as const;
 
-function generateCookieSecret() {
+function generateSigningKey() {
   if (process.env.COOKIE_SECRET !== undefined) {
+    // legacy, replaced by SIGNING_KEY
     return process.env.COOKIE_SECRET;
+  } else if (process.env.SIGNING_KEY !== undefined) {
+    return process.env.SIGNING_KEY;
   }
 
-  const seed = "" + config.adminKey + config.openaiKey + config.anthropicKey;
-  const crypto = require("crypto");
+  const secrets = [
+    config.adminKey,
+    config.openaiKey,
+    config.anthropicKey,
+    config.googleAIKey,
+    config.mistralAIKey,
+    config.awsCredentials,
+    config.azureCredentials,
+  ];
+  if (secrets.filter((s) => s).length === 0) {
+    startupLogger.warn(
+      "No SIGNING_KEY or secrets are set. All sessions, cookies, and proofs of work will be invalidated on restart."
+    );
+    return crypto.randomBytes(32).toString("hex");
+  }
+
+  startupLogger.info("No SIGNING_KEY set; one will be generated from secrets.");
+  startupLogger.info(
+    "It's recommended to set SIGNING_KEY explicitly to ensure users' sessions and cookies always persist across restarts."
+  );
+  const seed = secrets.map((s) => s || "n/a").join("");
   return crypto.createHash("sha256").update(seed).digest("hex");
 }
 
-export const COOKIE_SECRET = generateCookieSecret();
+const signingKey = generateSigningKey();
+export const COOKIE_SECRET = signingKey;
+export const POW_HMAC_KEY = signingKey;
 
 export async function assertConfigIsValid() {
   if (process.env.MODEL_RATE_LIMIT !== undefined) {
