@@ -11,10 +11,9 @@ import {
 import { ProxyResHandlerWithBody } from ".";
 import { assertNever } from "../../../shared/utils";
 import {
-  MistralAIChatMessage,
   OpenAIChatMessage,
+  AnthropicChatMessage,
 } from "../../../shared/api-schemas";
-import { getOpenAIModelFamily } from "../../../shared/models";
 import { getUser } from "../../../shared/users/user-store";
 
 /** If event logging is enabled, logs the event */
@@ -30,8 +29,8 @@ export const logEvent: ProxyResHandlerWithBody = async (
   if (typeof responseBody !== "object") {
     throw new Error("Expected body to be an object");
   }
-  if (req.outboundApi !== "openai") {
-    // only openai for now
+  if (!["openai", "anthropic-chat"].includes(req.outboundApi)) {
+    // only chat apis are supported
     return;
   }
   if (!req.user) {
@@ -41,7 +40,7 @@ export const logEvent: ProxyResHandlerWithBody = async (
   const loggable = isTextGenerationRequest(req);
   if (!loggable) return;
 
-  const messages = req.body.messages as OpenAIChatMessage[];
+  const messages = req.body.messages as (OpenAIChatMessage[] | AnthropicChatMessage[]);
 
   let hashes = [];
   hashes.push(hashMessages(messages));
@@ -54,8 +53,8 @@ export const logEvent: ProxyResHandlerWithBody = async (
   }
 
   const model = getModelFromBody(req, responseBody);
-  const family = getOpenAIModelFamily(req.body.model);
   const userToken = req.user!.token;
+  const family = req.modelFamily!;
   const newTokens = getUser(req.user!.token)!.tokenCounts[family] ?? 0;
   eventLogger.logEvent({
     model,
@@ -66,7 +65,7 @@ export const logEvent: ProxyResHandlerWithBody = async (
   });
 };
 
-const hashMessages = (messages: OpenAIChatMessage[]): string => {
+const hashMessages = (messages: OpenAIChatMessage[] | AnthropicChatMessage[]): string => {
   let hasher = createHash("sha256");
   let messageTexts = [];
   for (const msg of messages) {
