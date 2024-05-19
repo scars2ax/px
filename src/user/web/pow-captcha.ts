@@ -2,9 +2,11 @@ import crypto from "crypto";
 import express from "express";
 import argon2 from "@node-rs/argon2";
 import { z } from "zod";
-import { createUser, upsertUser } from "../../shared/users/user-store";
-import { config, POW_HMAC_KEY } from "../../config";
+import { createUser, getUser, upsertUser } from "../../shared/users/user-store";
+import { config } from "../../config";
 
+/** HMAC key for signing challenges; regenerated on startup */
+const HMAC_KEY = crypto.randomBytes(32).toString("hex");
 /** Expiry time for a challenge in milliseconds */
 const POW_EXPIRY = 1000 * 60 * 60; // 1 hour
 /** Lockout time after failed verification in milliseconds */
@@ -48,6 +50,8 @@ type Challenge = {
   ip?: string;
   /** Challenge version */
   v?: number;
+  /** Usertoken for refreshing */
+  token?: string;
 };
 
 const verifySchema = z.object({
@@ -65,9 +69,15 @@ const verifySchema = z.object({
     e: z.number().int().positive(),
     ip: z.string().min(1).max(64).optional(),
     v: z.literal(1).optional(),
+    token: z.string().min(1).max(64).optional(),
   }),
   solution: z.string().min(1).max(64),
   signature: z.string().min(1),
+});
+
+const challengeSchema = z.object({
+  action: z.union([z.literal("new"), z.literal("refresh")]),
+  token: z.string().min(1).max(64).optional(),
 });
 
 /** Solutions by timestamp */
@@ -90,8 +100,12 @@ setInterval(() => {
   }
 }, 1000);
 
-function generateChallenge(clientIp?: string): Challenge {
-  const workFactor = workFactors[config.captchaPoWDifficultyLevel];
+function generateChallenge(clientIp?: string, token?: string): Challenge {
+  let workFactor = workFactors[config.captchaPoWDifficultyLevel];
+  if (token) {
+    // Refreshing a token is easier
+    workFactor /= 3;
+  }
   const hashBits = BigInt(argon2Params.ARGON2_HASH_LENGTH) * 8n;
   const hashMax = 2n ** hashBits;
   const targetValue = hashMax / BigInt(workFactor);
@@ -105,11 +119,12 @@ function generateChallenge(clientIp?: string): Challenge {
     d: targetValue.toString() + "n",
     e: Date.now() + POW_EXPIRY,
     ip: clientIp,
+    token,
   };
 }
 
 function signMessage(msg: any): string {
-  const hmac = crypto.createHmac("sha256", POW_HMAC_KEY);
+  const hmac = crypto.createHmac("sha256", HMAC_KEY);
   if (typeof msg === "object") {
     hmac.update(JSON.stringify(msg));
   } else {
@@ -140,11 +155,42 @@ async function verifySolution(
   return result;
 }
 
+function verifyTokenRefreshable(token?: string) {
+  if (!token) {
+    return false;
+  }
+
+  const user = getUser(token);
+  if (!user) {
+    return false;
+  }
+  if (user.type !== "temporary") {
+    return false;
+  }
+  return user.meta?.refreshable;
+}
+
 const router = express.Router();
 router.get("/challenge", (req, res) => {
-  const challenge = generateChallenge(req.ip);
-  const signature = signMessage(challenge);
-  res.json({ challenge, signature });
+  const data = challengeSchema.safeParse(req.query);
+  if (!data.success) {
+    res.status(400).json({ error: "Invalid challenge request" });
+    return;
+  }
+  const { action, token } = data.data;
+  if (action === "refresh") {
+    if (!verifyTokenRefreshable(token)) {
+      res.status(400).json({ error: "Invalid token for refresh" });
+      return;
+    }
+    const challenge = generateChallenge(req.ip, token);
+    const signature = signMessage(challenge);
+    res.json({ challenge, signature });
+  } else {
+    const challenge = generateChallenge(req.ip);
+    const signature = signMessage(challenge);
+    res.json({ challenge, signature });
+  }
 });
 
 router.post("/verify", async (req, res) => {
@@ -189,6 +235,11 @@ router.post("/verify", async (req, res) => {
     return;
   }
 
+  if (challenge.token && !verifyTokenRefreshable(challenge.token)) {
+    res.status(400).json({ error: "Invalid token for refresh" });
+    return;
+  }
+
   recentAttempts.set(ip, Date.now());
   try {
     const success = await verifySolution(challenge, solution, req.log);
@@ -203,15 +254,34 @@ router.post("/verify", async (req, res) => {
     return;
   }
 
-  const token = createUser({
-    type: "temporary",
-    expiresAt: Date.now() + config.captchaTokenHours * 60 * 60 * 1000,
-  });
-  req.log.info({ ip, token: `...${token.slice(-5)}` }, "Captcha token issued");
-  upsertUser({ token, ip: [ip], maxIps: config.captchaTokenMaxIps });
-
-  res.json({ token });
-  // TODO: Issue jwt to let user refresh temp token or rebind IP
+  if (challenge.token) {
+    const user = getUser(challenge.token);
+    if (user) {
+      user.expiresAt = Date.now() + config.captchaTokenHours * 60 * 60 * 1000;
+      upsertUser(user);
+      req.log.info(
+        { token: `...${challenge.token.slice(-5)}` },
+        "Token refreshed"
+      );
+      return res.json({ success: true, token: challenge.token });
+    }
+  } else {
+    const token = createUser({
+      type: "temporary",
+      expiresAt: Date.now() + config.captchaTokenHours * 60 * 60 * 1000,
+    });
+    upsertUser({
+      token,
+      ip: [ip],
+      maxIps: config.captchaTokenMaxIps,
+      meta: { refreshable: true },
+    });
+    req.log.info(
+      { ip, token: `...${token.slice(-5)}` },
+      "Captcha token issued"
+    );
+    return res.json({ success: true, token });
+  }
 });
 
 router.get("/", (_req, res) => {

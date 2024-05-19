@@ -40,6 +40,10 @@ router.get("/create-user", (req, res) => {
   });
 });
 
+router.get("/pow-captcha", (_req, res) => {
+  res.render("admin_pow-captcha");
+});
+
 router.post("/create-user", (req, res) => {
   const body = req.body;
 
@@ -223,16 +227,28 @@ router.post("/maintenance", (req, res) => {
       break;
     }
     case "downloadImageMetadata": {
-      const data = JSON.stringify({
-        exportedAt: new Date().toISOString(),
-        generations: getLastNImages()
-      }, null, 2);
+      const data = JSON.stringify(
+        {
+          exportedAt: new Date().toISOString(),
+          generations: getLastNImages(),
+        },
+        null,
+        2
+      );
       res.setHeader(
         "Content-Disposition",
         `attachment; filename=image-metadata-${new Date().toISOString()}.json`
       );
       res.setHeader("Content-Type", "application/json");
       return res.send(data);
+    }
+    case "kill-temp-tokens": {
+      const users = userStore.getUsers();
+      const killed = users.filter((u) => u.type === "temporary");
+      killed.forEach((user) => userStore.disableUser(user.token, "Killed"));
+      flash.type = "success";
+      flash.message = `${killed.length} temporary users disabled.`;
+      break;
     }
     default: {
       throw new HttpError(400, "Invalid action");

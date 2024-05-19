@@ -101,12 +101,18 @@
         <strong><%= tokenMaxIps || "unlimited" %></strong> IP addresses can share a token.
       </li>
       <li>JavaScript is required to complete the process but can be disabled once a token is issued.</li>
-      <li>Cookies must be enabled if you want to refresh your token later.</li>
+      <li>
+        If the server is restarted, any incomplete verifications will be lost and you will need to refresh the page.
+      </li>
     </ul>
   </details>
+  <form id="captcha-form" style="display: none">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+    <input type="hidden" name="tokenLifetime" value="<%= tokenLifetime %>" />
+  </form>
   <div id="captcha-progress-container" style="display: none">
+    <label for="captcha-progress-text">Status:</label>
     <div id="captcha-progress" class="progress-bar">
-      <label for="captcha-progress-text">Progress:</label>
       <div class="progress"></div>
     </div>
     <textarea disabled id="captcha-progress-text" style="width: 100%; height: 100px; resize: none"></textarea>
@@ -133,9 +139,13 @@
     btn.textContent = "Start verification";
     document.getElementById("captcha-container").style.display = "block";
 
-    nonce = 0;
     challenge = c;
     signature = s;
+    solution = null;
+    nonce = 0;
+    startTime = 0;
+    lastUpdateTime = 0;
+    elapsedTime = 0;
     const targetValue = challenge.d.slice(0, -1);
     const hashLength = challenge.hl;
     workFactor = Number(BigInt(2) ** BigInt(8 * hashLength) / BigInt(targetValue));
@@ -162,15 +172,16 @@
           solution = nonce = e.data.nonce;
           document.getElementById("captcha-result").textContent =
             "Verification completed. Submitting solution for verification...";
+          document.getElementById("worker-control").style.display = "none";
           submitVerification();
           break;
         case "error":
           active = false;
           const msg = e.data.error || "An unknown error occurred.";
           document.getElementById("captcha-result").innerHTML = `
-            <p style="color: red">Error: ${msg}</p>
-            <p>Try using another device or browser if the problem persists.</p>
-`;
+              <p style="color: red">Error: ${msg}</p>
+              <p>Refresh the page and try again. Use another device or browser if the problem persists.</p>
+  `;
           break;
       }
 
@@ -207,10 +218,19 @@
         if (data.error) {
           document.getElementById("captcha-result").textContent = "Error: " + data.error;
         } else {
+          const lifetime = document.getElementById("captcha-form").querySelector('input[name="tokenLifetime"]').value;
+          window.localStorage.setItem(
+            "captcha-temp-token",
+            JSON.stringify({
+              token: data.token,
+              expires: Date.now() + lifetime * 3600 * 1000,
+            })
+          );
           document.getElementById("captcha-result").innerHTML = `
-            <p style="color: green">Verification complete</p>
-            <p>Your user token is: <code>${data.token}</code></p>
-`;
+              <p style="color: green">Verification complete</p>
+              <p>Your user token is: <code>${data.token}</code></p>
+              <p>Valid until: ${new Date(Date.now() + lifetime * 3600 * 1000).toLocaleString()}</p>
+  `;
         }
       });
   }
@@ -238,10 +258,11 @@
     };
 
     document.getElementById("captcha-progress").style.width = Math.min(progress, 100) + "%";
-    document.getElementById("captcha-progress-text").value = `Hashes computed: ${totalHashes.toLocaleString()}
+    document.getElementById("captcha-progress-text").value = `
+Hashes computed: ${totalHashes.toLocaleString()}
 Expected hashes: ${workFactor.toLocaleString()}
 Elapsed time: ${formatTime(elapsedTime)}
 Hash rate: ${hashRate.toFixed(2)} H/s
-${active ? `Estimated time remaining: ${formatTime(expectedTimeRemaining)}` : "Verification not running"}`;
+${active ? `Estimated time remaining: ${formatTime(expectedTimeRemaining)}` : "Verification not running"}`.trim();
   }
 </script>

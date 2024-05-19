@@ -1,13 +1,62 @@
 <%- include("partials/shared_header", { title: "Request User Token" }) %>
+
+<style>
+  #request-buttons {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 20px;
+    width: 400px;
+  }
+
+  #request-buttons button {
+    margin: 0 10px;
+    flex: 1;
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+  }
+</style>
+
 <h1>Request User Token</h1>
 <p>
   You can request a user token to authenticate with this proxy. The token will be valid for <%= tokenLifetime %> hours.
 </p>
-<button id="request_token" onclick="requestChallenge()">Request verification</button>
+<div id="existing-token" style="display: none">
+  <p>
+    It looks like you already have an existing temporary user token. You can refresh its expiration by completing a
+    faster verification challenge.
+  </p>
+  <strong id="existing-token-value">Existing token:</strong>
+</div>
+<div id="request-buttons">
+  <button disabled id="refresh_token" onclick="requestChallenge('refresh')">Refresh old token</button>
+  <button id="request_token" onclick="requestChallenge('new')">Request new token</button>
+</div>
 <%- include("partials/user_challenge_widget") %>
 <script>
-  function requestChallenge() {
-    fetch("/user/captcha/challenge", {
+  function requestChallenge(action) {
+    const token = localStorage.getItem("captcha-temp-token");
+    if (token && action === "new") {
+      const data = JSON.parse(token);
+      const { expires } = data;
+      const expiresDate = new Date(expires);
+      const now = new Date();
+      if (expiresDate > now) {
+        if (!confirm("You already have an existing token. Are you sure you want to request a new one?")) {
+          return;
+        }
+        localStorage.removeItem("captcha-temp-token");
+        document.getElementById("existing-token").style.display = "none";
+        document.getElementById("refresh_token").disabled = true;
+      }
+    } else if (!token && action === "refresh") {
+      alert("You don't have an existing token to refresh");
+      return;
+    }
+
+    const refreshToken = token && action === "refresh" ? JSON.parse(token).token : null;
+
+    fetch("/user/captcha/challenge?action=" + action + (refreshToken ? "&refreshToken=" + refreshToken : ""), {
       method: "GET",
       headers: { "Content-Type": "application/json" },
     })
@@ -26,6 +75,23 @@
         console.error(error);
         alert("Failed to request verification challenge from server");
       });
+  }
+
+  const existingToken = localStorage.getItem("captcha-temp-token");
+  if (existingToken) {
+    const data = JSON.parse(existingToken);
+    const { token, expires } = data;
+    const expiresDate = new Date(expires);
+    const now = new Date();
+    if (expiresDate > now) {
+      document.getElementById(
+        "existing-token-value"
+      ).textContent = `Existing token: ${token} - Expires: ${expiresDate.toISOString()}`;
+      document.getElementById("existing-token").style.display = "block";
+        document.getElementById("refresh_token").disabled = false;
+    } else {
+      localStorage.removeItem("captcha-temp-token");
+    }
   }
 </script>
 
