@@ -1,0 +1,20 @@
+<%- include("partials/shared_header", { title: "Proof of Work Verification Settings - OAI Reverse Proxy Admin" }) %>
+<h1>PoW Verification Settings</h1>
+<p>
+  This page allows you to configure the proof of work verification captcha settings or manage user tokens issued via the
+  captcha.
+</p>
+<div>
+  <h3>Difficulty Level</h3>
+  <form action="/admin/pow" method="post">
+    <label for="difficulty">Difficulty Level:</label>
+    <select name="difficulty" id="difficulty">
+      <option value="low">Low</option>
+      <option value="medium">Medium</option>
+      <option value="high">High</option>
+      <option value="extreme">Extreme</option>
+    </select>
+    <button type="submit">Update</button>
+  </form>
+</div>
+<%- include("partials/admin-footer") %>

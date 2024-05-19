@@ -10,67 +10,23 @@ const POW_EXPIRY = 1000 * 60 * 60; // 1 hour
 /** Lockout time after failed verification in milliseconds */
 const LOCKOUT_TIME = 1000 * 30; // 30 seconds
 
-type ProofOfWorkConfig = {
-  /**
-   * Argon2 output length in bytes. This is the length of the hash that will be
-   * compared against the challenge target.
-   */
-  ARGON2_HASH_LENGTH: number;
-  /**
-   * Argon2 hash iterations. Larger values directly increase the time to
-   * compute the hash.
-   */
-  ARGON2_TIME_COST: number;
-  /**
-   * Argon2 memory cost in kilobytes. Larger values make it harder to
-   * parallelize and take longer to compute but may cause thrashing. Low-
-   * memory devices may not be able to handle large values.
-   *
-   * This is per-thread, so multiply by parallelism to get the total memory.
-   */
-  ARGON2_MEMORY_KB: number;
-  /**
-   * Argon2 degree of parallelism. Recommended to keep this low to avoid
-   * slowing down older devices.
-   */
-  ARGON2_PARALLELISM: number;
-  /**
-   * Work factor for the challenge. This is the expected number of hashes that
-   * will be computed to solve the challenge, on average. The actual number of
-   * hashes will vary due to randomness.
-   */
-  WORK_FACTOR: number;
+const argon2Params = {
+  ARGON2_TIME_COST: parseInt(process.env.ARGON2_TIME_COST || "6"),
+  ARGON2_MEMORY_KB: parseInt(process.env.ARGON2_MEMORY_KB || "65536"),
+  ARGON2_PARALLELISM: parseInt(process.env.ARGON2_PARALLELISM || "4"),
+  ARGON2_HASH_LENGTH: parseInt(process.env.ARGON2_HASH_LENGTH || "32"),
 };
 
-const levels: Record<string, ProofOfWorkConfig> = {
-  extreme: {
-    ARGON2_TIME_COST: 6,
-    ARGON2_MEMORY_KB: 1024 * 64,
-    ARGON2_PARALLELISM: 4,
-    WORK_FACTOR: 1000,
-    ARGON2_HASH_LENGTH: 32,
-  },
-  high: {
-    ARGON2_TIME_COST: 6,
-    ARGON2_MEMORY_KB: 1024 * 64,
-    ARGON2_PARALLELISM: 4,
-    WORK_FACTOR: 500,
-    ARGON2_HASH_LENGTH: 32,
-  },
-  medium: {
-    ARGON2_TIME_COST: 6,
-    ARGON2_MEMORY_KB: 1024 * 64,
-    ARGON2_PARALLELISM: 4,
-    WORK_FACTOR: 200,
-    ARGON2_HASH_LENGTH: 32,
-  },
-  low: {
-    ARGON2_TIME_COST: 6,
-    ARGON2_MEMORY_KB: 1024 * 64,
-    ARGON2_PARALLELISM: 4,
-    WORK_FACTOR: 25,
-    ARGON2_HASH_LENGTH: 32,
-  },
+/**
+ * Work factor for each difficulty. This is the expected number of hashes that
+ * will be computed to solve the challenge, on average. The actual number of
+ * hashes will vary due to randomness.
+ */
+const workFactors: Record<string, number> = {
+  extreme: 1000,
+  high: 500,
+  medium: 200,
+  low: 25,
 };
 
 type Challenge = {
@@ -135,17 +91,17 @@ setInterval(() => {
 }, 1000);
 
 function generateChallenge(clientIp?: string): Challenge {
-  const difficulty = levels[config.captchaPoWDifficultyLevel];
-  const hashBits = BigInt(difficulty.ARGON2_HASH_LENGTH) * 8n;
+  const workFactor = workFactors[config.captchaPoWDifficultyLevel];
+  const hashBits = BigInt(argon2Params.ARGON2_HASH_LENGTH) * 8n;
   const hashMax = 2n ** hashBits;
-  const targetValue = hashMax / BigInt(difficulty.WORK_FACTOR);
+  const targetValue = hashMax / BigInt(workFactor);
 
   return {
     s: crypto.randomBytes(32).toString("hex"),
-    hl: difficulty.ARGON2_HASH_LENGTH,
-    t: difficulty.ARGON2_TIME_COST,
-    m: difficulty.ARGON2_MEMORY_KB,
-    p: difficulty.ARGON2_PARALLELISM,
+    hl: argon2Params.ARGON2_HASH_LENGTH,
+    t: argon2Params.ARGON2_TIME_COST,
+    m: argon2Params.ARGON2_MEMORY_KB,
+    p: argon2Params.ARGON2_PARALLELISM,
     d: targetValue.toString() + "n",
     e: Date.now() + POW_EXPIRY,
     ip: clientIp,
