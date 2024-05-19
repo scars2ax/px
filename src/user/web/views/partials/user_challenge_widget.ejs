@@ -8,6 +8,11 @@
     max-width: 500px;
     margin: 50px auto;
   }
+  @media (max-width: 1000px) {
+    #captcha-container {
+      margin: 20px;
+    }
+  }
 
   #captcha-container p {
     padding: 2px;
@@ -29,6 +34,7 @@
 
   #captcha-control {
     display: flex;
+    flex-direction: column;
     justify-content: space-between;
   }
 
@@ -119,25 +125,104 @@
   </div>
   <div id="captcha-result"></div>
   <div id="captcha-control">
+    <div>
+      <label for="workers">Number of workers:</label>
+      <input type="number" id="workers" value="1" min="1" max="16" onchange="spawnWorkers()" />
+    </div>
     <button id="worker-control" onclick="toggleWorker()">Start verification</button>
   </div>
 </div>
+
+<script src="https://unpkg.com/wasm-feature-detect/dist/umd/index.js"></script>
 <script>
-  let worker = null;
+  function detectFeatures() {
+    const features = {};
+    Promise.all(
+      ["bigInt", "bulkMemory", "simd", "relaxedSimd"].map((f) => wasmFeatureDetect[f]().then((r) => (features[f] = r)))
+    ).then(() => {
+      alert("Features detected: " + JSON.stringify(features));
+    });
+  }
+  // detectFeatures();
+
+  let workers = [];
+
   let challenge = null;
   let signature = null;
   let solution = null;
-  let nonce = 0;
+  let totalHashes = 0;
   let startTime = 0;
   let lastUpdateTime = 0;
   let elapsedTime = 0;
   let workFactor = 0;
   let active = false;
 
+  // Safari is all kinds of broken and throws WASM Memory errors when memory
+  // pressure is high. Batch size and worker count need to be reduced to prevent
+  // this. Performance is still decent on iPad with 4 workers.
+  function isIOSiPadOSWebKit() {
+    const userAgent = navigator.userAgent;
+    const isWebKit = userAgent.includes("Safari") && !userAgent.includes("Chrome") && !userAgent.includes("Android");
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.platform) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+    return isWebKit && isIOS;
+  }
+  let isMobileWebkit = isIOSiPadOSWebKit();
+
+  function handleWorkerMessage(e) {
+    switch (e.data.type) {
+      case "progress":
+        totalHashes += e.data.hashes;
+        break;
+      case "started":
+        active = true;
+        document.getElementById("worker-control").textContent = "Pause verification";
+        startTime = Date.now();
+        lastUpdateTime = startTime;
+        document.getElementById("captcha-progress-container").style.display = "block";
+        break;
+      case "paused":
+        active = false;
+        document.getElementById("worker-control").textContent = "Start verification";
+        document.getElementById("workers").disabled = false;
+        break;
+      case "solved":
+        if (solution) {
+          return;
+        }
+        workers.forEach((w) => w.postMessage({ type: "stop" }));
+        active = false;
+        solution = e.data.nonce;
+        document.getElementById("captcha-result").textContent =
+          "Verification completed. Submitting solution for verification...";
+        document.getElementById("captcha-control").style.display = "none";
+        submitVerification();
+        break;
+      case "error":
+        workers.forEach((w) => w.postMessage({ type: "stop" }));
+        active = false;
+        const msg = e.data.error || "An unknown error occurred.";
+        const debug = e.data.debug || "";
+        document.getElementById("captcha-result").innerHTML = `
+                <p style="color:red">Error: ${msg}</p>
+                <pre style="color: red">${debug.stack}</pre>
+                <pre style="color: red">${debug.lastNonce}, ${String(debug.targetValue)}</pre>
+                <p>Refresh the page and try again. Use another device or browser if the problem persists.</p>
+    `;
+        break;
+    }
+
+    estimateProgress();
+  }
+
   function loadNewChallenge(c, s) {
     const btn = document.getElementById("worker-control");
     btn.textContent = "Start verification";
     document.getElementById("captcha-container").style.display = "block";
+    document.getElementById("workers").disabled = false;
+    const maxWorkers = isMobileWebkit ? 4 : 16;
+    document.getElementById("workers").value = Math.min(maxWorkers, navigator.hardwareConcurrency || 4).toString();
 
     challenge = c;
     signature = s;
@@ -149,51 +234,39 @@
     const targetValue = challenge.d.slice(0, -1);
     const hashLength = challenge.hl;
     workFactor = Number(BigInt(2) ** BigInt(8 * hashLength) / BigInt(targetValue));
-    worker = new Worker("/res/js/hash-worker.js");
-    worker.onmessage = function (e) {
-      switch (e.data.type) {
-        case "progress":
-          nonce = e.data.nonce;
-          break;
-        case "started":
-          active = true;
-          btn.textContent = "Pause verification";
-          startTime = Date.now();
-          lastUpdateTime = startTime;
-          document.getElementById("captcha-progress-container").style.display = "block";
-          break;
-        case "paused":
-          active = false;
-          nonce = e.data.nonce;
-          btn.textContent = "Start verification";
-          break;
-        case "solved":
-          active = false;
-          solution = nonce = e.data.nonce;
-          document.getElementById("captcha-result").textContent =
-            "Verification completed. Submitting solution for verification...";
-          document.getElementById("worker-control").style.display = "none";
-          submitVerification();
-          break;
-        case "error":
-          active = false;
-          const msg = e.data.error || "An unknown error occurred.";
-          document.getElementById("captcha-result").innerHTML = `
-              <p style="color: red">Error: ${msg}</p>
-              <p>Refresh the page and try again. Use another device or browser if the problem persists.</p>
-  `;
-          break;
-      }
+    spawnWorkers();
+  }
 
-      estimateProgress();
-    };
+  function spawnWorkers() {
+    for (const worker of workers) {
+      worker.terminate();
+    }
+    workers = [];
+
+    const selectedWorkers = document.getElementById("workers").value;
+    const workerCount = Math.min(16, Math.max(1, parseInt(selectedWorkers)));
+    for (let i = 0; i < workerCount; i++) {
+      const worker = new Worker("/res/js/hash-worker.js");
+      worker.onmessage = handleWorkerMessage;
+      workers.push(worker);
+    }
   }
 
   function toggleWorker() {
-    if (!worker) {
-      return;
+    if (active) {
+      workers.forEach((w) => w.postMessage({ type: "stop" }));
+    } else {
+      const workerCount = workers.length;
+      const hashSpace = BigInt(challenge.hl * 8) ** BigInt(2);
+      const workerSpace = hashSpace / BigInt(workerCount);
+      const alreadyHashed = Math.floor(totalHashes / workerCount);
+      document.getElementById("workers").disabled = true;
+
+      for (let i = 0; i < workerCount; i++) {
+        const startNonce = workerSpace * BigInt(i) + BigInt(alreadyHashed);
+        workers[i].postMessage({ type: "start", challenge: challenge, signature: signature, nonce: startNonce });
+      }
     }
-    worker.postMessage({ type: "toggle", challenge: challenge, signature: signature, nonce: nonce });
   }
 
   function submitVerification() {
@@ -227,16 +300,15 @@
             })
           );
           document.getElementById("captcha-result").innerHTML = `
-              <p style="color: green">Verification complete</p>
-              <p>Your user token is: <code>${data.token}</code></p>
-              <p>Valid until: ${new Date(Date.now() + lifetime * 3600 * 1000).toLocaleString()}</p>
-  `;
+                  <p style="color: green">Verification complete</p>
+                  <p>Your user token is: <code>${data.token}</code></p>
+                  <p>Valid until: ${new Date(Date.now() + lifetime * 3600 * 1000).toLocaleString()}</p>
+      `;
         }
       });
   }
 
   function estimateProgress() {
-    const totalHashes = nonce;
     elapsedTime += (Date.now() - lastUpdateTime) / 1000;
     lastUpdateTime = Date.now();
     const hashRate = totalHashes / elapsedTime;
@@ -259,10 +331,11 @@
 
     document.getElementById("captcha-progress").style.width = Math.min(progress, 100) + "%";
     document.getElementById("captcha-progress-text").value = `
-Hashes computed: ${totalHashes.toLocaleString()}
-Expected hashes: ${workFactor.toLocaleString()}
-Elapsed time: ${formatTime(elapsedTime)}
-Hash rate: ${hashRate.toFixed(2)} H/s
-${active ? `Estimated time remaining: ${formatTime(expectedTimeRemaining)}` : "Verification not running"}`.trim();
+  Hashes computed: ${totalHashes.toLocaleString()}
+  Expected hashes: ${workFactor.toLocaleString()}
+  Elapsed time: ${formatTime(elapsedTime)}
+  Hash rate: ${hashRate.toFixed(2)} H/s
+  Workers: ${workers.length}${isMobileWebkit ? " (iOS/iPadOS detected)" : ""}
+  ${active ? `Estimated time remaining: ${formatTime(expectedTimeRemaining)}` : "Verification not running"}`.trim();
   }
 </script>

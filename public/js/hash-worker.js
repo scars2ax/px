@@ -6,6 +6,7 @@ let active = false;
 let nonce = 0;
 let signature = "";
 let lastNotify = 0;
+let hashesSinceLastNotify = 0;
 let params = {
   salt: null,
   hashLength: 0,
@@ -14,18 +15,17 @@ let params = {
   parallelism: 0,
   targetValue: BigInt(0),
 };
+let isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
 self.onmessage = async (event) => {
   const { data } = event;
   console.log("Hash worker msg", data);
   switch (data.type) {
-    case "toggle":
-      if (active) {
-        active = false;
-        self.postMessage({ type: "paused", nonce });
-        return;
-      }
-
+    case "stop":
+      active = false;
+      self.postMessage({ type: "paused", hashes: hashesSinceLastNotify });
+      return;
+    case "start":
       active = true;
       signature = data.signature;
       nonce = data.nonce;
@@ -73,11 +73,12 @@ const checkHash = (hash) => {
 
 const solve = async () => {
   if (!active) {
-    console.log("Stopped", nonce);
+    console.log("Stopped solver", nonce);
     return;
   }
 
-  const batchSize = 5;
+  // iOS Safari seems to have issues resizing wasm Memory with large batch sizes
+  const batchSize = 4 / (isIOS ? 4 : 2);
   const batch = [];
   for (let i = 0; i < batchSize; i++) {
     batch.push(nonce++);
@@ -90,6 +91,7 @@ const solve = async () => {
         return { hash, nonce };
       })
     );
+    hashesSinceLastNotify += batchSize;
 
     const solution = results.find(({ hash }) => checkHash(hash));
     if (solution) {
@@ -97,16 +99,23 @@ const solve = async () => {
       self.postMessage({ type: "solved", nonce: solution.nonce });
       active = false;
     } else {
-      if (nonce % batchSize === 0 && Date.now() - lastNotify > 1000) {
+      if (Date.now() - lastNotify > 1000) {
+        console.log("Last nonce", nonce, "Hashes", hashesSinceLastNotify)
+        self.postMessage({ type: "progress", hashes: hashesSinceLastNotify });
         lastNotify = Date.now();
-        console.log("Notify progress", nonce);
-        self.postMessage({ type: "progress", nonce });
+        hashesSinceLastNotify = 0;
       }
-      setTimeout(solve, 0);
+      setTimeout(solve, 10);
     }
   } catch (error) {
     console.error("Error", error);
-    self.postMessage({ type: "error", error: error.message });
+    const stack = error.stack;
+    const debug = {
+      stack,
+      lastNonce: nonce,
+      targetValue: params.targetValue,
+    }
+    self.postMessage({ type: "error", error: error.message, debug });
     active = false;
   }
 };
