@@ -32,13 +32,25 @@ specifically by adjusting the average number of iterations required to find a
 valid solution. Due to randomness, the actual number of iterations required can
 vary significantly.
 
+You can adjust the difficulty while the proxy is running from the admin interface.
+
 ### Extreme
+
+- Average of 4000 iterations required
+- Not recommended unless you are expecting very high levels of abuse
 
 ### High
 
+- Average of 1900 iterations required
+
 ### Medium
 
+- Average of 900 iterations required
+
 ### Low
+
+- Average of 200 iterations required
+- Default setting.
 
 ## Custom argon2id parameters
 
@@ -49,13 +61,35 @@ reason to do so.
 The listed values are the defaults.
 
 ```
-ARGON2_TIME_COST=6
+ARGON2_TIME_COST=8
 ARGON2_MEMORY_KB=65536
-ARGON2_PARALLELISM=4
+ARGON2_PARALLELISM=1
 ARGON2_HASH_LENGTH=32
 ```
 
-Keep in mind that to verify submitted solutions, the server will need to
-allocate memory equal to `ARGON2_MEMORY_KB * ARGON2_PARALLELISM`. Therefore,
-when running on memory-constrained systems, you may need to reduce the memory
-cost and increase the time cost to compensate.
+Increasing parallelism will not do much except increase memory consumption for
+both the client and server, because browser proof-of-work implementations are
+single-threaded. It's better to increase the time cost if you want to increase
+the difficulty.
+
+Increasing memory too much may cause memory exhaustion on some mobile devices,
+particularly on iOS due to the way Safari handles WebAssembly memory allocation.
+
+## Tested hash rates
+
+These were measured with the default argon2id parameters listed above. These
+tests were not at all scientific so take them with a grain of salt.
+
+Safari does not like large WASM memory usage, so concurrency is limited to 4 to
+avoid overallocating memory on mobile WebKit browsers. Thermal throttling can
+also significantly reduce hash rates on mobile devices.
+
+- Intel Core i9-13900K (Chrome): 33-35 H/s
+- Intel Core i9-13900K (Firefox): 29-32 H/s
+- Intel Core i9-13900K (Chrome, in VM limited to 4 cores): 12.2 - 13.0 H/s 
+- iPad Pro (M2) (Safari, 6 workers): 8.0 - 10 H/s
+  - Thermal throttles early. 8 cores is normal concurrency, but unstable.
+- iPhone 13 Pro (Safari): 4.0 - 4.6 H/s
+- Samsung Galaxy S10e (Chrome): 3.6 - 3.8 H/s
+  - This is a 2019 phone almost matching an iPhone five years newer because of
+    bad Safari performance.

@@ -25,10 +25,10 @@ const argon2Params = {
  * hashes will vary due to randomness.
  */
 const workFactors: Record<string, number> = {
-  extreme: 3200,
-  high: 1600,
-  medium: 800,
-  low: 100,
+  extreme: 4000,
+  high: 1900,
+  medium: 900,
+  low: 200,
 };
 
 type Challenge = {

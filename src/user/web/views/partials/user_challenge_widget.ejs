@@ -141,13 +141,14 @@
   let totalHashes = 0;
   let startTime = 0;
   let lastUpdateTime = 0;
+  let reports = 0;
   let elapsedTime = 0;
   let workFactor = 0;
   let active = false;
 
   // Safari is all kinds of broken and throws WASM Memory errors when memory
   // pressure is high. Batch size and worker count need to be reduced to prevent
-  // this. Performance is still decent on iPad with 4 workers.
+  // this.
   function isIOSiPadOSWebKit() {
     const userAgent = navigator.userAgent;
     const isWebKit = userAgent.includes("Safari") && !userAgent.includes("Chrome") && !userAgent.includes("Android");
@@ -163,6 +164,7 @@
     switch (e.data.type) {
       case "progress":
         totalHashes += e.data.hashes;
+        reports++;
         break;
       case "started":
         active = true;
@@ -210,7 +212,7 @@
     btn.textContent = "Start verification";
     document.getElementById("captcha-container").style.display = "block";
     document.getElementById("workers").disabled = false;
-    const maxWorkers = isMobileWebkit ? 4 : 16;
+    const maxWorkers = isMobileWebkit ? 6 : 16;
     document.getElementById("workers").value = Math.min(maxWorkers, navigator.hardwareConcurrency || 4).toString();
 
     challenge = c;
@@ -304,6 +306,9 @@
   }
 
   function estimateProgress() {
+    if (reports % workers.length !== 0) {
+      return;
+    }
     elapsedTime += (Date.now() - lastUpdateTime) / 1000;
     lastUpdateTime = Date.now();
     const hashRate = totalHashes / elapsedTime;
