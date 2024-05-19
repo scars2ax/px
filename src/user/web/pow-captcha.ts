@@ -8,7 +8,7 @@ import { config } from "../../config";
 /** HMAC key for signing challenges; regenerated on startup */
 const HMAC_KEY = crypto.randomBytes(32).toString("hex");
 /** Expiry time for a challenge in milliseconds */
-const POW_EXPIRY = 1000 * 60 * 60; // 1 hour
+const POW_EXPIRY = 1000 * 60 * 30; // 30 minutes
 /** Lockout time after failed verification in milliseconds */
 const LOCKOUT_TIME = 1000 * 30; // 30 seconds
 
@@ -24,12 +24,7 @@ const argon2Params = {
  * will be computed to solve the challenge, on average. The actual number of
  * hashes will vary due to randomness.
  */
-const workFactors: Record<string, number> = {
-  extreme: 4000,
-  high: 1900,
-  medium: 900,
-  low: 200,
-};
+const workFactors = { extreme: 4000, high: 1900, medium: 900, low: 200 };
 
 type Challenge = {
   /** Salt */
@@ -107,7 +102,7 @@ setInterval(() => {
 function generateChallenge(clientIp?: string, token?: string): Challenge {
   let workFactor = workFactors[config.captchaPoWDifficultyLevel];
   if (token) {
-    // Refreshing a token is easier
+    // Challenge difficulty is reduced for token refreshes
     workFactor = Math.floor(workFactor / 2);
   }
   const hashBits = BigInt(argon2Params.ARGON2_HASH_LENGTH) * 8n;

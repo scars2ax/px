@@ -126,7 +126,7 @@ type Config = {
    * Difficulty level for the PoW captcha. Refer to docs/pow-captcha.md for
    * details on the available modes.
    */
-  captchaPoWDifficultyLevel: "very_low" | "low" | "medium" | "high" | "extreme";
+  captchaPoWDifficultyLevel: "low" | "medium" | "high" | "extreme";
   /** Per-user limit for requests per minute to text and chat models. */
   textModelRateLimit: number;
   /** Per-user limit for requests per minute to image generation models. */

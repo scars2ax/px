@@ -101,7 +101,9 @@
     <ul>
       <li>Verification must be submitted from the same device and IP address that started the verification.</li>
       <li>Don't leave the page or close the browser tab while the verification is running.</li>
-      <li>You can pause and resume the process, but the verification must be finished within one hour.</li>
+      <li>
+        You can pause and resume the process, but <strong>verification must be finished within 30 minutes</strong>.
+      </li>
       <li>
         Once issued a user token, it will be bound to your current IP address. Up to
         <strong><%= tokenMaxIps || "unlimited" %></strong> IP addresses can share a token.
@@ -332,7 +334,7 @@
 
     let note = "";
     if (ratio > 1.25) {
-      note = " (estimate is an average)";
+      note = " (actual time may vary)";
     } else if (ratio > 2) {
       note = " (you are particularly unlucky)";
     }
@@ -340,10 +342,10 @@
     document.getElementById("captcha-progress").style.width = Math.min(progress, 100) + "%";
     document.getElementById("captcha-progress-text").value = `
   Hashes computed: ${totalHashes.toLocaleString()}
-  Expected hashes: ${workFactor.toLocaleString()}${note}
+  Average hashes needed: ${workFactor.toLocaleString()}${note}
   Elapsed time: ${formatTime(elapsedTime)}
   Hash rate: ${hashRate.toFixed(2)} H/s
   Workers: ${workers.length}${isMobileWebkit ? " (iOS/iPadOS detected)" : ""}
-  ${active ? `Estimated time remaining: ${formatTime(expectedTimeRemaining)}` : "Verification not running"}`.trim();
+  ${active ? `Approx. time remaining: ${formatTime(expectedTimeRemaining)}` : "Verification task stopped"}`.trim();
   }
 </script>
