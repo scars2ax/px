@@ -67,6 +67,7 @@
         }
         const { challenge, signature } = data;
         loadNewChallenge(challenge, signature);
+        document.getElementById("request-buttons").style.display = "none";
       })
       .catch(function (error) {
         console.error(error);

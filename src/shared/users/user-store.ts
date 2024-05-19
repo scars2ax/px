@@ -279,7 +279,7 @@ export function disableUser(token: string, reason?: string) {
   if (user.meta) {
     // manually banned tokens cannot be refreshed
     user.meta.refreshable = false;
-  };
+  }
   usersToFlush.add(token);
 }
 

@@ -41,7 +41,9 @@ router.get("/create-user", (req, res) => {
 });
 
 router.get("/pow-captcha", (_req, res) => {
-  res.render("admin_pow-captcha");
+  res.render("admin_pow-captcha", {
+    difficulty: config.captchaPoWDifficultyLevel,
+  });
 });
 
 router.post("/create-user", (req, res) => {
@@ -242,12 +244,37 @@ router.post("/maintenance", (req, res) => {
       res.setHeader("Content-Type", "application/json");
       return res.send(data);
     }
-    case "kill-temp-tokens": {
+    case "expireTempTokens": {
       const users = userStore.getUsers();
-      const killed = users.filter((u) => u.type === "temporary");
-      killed.forEach((user) => userStore.disableUser(user.token, "Killed"));
+      const temps = users.filter((u) => u.type === "temporary");
+      temps.forEach((user) => {
+        user.expiresAt = Date.now();
+        userStore.upsertUser(user);
+      });
       flash.type = "success";
-      flash.message = `${killed.length} temporary users disabled.`;
+      flash.message = `${temps.length} temporary users marked for expiration.`;
+      break;
+    }
+    case "cleanTempTokens": {
+      const users = userStore.getUsers();
+      const disabledTempUsers = users.filter(
+        (u) => u.type === "temporary" && u.expiresAt && u.expiresAt < Date.now()
+      );
+      disabledTempUsers.forEach((user) => {
+        user.disabledAt = 1; //will be cleaned up by the next cron job
+        userStore.upsertUser(user);
+      });
+      flash.type = "success";
+      flash.message = `${disabledTempUsers.length} disabled temporary users marked for cleanup.`;
+      break;
+    }
+    case "setDifficulty": {
+      const selected = req.body["pow-difficulty"];
+      const valid = ["low", "medium", "high", "extreme"];
+      if (!selected || !valid.includes(selected)) {
+        throw new HttpError(400, "Invalid difficulty" + selected);
+      }
+      config.captchaPoWDifficultyLevel = selected;
       break;
     }
     default: {
@@ -256,8 +283,9 @@ router.post("/maintenance", (req, res) => {
   }
 
   req.session.flash = flash;
+  const referer = req.get("referer");
 
-  return res.redirect(`/admin/manage`);
+  return res.redirect(referer || "/admin/manage");
 });
 
 router.get("/download-stats", (_req, res) => {

@@ -71,14 +71,14 @@
 </style>
 <div style="display: none" id="captcha-container">
   <p>
-    To prevent abuse, your browser needs to perform some calculations before a user token will be issued. This
+    To prevent abuse, your browser needs to perform a verification task before a user token will be issued. This
     verification process might take from a few seconds to a few minutes, depending on your device.
   </p>
   <p>Click the button below to start.</p>
   <details>
     <summary>What is this?</summary>
     <p>
-      This is a proof-of-work captcha that requires your device's CPU to do some work to earn a user token. This helps
+      This is a proof-of-work task that asks your device's CPU to do some calculations to earn a user token. This helps
       prevent mass registration and abuse of the service by increasing the cost of mass registration.
     </p>
   </details>
@@ -133,20 +133,8 @@
   </div>
 </div>
 
-<script src="https://unpkg.com/wasm-feature-detect/dist/umd/index.js"></script>
 <script>
-  function detectFeatures() {
-    const features = {};
-    Promise.all(
-      ["bigInt", "bulkMemory", "simd", "relaxedSimd"].map((f) => wasmFeatureDetect[f]().then((r) => (features[f] = r)))
-    ).then(() => {
-      alert("Features detected: " + JSON.stringify(features));
-    });
-  }
-  // detectFeatures();
-
   let workers = [];
-
   let challenge = null;
   let signature = null;
   let solution = null;
@@ -163,8 +151,9 @@
   function isIOSiPadOSWebKit() {
     const userAgent = navigator.userAgent;
     const isWebKit = userAgent.includes("Safari") && !userAgent.includes("Chrome") && !userAgent.includes("Android");
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.platform) ||
-      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const isIOS =
+      /iPad|iPhone|iPod/.test(navigator.platform) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
     return isWebKit && isIOS;
   }
@@ -208,7 +197,7 @@
                 <p style="color:red">Error: ${msg}</p>
                 <pre style="color: red">${debug.stack}</pre>
                 <pre style="color: red">${debug.lastNonce}, ${String(debug.targetValue)}</pre>
-                <p>Refresh the page and try again. Use another device or browser if the problem persists.</p>
+                <p>Refresh the page and try again. Use another device or browser if the problem persists, or lower the number of workers.</p>
     `;
         break;
     }
@@ -264,7 +253,13 @@
 
       for (let i = 0; i < workerCount; i++) {
         const startNonce = workerSpace * BigInt(i) + BigInt(alreadyHashed);
-        workers[i].postMessage({ type: "start", challenge: challenge, signature: signature, nonce: startNonce });
+        workers[i].postMessage({
+          type: "start",
+          challenge: challenge,
+          signature: signature,
+          nonce: startNonce,
+          isMobileWebkit,
+        });
       }
     }
   }
@@ -314,6 +309,7 @@
     const hashRate = totalHashes / elapsedTime;
     const expectedTimeRemaining = (workFactor - totalHashes) / hashRate;
     const progress = 100 * (totalHashes / workFactor);
+    const ratio = totalHashes / workFactor;
 
     const formatTime = (time) => {
       if (time < 60) {
@@ -329,10 +325,17 @@
       }
     };
 
+    let note = "";
+    if (ratio > 1.25) {
+      note = " (estimate is an average)";
+    } else if (ratio > 2) {
+      note = " (you are particularly unlucky)";
+    }
+
     document.getElementById("captcha-progress").style.width = Math.min(progress, 100) + "%";
     document.getElementById("captcha-progress-text").value = `
   Hashes computed: ${totalHashes.toLocaleString()}
-  Expected hashes: ${workFactor.toLocaleString()}
+  Expected hashes: ${workFactor.toLocaleString()}${note}
   Elapsed time: ${formatTime(elapsedTime)}
   Hash rate: ${hashRate.toFixed(2)} H/s
   Workers: ${workers.length}${isMobileWebkit ? " (iOS/iPadOS detected)" : ""}
