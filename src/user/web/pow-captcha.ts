@@ -9,8 +9,8 @@ import { config } from "../../config";
 const HMAC_KEY = crypto.randomBytes(32).toString("hex");
 /** Expiry time for a challenge in milliseconds */
 const POW_EXPIRY = 1000 * 60 * 30; // 30 minutes
-/** Lockout time after failed verification in milliseconds */
-const LOCKOUT_TIME = 1000 * 30; // 30 seconds
+/** Lockout time after verification in milliseconds */
+const LOCKOUT_TIME = 1000 * 60; // 60 seconds
 
 const argon2Params = {
   ARGON2_TIME_COST: parseInt(process.env.ARGON2_TIME_COST || "8"),
@@ -72,11 +72,13 @@ const verifySchema = z.object({
   }),
   solution: z.string().min(1).max(64),
   signature: z.string().min(1),
+  proxyKey: z.string().min(1).max(1024).optional(),
 });
 
 const challengeSchema = z.object({
   action: z.union([z.literal("new"), z.literal("refresh")]),
   refreshToken: z.string().min(1).max(64).optional(),
+  proxyKey: z.string().min(1).max(1024).optional(),
 });
 
 /** Solutions by timestamp */
@@ -177,16 +179,25 @@ function verifyTokenRefreshable(token?: string, logger?: any): boolean {
 }
 
 const router = express.Router();
-router.get("/challenge", (req, res) => {
-  const data = challengeSchema.safeParse(req.query);
+router.post("/challenge", (req, res) => {
+  const data = challengeSchema.safeParse(req.body);
   if (!data.success) {
-    res.status(400).json({ error: "Invalid challenge request" });
+    res
+      .status(400)
+      .json({ error: "Invalid challenge request", details: data.error });
     return;
   }
-  const { action, refreshToken } = data.data;
+  const { action, refreshToken, proxyKey } = data.data;
+  if (config.proxyKey && proxyKey !== config.proxyKey) {
+    res.status(400).json({ error: "Invalid proxy password" });
+    return;
+  }
+
   if (action === "refresh") {
-    if (!verifyTokenRefreshable(refreshToken, req.log)) {
-      res.status(400).json({ error: "Invalid token for refresh" });
+    if (verifyTokenRefreshable(refreshToken, req.log)) {
+      res
+        .status(400)
+        .json({ error: "Not allowed to refresh that token; request a new one" });
       return;
     }
     const challenge = generateChallenge(req.ip, refreshToken);
@@ -201,6 +212,7 @@ router.get("/challenge", (req, res) => {
 
 router.post("/verify", async (req, res) => {
   const ip = req.ip;
+  req.log.info("Got verification request");
   if (recentAttempts.has(ip)) {
     res
       .status(429)
@@ -218,31 +230,40 @@ router.post("/verify", async (req, res) => {
 
   const { challenge, signature, solution } = result.data;
   if (signMessage(challenge) !== signature) {
-    res
-      .status(400)
-      .json({ error: "Invalid signature; please request a new challenge" });
+    res.status(400).json({
+      error:
+        "Invalid signature; server may have restarted since challenge was issued. Please request a new challenge.",
+    });
+    return;
+  }
+
+  if (config.proxyKey && result.data.proxyKey !== config.proxyKey) {
+    res.status(401).json({ error: "Invalid proxy password" });
     return;
   }
 
   if (challenge.ip && challenge.ip !== ip) {
+    req.log.warn("Attempt to verify from different IP address");
     res.status(400).json({
-      error: "Solution must be verified from the original IP address",
+      error: "Solution must be verified from original IP address",
     });
     return;
   }
 
   if (solves.has(signature)) {
-    res.status(400).json({ error: "Challenge already solved" });
+    req.log.warn("Attempt to reuse signature");
+    res.status(400).json({ error: "Reused signature" });
     return;
   }
 
   if (Date.now() > challenge.e) {
-    res.status(400).json({ error: "Challenge expired" });
+    req.log.warn("Verification took too long");
+    res.status(400).json({ error: "Verification took too long" });
     return;
   }
 
   if (challenge.token && !verifyTokenRefreshable(challenge.token, req.log)) {
-    res.status(400).json({ error: "Invalid token for refresh" });
+    res.status(400).json({ error: "Not allowed to refresh that usertoken" });
     return;
   }
 
@@ -250,12 +271,13 @@ router.post("/verify", async (req, res) => {
   try {
     const success = await verifySolution(challenge, solution, req.log);
     if (!success) {
-      res.status(400).json({ error: "Invalid solution" });
+      req.log.warn("Solution failed verification");
+      res.status(400).json({ error: "Solution failed verification" });
       return;
     }
     solves.set(signature, Date.now());
   } catch (err) {
-    req.log.error(err, "Error verifying solution");
+    req.log.error(err, "Error verifying proof-of-work");
     res.status(500).json({ error: "Internal error" });
     return;
   }
@@ -292,6 +314,7 @@ router.post("/verify", async (req, res) => {
 
 router.get("/", (_req, res) => {
   res.render("user_request_token", {
+    keyRequired: !!config.proxyKey,
     tokenLifetime: config.captchaTokenHours,
     tokenMaxIps: config.captchaTokenMaxIps,
   });

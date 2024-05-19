@@ -71,8 +71,8 @@
 </style>
 <div style="display: none" id="captcha-container">
   <p>
-    To prevent abuse, your browser needs to perform a verification task before a user token will be issued. This
-    verification process might take from a few seconds to a few minutes, depending on your device.
+    Your device needs to perform a verification task before a user token will be issued. This verification might take
+    anywhere from a few seconds to a few minutes, depending on your device and the proxy's security settings.
   </p>
   <p>Click the button below to start.</p>
   <details>
@@ -333,10 +333,10 @@
     };
 
     let note = "";
-    if (ratio > 1.25) {
-      note = " (actual time may vary)";
-    } else if (ratio > 2) {
+    if (ratio > 2.25) {
       note = " (you are particularly unlucky)";
+    } else if (ratio > 1.33) {
+      note = " (actual time may vary)";
     }
 
     document.getElementById("captcha-progress").style.width = Math.min(progress, 100) + "%";

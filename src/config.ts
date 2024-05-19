@@ -488,12 +488,6 @@ export async function assertConfigIsValid() {
     );
   }
 
-  if (config.gatekeeper !== "proxy_key" && config.proxyKey) {
-    throw new Error(
-      "`PROXY_KEY` is set, but gatekeeper mode is not `proxy_key`. Make sure to set `GATEKEEPER=proxy_key`."
-    );
-  }
-
   if (
     config.gatekeeperStore === "firebase_rtdb" &&
     (!config.firebaseKey || !config.firebaseRtdbUrl)
