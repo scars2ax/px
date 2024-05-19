@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
 import type firebase from "firebase-admin";
+import type sqlite3 from "better-sqlite3";
 import path from "path";
 import pino from "pino";
 import type { ModelFamily } from "./shared/models";
