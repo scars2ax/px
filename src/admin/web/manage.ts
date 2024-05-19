@@ -15,6 +15,7 @@ import {
   UserTokenCounts,
 } from "../../shared/users/schema";
 import { getLastNImages } from "../../shared/file-storage/image-history";
+import { blacklists, parseCidrs, whitelists } from "../../shared/cidr";
 
 const router = Router();
 
@@ -40,10 +41,71 @@ router.get("/create-user", (req, res) => {
   });
 });
 
-router.get("/pow-captcha", (_req, res) => {
-  res.render("admin_pow-captcha", {
+router.get("/anti-abuse", (_req, res) => {
+  const wl = [...whitelists.entries()];
+  const bl = [...blacklists.entries()];
+
+  res.render("admin_anti-abuse", {
     difficulty: config.captchaPoWDifficultyLevel,
+    whitelists: wl.map((w) => ({
+      name: w[0],
+      mode: "whitelist",
+      ranges: w[1].ranges,
+    })),
+    blacklists: bl.map((b) => ({
+      name: b[0],
+      mode: "blacklist",
+      ranges: b[1].ranges,
+    })),
   });
+});
+
+router.post("/cidr", (req, res) => {
+  const body = req.body;
+  const valid = z
+    .object({
+      action: z.enum(["add", "remove"]),
+      mode: z.enum(["whitelist", "blacklist"]),
+      name: z.string().min(1),
+      mask: z.string().min(1),
+    })
+    .safeParse(body);
+
+  if (!valid.success) {
+    throw new HttpError(
+      400,
+      valid.error.issues.flatMap((issue) => issue.message).join(", ")
+    );
+  }
+
+  const { mode, name, mask } = valid.data;
+  const list = (mode === "whitelist" ? whitelists : blacklists).get(name);
+  if (!list) {
+    throw new HttpError(404, "List not found");
+  }
+  if (valid.data.action === "remove") {
+    const newRanges = new Set(list.ranges);
+    newRanges.delete(mask);
+    list.updateRanges([...newRanges]);
+    req.session.flash = {
+      type: "success",
+      message: `${mode} ${name} updated`,
+    };
+    return res.redirect("/admin/manage/anti-abuse");
+  } else if (valid.data.action === "add") {
+    const result = parseCidrs(mask);
+    if (result.length === 0) {
+      throw new HttpError(400, "Invalid CIDR mask");
+    }
+
+    const newRanges = new Set([...list.ranges, mask]);
+    list.updateRanges([...newRanges]);
+    req.session.flash = {
+      type: "success",
+      message: `${mode} ${name} updated`,
+    };
+    return res.redirect("/admin/manage/anti-abuse");
+  }
 });
 
 router.post("/create-user", (req, res) => {

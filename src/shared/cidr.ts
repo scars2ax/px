@@ -4,11 +4,23 @@ import { logger } from "../logger";
 
 const log = logger.child({ module: "cidr" });
 
-function parseRangeList(ranges: string[] | string) {
-  const rangeList = Array.isArray(ranges)
-    ? ranges
-    : ranges.split(",").map((s) => s.trim());
-  return rangeList
+type IpCheckMiddleware = ((
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => void) & {
+  ranges: string[];
+  updateRanges: (ranges: string[] | string) => void;
+};
+
+export const whitelists = new Map<string, IpCheckMiddleware>();
+export const blacklists = new Map<string, IpCheckMiddleware>();
+
+export function parseCidrs(cidrs: string[] | string): [IPv4 | IPv6, number][] {
+  const list = Array.isArray(cidrs)
+    ? cidrs
+    : cidrs.split(",").map((s) => s.trim());
+  return list
     .map((input) => {
       try {
         if (input.includes("/")) {
@@ -20,7 +32,7 @@ function parseRangeList(ranges: string[] | string) {
           );
         }
       } catch (e) {
-        log.error({ input, error: e.message }, "Invalid CIDR range; skipping");
+        log.error({ input, error: e.message }, "Invalid CIDR mask; skipping");
         return null;
       }
     })
@@ -29,43 +41,59 @@ function parseRangeList(ranges: string[] | string) {
 
 export function createWhitelistMiddleware(
   name: string,
-  ranges: string[] | string
+  base: string[] | string
 ) {
-  const cidrs = parseRangeList(ranges);
-
-  log.info({ list: name, cidrs }, "IP whitelist configured");
+  let cidrs: string[] = [];
+  let matchers: [IPv4 | IPv6, number][] = [];
 
   const middleware = (req: Request, res: Response, next: NextFunction) => {
     const ip = ipaddr.process(req.ip);
-    const allowed = cidrs.some((cidr) => ip.match(cidr));
+    const allowed = matchers.some((cidr) => ip.match(cidr));
     if (allowed) {
-      req.log.info({ ip: req.ip, list: name }, "Request allowed by whitelist");
       return next();
     }
     req.log.warn({ ip: req.ip, list: name }, "Request denied by whitelist");
     res.status(403).json({ error: `Forbidden (by ${name})` });
   };
-  middleware.ranges = ranges;
+  middleware.ranges = [] as string[];
+  middleware.updateRanges = (ranges: string[] | string) => {
+    cidrs = Array.isArray(ranges) ? ranges.slice() : [ranges];
+    matchers = parseCidrs(cidrs);
+    log.info({ list: name, matchers }, "IP whitelist configured");
+    middleware.ranges = cidrs;
+  };
+
+  middleware.updateRanges(base);
+
+  whitelists.set(name, middleware);
   return middleware;
 }
 
 export function createBlacklistMiddleware(
   name: string,
-  ranges: string[] | string
+  base: string[] | string
 ) {
-  const cidrs = parseRangeList(ranges);
-
-  log.info({ list: name, cidrs }, "IP blacklist configured");
+  let cidrs: string[] = [];
+  let matchers: [IPv4 | IPv6, number][] = [];
 
   const middleware = (req: Request, res: Response, next: NextFunction) => {
     const ip = ipaddr.process(req.ip);
-    const denied = cidrs.some((cidr) => ip.match(cidr));
+    const denied = matchers.some((cidr) => ip.match(cidr));
     if (denied) {
       req.log.warn({ ip: req.ip, list: name }, "Request denied by blacklist");
       return res.status(403).json({ error: `Forbidden (by ${name})` });
     }
     return next();
   };
-  middleware.ranges = ranges;
+  middleware.ranges = [] as string[];
+  middleware.updateRanges = (ranges: string[] | string) => {
+    cidrs = Array.isArray(ranges) ? ranges.slice() : [ranges];
+    matchers = parseCidrs(cidrs);
+    log.info({ list: name, matchers }, "IP blacklist configured");
+    middleware.ranges = cidrs;
+  };
+  middleware.updateRanges(base);
+
+  blacklists.set(name, middleware);
   return middleware;
 }
