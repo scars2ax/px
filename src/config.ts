@@ -284,6 +284,18 @@ type Config = {
    * A leading slash is required.
    */
   proxyEndpointRoute: string;
+  /**
+   * If set, only requests from these IP addresses will be permitted to use the
+   * admin API and UI. Provide a comma-separated list of IP addresses or CIDR
+   * ranges. If not set, the admin API and UI will be open to all requests.
+   */
+  adminWhitelist: string[];
+  /**
+   * If set, requests from these IP addresses will be blocked from using the
+   * application. Provide a comma-separated list of IP addresses or CIDR ranges.
+   * If not set, no IP addresses will be blocked.
+   */
+  ipBlacklist: string[];
 };
 
 // To change configs, create a file called .env in the root directory.
@@ -391,6 +403,8 @@ export const config: Config = {
   allowOpenAIToolUsage: getEnvWithDefault("ALLOW_OPENAI_TOOL_USAGE", false),
   allowImagePrompts: getEnvWithDefault("ALLOW_IMAGE_PROMPTS", false),
   proxyEndpointRoute: getEnvWithDefault("PROXY_ENDPOINT_ROUTE", "/proxy"),
+  adminWhitelist: parseCsv(getEnvWithDefault("ADMIN_WHITELIST", "0.0.0.0/0")),
+  ipBlacklist: parseCsv(getEnvWithDefault("IP_BLACKLIST", "")),
 } as const;
 
 function generateSigningKey() {
@@ -547,6 +561,8 @@ export const OMITTED_KEYS = [
   "allowedModelFamilies",
   "trustedProxies",
   "proxyEndpointRoute",
+  "adminWhitelist",
+  "ipBlacklist",
 ] satisfies (keyof Config)[];
 type OmitKeys = (typeof OMITTED_KEYS)[number];
 
