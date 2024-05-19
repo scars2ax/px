@@ -1,4 +1,5 @@
 import { Router } from "express";
+import ipaddr from "ipaddr.js";
 import multer from "multer";
 import { z } from "zod";
 import { config } from "../../config";
@@ -46,6 +47,7 @@ router.get("/anti-abuse", (_req, res) => {
   const bl = [...blacklists.entries()];
 
   res.render("admin_anti-abuse", {
+    captchaMode: config.captchaMode,
     difficulty: config.captchaPoWDifficultyLevel,
     whitelists: wl.map((w) => ({
       name: w[0],
@@ -338,6 +340,83 @@ router.post("/maintenance", (req, res) => {
       }
       config.captchaPoWDifficultyLevel = selected;
       break;
+    }
+    case "generateTempIpReport": {
+      const tempUsers = userStore
+        .getUsers()
+        .filter((u) => u.type === "temporary");
+      const ipv4RangeMap: Map<string, Set<string>> = new Map<
+        string,
+        Set<string>
+      >();
+      const ipv6RangeMap: Map<string, Set<string>> = new Map<
+        string,
+        Set<string>
+      >();
+
+      tempUsers.forEach((u) => {
+        u.ip.forEach((ip) => {
+          try {
+            const parsed = ipaddr.parse(ip);
+            if (parsed.kind() === "ipv4") {
+              const subnet =
+                parsed.toNormalizedString().split(".").slice(0, 3).join(".") +
+                ".0/24";
+              const userSet = ipv4RangeMap.get(subnet) || new Set<string>();
+              userSet.add(u.token);
+              ipv4RangeMap.set(subnet, userSet);
+            } else if (parsed.kind() === "ipv6") {
+              const subnet =
+                parsed.toNormalizedString().split(":").slice(0, 3).join(":") +
+                "::/56";
+              const userSet = ipv6RangeMap.get(subnet) || new Set<string>();
+              userSet.add(u.token);
+              ipv6RangeMap.set(subnet, userSet);
+            }
+          } catch (e) {
+            req.log.warn(
+              { ip, error: e.message },
+              "Invalid IP address; skipping"
+            );
+          }
+        });
+      });
+
+      const ipv4Ranges = Array.from(ipv4RangeMap.entries())
+        .map(([subnet, userSet]) => ({
+          subnet,
+          distinctTokens: userSet.size,
+        }))
+        .sort((a, b) => b.distinctTokens - a.distinctTokens);
+
+      const ipv6Ranges = Array.from(ipv6RangeMap.entries())
+        .map(([subnet, userSet]) => ({
+          subnet,
+          distinctTokens: userSet.size,
+        }))
+        .sort((a, b) => {
+          if (a.distinctTokens === b.distinctTokens) {
+            return a.subnet.localeCompare(b.subnet);
+          }
+          return b.distinctTokens - a.distinctTokens;
+        });
+
+      const data = JSON.stringify(
+        {
+          exportedAt: new Date().toISOString(),
+          ipv4Ranges,
+          ipv6Ranges,
+        },
+        null,
+        2
+      );
+
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename=temp-ip-report-${new Date().toISOString()}.json`
+      );
+      res.setHeader("Content-Type", "application/json");
+      return res.send(data);
     }
     default: {
       throw new HttpError(400, "Invalid action");
