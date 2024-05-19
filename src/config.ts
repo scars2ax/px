@@ -294,6 +294,8 @@ type Config = {
    * If set, requests from these IP addresses will be blocked from using the
    * application. Provide a comma-separated list of IP addresses or CIDR ranges.
    * If not set, no IP addresses will be blocked.
+   *
+   * Takes precedence over the adminWhitelist.
    */
   ipBlacklist: string[];
 };

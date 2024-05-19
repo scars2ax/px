@@ -13,9 +13,9 @@ const POW_EXPIRY = 1000 * 60 * 60; // 1 hour
 const LOCKOUT_TIME = 1000 * 30; // 30 seconds
 
 const argon2Params = {
-  ARGON2_TIME_COST: parseInt(process.env.ARGON2_TIME_COST || "6"),
-  ARGON2_MEMORY_KB: parseInt(process.env.ARGON2_MEMORY_KB || "65536"),
-  ARGON2_PARALLELISM: parseInt(process.env.ARGON2_PARALLELISM || "4"),
+  ARGON2_TIME_COST: parseInt(process.env.ARGON2_TIME_COST || "8"),
+  ARGON2_MEMORY_KB: parseInt(process.env.ARGON2_MEMORY_KB || String(1024 * 64)),
+  ARGON2_PARALLELISM: parseInt(process.env.ARGON2_PARALLELISM || "1"),
   ARGON2_HASH_LENGTH: parseInt(process.env.ARGON2_HASH_LENGTH || "32"),
 };
 
@@ -25,10 +25,10 @@ const argon2Params = {
  * hashes will vary due to randomness.
  */
 const workFactors: Record<string, number> = {
-  extreme: 1000,
-  high: 500,
-  medium: 200,
-  low: 25,
+  extreme: 3200,
+  high: 1600,
+  medium: 800,
+  low: 100,
 };
 
 type Challenge = {
@@ -63,7 +63,11 @@ const verifySchema = z.object({
       .regex(/^[0-9a-f]+$/),
     hl: z.number().int().positive().max(64),
     t: z.number().int().positive().min(2).max(10),
-    m: z.number().int().positive().max(65536),
+    m: z
+      .number()
+      .int()
+      .positive()
+      .max(1024 * 1024 * 2),
     p: z.number().int().positive().max(16),
     d: z.string().regex(/^[0-9]+n$/),
     e: z.number().int().positive(),
@@ -77,7 +81,7 @@ const verifySchema = z.object({
 
 const challengeSchema = z.object({
   action: z.union([z.literal("new"), z.literal("refresh")]),
-  token: z.string().min(1).max(64).optional(),
+  refreshToken: z.string().min(1).max(64).optional(),
 });
 
 /** Solutions by timestamp */
@@ -104,7 +108,7 @@ function generateChallenge(clientIp?: string, token?: string): Challenge {
   let workFactor = workFactors[config.captchaPoWDifficultyLevel];
   if (token) {
     // Refreshing a token is easier
-    workFactor /= 3;
+    workFactor = Math.floor(workFactor / 2);
   }
   const hashBits = BigInt(argon2Params.ARGON2_HASH_LENGTH) * 8n;
   const hashMax = 2n ** hashBits;
@@ -155,18 +159,25 @@ async function verifySolution(
   return result;
 }
 
-function verifyTokenRefreshable(token?: string) {
+function verifyTokenRefreshable(token?: string, logger?: any): boolean {
   if (!token) {
+    logger?.warn("No token provided for refresh");
     return false;
   }
 
   const user = getUser(token);
   if (!user) {
+    logger?.warn({ token }, "No user found for token");
     return false;
   }
   if (user.type !== "temporary") {
+    logger?.warn({ token }, "User is not temporary");
     return false;
   }
+  logger?.info(
+    { token, refreshable: user.meta?.refreshable },
+    "Token refreshable"
+  );
   return user.meta?.refreshable;
 }
 
@@ -177,13 +188,13 @@ router.get("/challenge", (req, res) => {
     res.status(400).json({ error: "Invalid challenge request" });
     return;
   }
-  const { action, token } = data.data;
+  const { action, refreshToken } = data.data;
   if (action === "refresh") {
-    if (!verifyTokenRefreshable(token)) {
+    if (!verifyTokenRefreshable(refreshToken, req.log)) {
       res.status(400).json({ error: "Invalid token for refresh" });
       return;
     }
-    const challenge = generateChallenge(req.ip, token);
+    const challenge = generateChallenge(req.ip, refreshToken);
     const signature = signMessage(challenge);
     res.json({ challenge, signature });
   } else {
@@ -235,7 +246,7 @@ router.post("/verify", async (req, res) => {
     return;
   }
 
-  if (challenge.token && !verifyTokenRefreshable(challenge.token)) {
+  if (challenge.token && !verifyTokenRefreshable(challenge.token, req.log)) {
     res.status(400).json({ error: "Invalid token for refresh" });
     return;
   }

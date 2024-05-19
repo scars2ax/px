@@ -29,7 +29,7 @@
   <strong id="existing-token-value">Existing token:</strong>
 </div>
 <div id="request-buttons">
-  <button disabled id="refresh_token" onclick="requestChallenge('refresh')">Refresh old token</button>
+  <button disabled id="refresh-token" onclick="requestChallenge('refresh')">Refresh old token</button>
   <button id="request_token" onclick="requestChallenge('new')">Request new token</button>
 </div>
 <%- include("partials/user_challenge_widget") %>
@@ -47,7 +47,7 @@
         }
         localStorage.removeItem("captcha-temp-token");
         document.getElementById("existing-token").style.display = "none";
-        document.getElementById("refresh_token").disabled = true;
+        document.getElementById("refresh-token").disabled = true;
       }
     } else if (!token && action === "refresh") {
       alert("You don't have an existing token to refresh");
@@ -60,20 +60,17 @@
       method: "GET",
       headers: { "Content-Type": "application/json" },
     })
-      .then(function (response) {
-        if (response.ok) {
-          return response.json();
-        } else {
-          throw new Error("Failed to request challenge");
-        }
-      })
+      .then(response => response.json())
       .then(function (data) {
+        if (data.error) {
+          throw new Error(data.error);
+        }
         const { challenge, signature } = data;
         loadNewChallenge(challenge, signature);
       })
       .catch(function (error) {
         console.error(error);
-        alert("Failed to request verification challenge from server");
+        alert(`Failed to request verification challenge from server (${error.message})`);
       });
   }
 
@@ -86,9 +83,9 @@
     if (expiresDate > now) {
       document.getElementById(
         "existing-token-value"
-      ).textContent = `Existing token: ${token} - Expires: ${expiresDate.toISOString()}`;
+      ).textContent = `Your token: ${token} (valid until ${expiresDate.toLocaleString()})`;
       document.getElementById("existing-token").style.display = "block";
-        document.getElementById("refresh_token").disabled = false;
+      document.getElementById("refresh-token").disabled = false;
     } else {
       localStorage.removeItem("captcha-temp-token");
     }
