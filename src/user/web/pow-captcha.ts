@@ -315,6 +315,7 @@ router.post("/verify", async (req, res) => {
 router.get("/", (_req, res) => {
   res.render("user_request_token", {
     keyRequired: !!config.proxyKey,
+    difficultyLevel: config.captchaPoWDifficultyLevel,
     tokenLifetime: config.captchaTokenHours,
     tokenMaxIps: config.captchaTokenMaxIps,
   });
