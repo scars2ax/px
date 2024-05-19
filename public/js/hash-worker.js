@@ -8,17 +8,12 @@ let signature = "";
 let lastNotify = 0;
 let params = {
   salt: null,
-  workers: 0,
-  length: 0,
-  time: 0,
-  mem: 0,
+  hashLength: 0,
+  iterations: 0,
+  memorySize: 0,
   parallelism: 0,
-  type: 0,
-  difficulty: 0,
-  expiry: 0,
-  ip: "",
+  targetValue: BigInt(0),
 };
-let argon2Hash = null;
 
 self.onmessage = async (event) => {
   const { data } = event;
@@ -36,30 +31,20 @@ self.onmessage = async (event) => {
       nonce = data.nonce;
 
       const c = data.challenge;
-      params = {
-        salt: new TextEncoder().encode(c.s),
-        workers: c.w,
-        length: c.hl,
-        time: c.t,
-        mem: c.m,
-        parallelism: c.p,
-        type: c.at,
-        difficulty: c.d,
-        expiry: c.e,
-        ip: c.ip,
-      };
 
-      switch (params.type) {
-        case 0:
-          argon2Hash = self.hashwasm.argon2i;
-          break;
-        case 1:
-          argon2Hash = self.hashwasm.argon2d;
-          break;
-        case 2:
-          argon2Hash = self.hashwasm.argon2id;
-          break;
+      const salt = new Uint8Array(c.s.length / 2);
+      for (let i = 0; i < c.s.length; i += 2) {
+        salt[i / 2] = parseInt(c.s.slice(i, i + 2), 16);
       }
+
+      params = {
+        salt: salt,
+        hashLength: c.hl,
+        iterations: c.t,
+        memorySize: c.m,
+        parallelism: c.p,
+        targetValue: BigInt(c.d.slice(0, -1)),
+      };
 
       console.log("Started", params);
       self.postMessage({ type: "started" });
@@ -69,20 +54,21 @@ self.onmessage = async (event) => {
 };
 
 const doHash = async (password) => {
-  const { salt, length, time, mem, parallelism } = params;
-  return await argon2Hash({
+  const { salt, hashLength, iterations, memorySize, parallelism } = params;
+  return await self.hashwasm.argon2id({
     password,
     salt,
-    hashLength: length,
-    iterations: time,
-    memorySize: mem,
+    hashLength,
+    iterations,
+    memorySize,
     parallelism,
   });
 };
 
 const checkHash = (hash) => {
-  const { difficulty } = params;
-  return hash.startsWith("0".repeat(difficulty));
+  const { targetValue } = params;
+  const hashValue = BigInt(`0x${hash}`);
+  return hashValue <= targetValue;
 };
 
 const solve = async () => {
@@ -91,7 +77,7 @@ const solve = async () => {
     return;
   }
 
-  const batchSize = 10;
+  const batchSize = 5;
   const batch = [];
   for (let i = 0; i < batchSize; i++) {
     batch.push(nonce++);
@@ -100,16 +86,15 @@ const solve = async () => {
   try {
     const results = await Promise.all(
       batch.map(async (nonce) => {
-        const password = signature + ":" + nonce;
-        const hash = await doHash(password);
-        return { nonce, hash };
+        const hash = await doHash(String(nonce));
+        return { hash, nonce };
       })
     );
 
     const solution = results.find(({ hash }) => checkHash(hash));
     if (solution) {
-      console.log("Solution found", solution);
-      self.postMessage({ type: "solved", password: signature + ":" + solution.nonce, nonce: solution.nonce });
+      console.log("Solution found", solution, params.salt);
+      self.postMessage({ type: "solved", nonce: solution.nonce });
       active = false;
     } else {
       if (nonce % batchSize === 0 && Date.now() - lastNotify > 1000) {

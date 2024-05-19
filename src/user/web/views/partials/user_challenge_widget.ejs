@@ -42,10 +42,16 @@
     margin: 20px 0;
   }
 
+  #captcha-progress-container textarea {
+    margin-top: 5px;
+    background-color: transparent;
+    color: inherit;
+  }
+
   .progress-bar {
     width: 100%;
     height: 20px;
-    background-color: #e0e0e0;
+    background-color: #e0e6f6;
     border-radius: 5px;
     overflow: hidden;
   }
@@ -80,8 +86,8 @@
   <details>
     <summary>How often do I need to do this?</summary>
     <p>
-      Once you've earned a user token, it will remain valid for <%= tokenLifetime %> hours. After that, you can return to this page
-      from the same device and browser to refresh your token.
+      Once you've earned a user token, it will remain valid for <%= tokenLifetime %> hours. After that, you can return
+      to this page from the same device and browser to refresh your token.
     </p>
   </details>
   <details>
@@ -100,17 +106,14 @@
   </details>
   <div id="captcha-progress-container" style="display: none">
     <div id="captcha-progress" class="progress-bar">
+      <label for="captcha-progress-text">Progress:</label>
       <div class="progress"></div>
     </div>
-    <p id="captcha-progress-text">Progress: 0%</p>
-    <p id="captcha-runtime">Runtime: 0s</p>
-    <p id="captcha-hashrate">Hashrate: 0 H/s</p>
-    <p id="captcha-remaining">Estimated time remaining: calculating...</p>
+    <textarea disabled id="captcha-progress-text" style="width: 100%; height: 100px; resize: none"></textarea>
   </div>
   <div id="captcha-result"></div>
   <div id="captcha-control">
     <button id="worker-control" onclick="toggleWorker()">Start verification</button>
-    <button disabled id="captcha-submit" onclick="verifyCaptcha()">Get user token</button>
   </div>
 </div>
 <script>
@@ -120,7 +123,10 @@
   let solution = null;
   let nonce = 0;
   let startTime = 0;
+  let lastUpdateTime = 0;
   let elapsedTime = 0;
+  let workFactor = 0;
+  let active = false;
 
   function loadNewChallenge(c, s) {
     const btn = document.getElementById("worker-control");
@@ -130,41 +136,45 @@
     nonce = 0;
     challenge = c;
     signature = s;
+    const targetValue = challenge.d.slice(0, -1);
+    const hashLength = challenge.hl;
+    workFactor = Number(BigInt(2) ** BigInt(8 * hashLength) / BigInt(targetValue));
     worker = new Worker("/res/js/hash-worker.js");
     worker.onmessage = function (e) {
       switch (e.data.type) {
         case "progress":
           nonce = e.data.nonce;
-          estimateProgress();
           break;
         case "started":
+          active = true;
           btn.textContent = "Pause verification";
           startTime = Date.now();
+          lastUpdateTime = startTime;
           document.getElementById("captcha-progress-container").style.display = "block";
           break;
         case "paused":
+          active = false;
           nonce = e.data.nonce;
           btn.textContent = "Start verification";
-          elapsedTime += Date.now() - startTime;
-          document.getElementById("captcha-progress-container").style.display = "none";
           break;
         case "solved":
-          solution = e.data.solution;
-          nonce = e.data.nonce;
-          document.getElementById("result").textContent =
-            "Verification completed. Click the button below to obtain a user token.";
-          document.getElementById("captcha-submit").disabled = false;
-          document.getElementById("worker-control").style.display = "none";
-          document.getElementById("captcha-progress-container").style.display = "none";
+          active = false;
+          solution = nonce = e.data.nonce;
+          document.getElementById("captcha-result").textContent =
+            "Verification completed. Submitting solution for verification...";
+          submitVerification();
           break;
         case "error":
+          active = false;
           const msg = e.data.error || "An unknown error occurred.";
           document.getElementById("captcha-result").innerHTML = `
-            <p style="color: darkred">Error: ${msg}</p>
+            <p style="color: red">Error: ${msg}</p>
             <p>Try using another device or browser if the problem persists.</p>
 `;
           break;
       }
+
+      estimateProgress();
     };
   }
 
@@ -175,14 +185,14 @@
     worker.postMessage({ type: "toggle", challenge: challenge, signature: signature, nonce: nonce });
   }
 
-  function submitCaptcha() {
+  function submitVerification() {
     if (!solution) {
       return;
     }
     const body = {
       challenge: challenge,
       signature: signature,
-      solution: solution,
+      solution: String(solution),
       _csrf: document.querySelector("meta[name=csrf-token]").getAttribute("content"),
     };
 
@@ -197,21 +207,23 @@
         if (data.error) {
           document.getElementById("captcha-result").textContent = "Error: " + data.error;
         } else {
-          document.getElementById("captcha-result").textContent = "User token: " + data.token;
+          document.getElementById("captcha-result").innerHTML = `
+            <p style="color: green">Verification complete</p>
+            <p>Your user token is: <code>${data.token}</code></p>
+`;
         }
       });
   }
 
   function estimateProgress() {
-    const difficulty = challenge.d;
-    const hashes = Math.pow(16, difficulty);
-    const totalRuntime = (Date.now() - startTime + elapsedTime) / 1000;
-    const hashRate = nonce / totalRuntime;
-    const remaining = hashes - nonce;
-    const timeRemaining = remaining / hashRate;
-    const progress = 100 * (1 - remaining / hashes);
+    const totalHashes = nonce;
+    elapsedTime += (Date.now() - lastUpdateTime) / 1000;
+    lastUpdateTime = Date.now();
+    const hashRate = totalHashes / elapsedTime;
+    const expectedTimeRemaining = (workFactor - totalHashes) / hashRate;
+    const progress = 100 * (totalHashes / workFactor);
 
-    const prettyTime = (time) => {
+    const formatTime = (time) => {
       if (time < 60) {
         return time.toFixed(1) + "s";
       } else if (time < 3600) {
@@ -225,10 +237,11 @@
       }
     };
 
-    document.getElementById("captcha-progress").style.width = progress + "%";
-    document.getElementById("captcha-progress-text").textContent = "Progress: " + progress.toFixed(2) + "%";
-    document.getElementById("captcha-runtime").textContent = "Runtime: " + totalRuntime.toFixed(2) + "s";
-    document.getElementById("captcha-hashrate").textContent = "Hashrate: " + hashRate.toFixed(2) + " H/s";
-    document.getElementById("captcha-remaining").textContent = "Estimated time remaining: " + prettyTime(timeRemaining);
+    document.getElementById("captcha-progress").style.width = Math.min(progress, 100) + "%";
+    document.getElementById("captcha-progress-text").value = `Hashes computed: ${totalHashes.toLocaleString()}
+Expected hashes: ${workFactor.toLocaleString()}
+Elapsed time: ${formatTime(elapsedTime)}
+Hash rate: ${hashRate.toFixed(2)} H/s
+${active ? `Estimated time remaining: ${formatTime(expectedTimeRemaining)}` : "Verification not running"}`;
   }
 </script>

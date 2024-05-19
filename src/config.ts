@@ -122,6 +122,11 @@ type Config = {
   captchaTokenHours: number;
   /** Maximum number of IPs allowed per captcha-issued temporary user token. */
   captchaTokenMaxIps: number;
+  /**
+   * Difficulty level for the PoW captcha. Refer to docs/pow-captcha.md for
+   * details on the available modes.
+   */
+  captchaPoWDifficultyLevel: "very_low" | "low" | "medium" | "high" | "extreme";
   /** Per-user limit for requests per minute to text and chat models. */
   textModelRateLimit: number;
   /** Per-user limit for requests per minute to image generation models. */
@@ -300,8 +305,9 @@ export const config: Config = {
   maxIpsPerUser: getEnvWithDefault("MAX_IPS_PER_USER", 0),
   maxIpsAutoBan: getEnvWithDefault("MAX_IPS_AUTO_BAN", false),
   captchaMode: getEnvWithDefault("CAPTCHA_MODE", "none"),
-  captchaTokenHours: getEnvWithDefault("CAPTCHA_TOKEN_HOURS", 6),
+  captchaTokenHours: getEnvWithDefault("CAPTCHA_TOKEN_HOURS", 24),
   captchaTokenMaxIps: getEnvWithDefault("CAPTCHA_TOKEN_MAX_IPS", 2),
+  captchaPoWDifficultyLevel: getEnvWithDefault("CAPTCHA_POW_DIFFICULTY_LEVEL", "low"),
   firebaseRtdbUrl: getEnvWithDefault("FIREBASE_RTDB_URL", undefined),
   firebaseKey: getEnvWithDefault("FIREBASE_KEY", undefined),
   textModelRateLimit: getEnvWithDefault("TEXT_MODEL_RATE_LIMIT", 4),
