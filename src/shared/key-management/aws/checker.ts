@@ -66,6 +66,15 @@ export class AwsKeyChecker extends KeyCheckerBase<AwsBedrockKey> {
       const families: AwsBedrockModelFamily[] = [];
       if (claudeV2 || sonnet || haiku) families.push("aws-claude");
       if (opus) families.push("aws-claude-opus");
+
+      if (families.length === 0) {
+        this.log.warn(
+          { key: key.hash },
+          "Key does not have access to any models; disabling."
+        );
+        return this.updateKey(key.hash, { isDisabled: true });
+      }
+
       this.updateKey(key.hash, {
         sonnetEnabled: sonnet,
         haikuEnabled: haiku,
@@ -190,13 +199,14 @@ export class AwsKeyChecker extends KeyCheckerBase<AwsBedrockKey> {
     const correctErrorType = errorType === "ValidationException";
     const correctErrorMessage = errorMessage?.match(/max_tokens/);
     if (!correctErrorType || !correctErrorMessage) {
-      throw new AxiosError(
-        `Unexpected error when invoking model ${model}: ${errorMessage}`,
-        "AWS_ERROR",
-        response.config,
-        response.request,
-        response
-      );
+      return false;
+      // throw new AxiosError(
+      //   `Unexpected error when invoking model ${model}: ${errorMessage}`,
+      //   "AWS_ERROR",
+      //   response.config,
+      //   response.request,
+      //   response
+      // );
     }
 
     this.log.debug(
