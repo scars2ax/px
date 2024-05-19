@@ -14,12 +14,11 @@ let params = {
   memorySize: 0,
   parallelism: 0,
   targetValue: BigInt(0),
+  safariFix: false,
 };
-let isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
 self.onmessage = async (event) => {
   const { data } = event;
-  console.log("Hash worker msg", data);
   switch (data.type) {
     case "stop":
       active = false;
@@ -31,7 +30,7 @@ self.onmessage = async (event) => {
       nonce = data.nonce;
 
       const c = data.challenge;
-
+      // decode salt to Uint8Array
       const salt = new Uint8Array(c.s.length / 2);
       for (let i = 0; i < c.s.length; i += 2) {
         salt[i / 2] = parseInt(c.s.slice(i, i + 2), 16);
@@ -44,6 +43,7 @@ self.onmessage = async (event) => {
         memorySize: c.m,
         parallelism: c.p,
         targetValue: BigInt(c.d.slice(0, -1)),
+        safariFix: data.isMobileWebkit,
       };
 
       console.log("Started", params);
@@ -77,8 +77,8 @@ const solve = async () => {
     return;
   }
 
-  // iOS Safari seems to have issues resizing wasm Memory with large batch sizes
-  const batchSize = 4 / (isIOS ? 4 : 2);
+  // Safari WASM doesn't like multiple calls in one worker
+  const batchSize = 1;
   const batch = [];
   for (let i = 0; i < batchSize; i++) {
     batch.push(nonce++);
@@ -100,7 +100,7 @@ const solve = async () => {
       active = false;
     } else {
       if (Date.now() - lastNotify > 1000) {
-        console.log("Last nonce", nonce, "Hashes", hashesSinceLastNotify)
+        console.log("Last nonce", nonce, "Hashes", hashesSinceLastNotify);
         self.postMessage({ type: "progress", hashes: hashesSinceLastNotify });
         lastNotify = Date.now();
         hashesSinceLastNotify = 0;
@@ -114,7 +114,7 @@ const solve = async () => {
       stack,
       lastNonce: nonce,
       targetValue: params.targetValue,
-    }
+    };
     self.postMessage({ type: "error", error: error.message, debug });
     active = false;
   }
