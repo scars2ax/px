@@ -8,7 +8,7 @@ import type { AwsBedrockKey, AwsBedrockKeyProvider } from "./provider";
 import { AwsBedrockModelFamily } from "../../models";
 
 const MIN_CHECK_INTERVAL = 3 * 1000; // 3 seconds
-const KEY_CHECK_PERIOD = 30 * 60 * 1000; // 30 minutes
+const KEY_CHECK_PERIOD = 90 * 60 * 1000; // 90 minutes
 const AMZ_HOST =
   process.env.AMZ_HOST || "bedrock-runtime.%REGION%.amazonaws.com";
 const GET_CALLER_IDENTITY_URL = `https://sts.amazonaws.com/?Action=GetCallerIdentity&Version=2011-06-15`;
