@@ -6,7 +6,7 @@
 </p>
 <div>
   <h3>Difficulty Level</h3>
-  <form action="/admin/pow" method="post">
+  <div>
     <label for="difficulty">Difficulty Level:</label>
     <select name="difficulty" id="difficulty">
       <option value="low">Low</option>
@@ -14,11 +14,12 @@
       <option value="high">High</option>
       <option value="extreme">Extreme</option>
     </select>
-    <button type="submit">Update</button>
-  </form>
+    <button onclick='doAction("set-difficulty")'>Update Difficulty</button>
+  </div>
   <form id="maintenanceForm" action="/admin/manage/maintenance" method="post">
     <input id="_csrf" type="hidden" name="_csrf" value="<%= csrfToken %>" />
     <input id="hiddenAction" type="hidden" name="action" value="" />
+    <input id="hiddenDifficulty" type="hidden" name="pow-difficulty" value="" />
   </form>
   <h3>Manage User Tokens</h3>
   <p><button onclick='doAction("kill-temp-tokens")'>💣 Delete All Temporary Tokens</button></p>
@@ -27,6 +28,9 @@
 <script>
   function doAction(action) {
     document.getElementById("hiddenAction").value = action;
+    if (action === "set-difficulty") {
+      document.getElementById("hiddenDifficulty").value = document.getElementById("difficulty").value;
+    }
     document.getElementById("maintenanceForm").submit();
   }
 </script>
