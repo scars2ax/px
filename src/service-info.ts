@@ -448,7 +448,7 @@ function getInfoForFamily(family: ModelFamily): BaseFamilyInfo {
           const logged = modelStats.get(`${family}__awsLogged`) || 0;
           if (logged > 0) {
             info.privacy = config.allowAwsLogging
-              ? `${logged} active keys are potentially logged.`
+              ? `AWS logging verification inactive. Prompts could be logged.`
               : `${logged} active keys are potentially logged and can't be used. Set ALLOW_AWS_LOGGING=true to override.`;
           }
         }
