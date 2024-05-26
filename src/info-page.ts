@@ -16,7 +16,7 @@ const MODEL_FAMILY_FRIENDLY_NAME: { [f in ModelFamily]: string } = {
   gpt4: "GPT-4",
   "gpt4-32k": "GPT-4 32k",
   "gpt4-turbo": "GPT-4 Turbo",
-  "gpt4o": "GPT-4o",
+  gpt4o: "GPT-4o",
   "dall-e": "DALL-E",
   claude: "Claude (Sonnet)",
   "claude-opus": "Claude (Opus)",
@@ -63,36 +63,42 @@ export function renderPage(info: ServiceInfo) {
   const title = getServerTitle();
   const headerHtml = buildInfoPageHeader(info);
 
-  return `<!DOCTYPE html>
+  return `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="robots" content="noindex" />
     <title>${title}</title>
+    <link rel="stylesheet" href="/res/css/reset.css" media="screen" />
+    <link rel="stylesheet" href="/res/css/sakura.css" media="screen" />
+    <link rel="stylesheet" href="/res/css/sakura-dark.css" media="screen and (prefers-color-scheme: dark)" />
     <style>
       body {
         font-family: sans-serif;
-        background-color: #f0f0f0;
         padding: 1em;
+        max-width: 900px;
+        margin: 0;
       }
-      @media (prefers-color-scheme: dark) {
-        body {
-          background-color: #222;
-          color: #eee;
-        }
-        
-        a:link, a:visited {
-          color: #bbe;
-        }
+      
+      .self-service-links {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 1em;
+        padding: 0.5em;
+        font-size: 0.8em;
+      }
+      
+      .self-service-links a {
+        margin: 0 0.5em;
       }
     </style>
   </head>
   <body>
     ${headerHtml}
     <hr />
+    ${getSelfServiceLinks()}
     <h2>Service Info</h2>
     <pre>${JSON.stringify(info, null, 2)}</pre>
-    ${getSelfServiceLinks()}
   </body>
 </html>`;
 }
@@ -146,7 +152,15 @@ This proxy keeps full logs of all prompts and AI responses. Prompt logs are anon
 
 function getSelfServiceLinks() {
   if (config.gatekeeper !== "user_token") return "";
-  return `<footer style="font-size: 0.8em;"><hr /><a target="_blank" href="/user/lookup">Check your user token info</a></footer>`;
+
+  const links = [["Check your user token", "/user/lookup"]];
+  if (config.captchaMode !== "none") {
+    links.unshift(["Request a user token", "/user/captcha"]);
+  }
+
+  return `<div class="self-service-links">${links
+    .map(([text, link]) => `<a target="_blank" href="${link}">${text}</a>`)
+    .join(" | ")}</div>`;
 }
 
 function getServerTitle() {

@@ -8,6 +8,7 @@ import pinoHttp from "pino-http";
 import os from "os";
 import childProcess from "child_process";
 import { logger } from "./logger";
+import { createBlacklistMiddleware } from "./shared/cidr";
 import { setupAssetsDir } from "./shared/file-storage/setup-assets-dir";
 import { keyPool } from "./shared/key-management";
 import { adminRouter } from "./admin/routes";
@@ -31,7 +32,12 @@ app.use(
   pinoHttp({
     quietReqLogger: true,
     logger,
-    autoLogging: { ignore: ({ url }) => ["/health"].includes(url as string) },
+    autoLogging: {
+      ignore: ({ url }) => {
+        const ignoreList = ["/health", "/res", "/user_content"];
+        return ignoreList.some((path) => (url as string).startsWith(path));
+      },
+    },
     redact: {
       paths: [
         "req.headers.cookie",
@@ -62,9 +68,17 @@ app.set("views", [
 ]);
 
 app.use("/user_content", express.static(USER_ASSETS_DIR, { maxAge: "2h" }));
+app.use(
+  "/res",
+  express.static(path.join(__dirname, "..", "public"), { maxAge: "2h", etag: false })
+);
 
 app.get("/health", (_req, res) => res.sendStatus(200));
 app.use(cors());
+
+const blacklist = createBlacklistMiddleware("IP_BLACKLIST", config.ipBlacklist);
+app.use(blacklist);
+
 app.use(checkOrigin);
 
 app.use("/admin", adminRouter);
