@@ -584,7 +584,7 @@ export async function assertConfigIsValid() {
   }
 
   await maybeInitializeFirebase();
-  await maybeInitializeEventLogging();
+  // await maybeInitializeEventLogging();
 }
 
 /**
@@ -714,7 +714,6 @@ function getEnvWithDefault<T>(env: string | string[], defaultValue: T): T {
 }
 
 let firebaseApp: firebase.app.App | undefined;
-let eventDatabase: sqlite3.Database | undefined;
 
 async function maybeInitializeFirebase() {
   if (!config.gatekeeperStore.startsWith("firebase")) {
@@ -738,35 +737,6 @@ export function getFirebaseApp(): firebase.app.App {
     throw new Error("Firebase app not initialized.");
   }
   return firebaseApp;
-}
-
-async function maybeInitializeEventLogging() {
-  if (!config.eventLogging) {
-    return;
-  }
-
-  const sqlite3 = await import("better-sqlite3");
-  const db = sqlite3.default(config.eventLoggingUrl!);
-
-  db.prepare(
-    `CREATE TABLE IF NOT EXISTS events (
-      date TEXT PRIMARY KEY NOT NULL,
-      model TEXT NOT NULL,
-      family TEXT NOT NULL,
-      hashes TEXT NOT NULL,
-      userToken TEXT NOT NULL,
-      usage INTEGER NOT NULL
-    )`
-  ).run();
-
-  eventDatabase = db;
-}
-
-export function getEventDatabase(): sqlite3.Database {
-  if (!eventDatabase) {
-    throw new Error("Event database not initialized.");
-  }
-  return eventDatabase;
 }
 
 function parseCsv(val: string): string[] {

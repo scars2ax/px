@@ -2,7 +2,8 @@
 
 import { logger } from "../../logger";
 import { EventLogEntry } from ".";
-import { config, getEventDatabase } from "../../config";
+import { config } from "../../config";
+import { getEventDatabase } from "../database";
 
 const log = logger.child({ module: "event-logger" });
 
