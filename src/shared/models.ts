@@ -14,7 +14,8 @@ export type LLMService =
   | "google-ai"
   | "mistral-ai"
   | "aws"
-  | "azure";
+  | "azure"
+  | "cohere";
 
 export type OpenAIModelFamily =
   | "turbo"
@@ -32,13 +33,15 @@ export type MistralAIModelFamily =
   | "mistral-large";
 export type AwsBedrockModelFamily = "aws-claude" | "aws-claude-opus";
 export type AzureOpenAIModelFamily = `azure-${OpenAIModelFamily}`;
+export type CohereModelFamily = "command-r" | "command-r-plus";
 export type ModelFamily =
   | OpenAIModelFamily
   | AnthropicModelFamily
   | GoogleAIModelFamily
   | MistralAIModelFamily
   | AwsBedrockModelFamily
-  | AzureOpenAIModelFamily;
+  | AzureOpenAIModelFamily
+  | CohereModelFamily;
 
 export const MODEL_FAMILIES = (<A extends readonly ModelFamily[]>(
   arr: A & ([ModelFamily] extends [A[number]] ? unknown : never)
@@ -64,6 +67,8 @@ export const MODEL_FAMILIES = (<A extends readonly ModelFamily[]>(
   "azure-gpt4-turbo",
   "azure-gpt4o",
   "azure-dall-e",
+  "command-r",
+  "command-r-plus",
 ] as const);
 
 export const LLM_SERVICES = (<A extends readonly LLMService[]>(
@@ -75,6 +80,7 @@ export const LLM_SERVICES = (<A extends readonly LLMService[]>(
   "mistral-ai",
   "aws",
   "azure",
+  "cohere",
 ] as const);
 
 export const OPENAI_MODEL_FAMILY_MAP: { [regex: string]: OpenAIModelFamily } = {
@@ -116,6 +122,8 @@ export const MODEL_FAMILY_SERVICE: {
   "mistral-small": "mistral-ai",
   "mistral-medium": "mistral-ai",
   "mistral-large": "mistral-ai",
+  "command-r": "cohere",
+  "command-r-plus": "cohere",
 };
 
 export const IMAGE_GEN_MODELS: ModelFamily[] = ["dall-e", "azure-dall-e"];
@@ -181,6 +189,11 @@ export function getAzureOpenAIModelFamily(
   return defaultFamily;
 }
 
+export function getCohereModelFamily(model: string): CohereModelFamily {
+  if (model.includes("plus")) return "command-r-plus";
+  return "command-r";
+}
+
 export function assertIsKnownModelFamily(
   modelFamily: string
 ): asserts modelFamily is ModelFamily {
@@ -219,6 +232,9 @@ export function getModelFamilyForRequest(req: Request): ModelFamily {
         break;
       case "mistral-ai":
         modelFamily = getMistralAIModelFamily(model);
+        break;
+      case "cohere-chat":
+        modelFamily = getCohereModelFamily(model);
         break;
       default:
         assertNever(req.outboundApi);
