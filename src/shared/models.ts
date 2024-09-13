@@ -18,6 +18,8 @@ export type LLMService =
 
 export type OpenAIModelFamily =
   | "turbo"
+  | "gpto1"
+  | "gpto1-mini"
   | "gpt4"
   | "gpt4-32k"
   | "gpt4-turbo"
@@ -43,6 +45,8 @@ export type ModelFamily =
 export const MODEL_FAMILIES = (<A extends readonly ModelFamily[]>(
   arr: A & ([ModelFamily] extends [A[number]] ? unknown : never)
 ) => arr)([
+  "gpto1",
+  "gpto1-mini",
   "turbo",
   "gpt4",
   "gpt4-32k",
@@ -78,6 +82,10 @@ export const LLM_SERVICES = (<A extends readonly LLMService[]>(
 ] as const);
 
 export const OPENAI_MODEL_FAMILY_MAP: { [regex: string]: OpenAIModelFamily } = {
+  "^o1-preview$": "o1",
+  "^o1-preview-2024-09-12$": "o1",
+  "^o1-mini$": "o1-mini",
+  "^o1-mini-2024-09-12$": "o1-mini",
   "^gpt-4o": "gpt4o",
   "^gpt-4-turbo(-\\d{4}-\\d{2}-\\d{2})?$": "gpt4-turbo",
   "^gpt-4-turbo(-preview)?$": "gpt4-turbo",
@@ -97,6 +105,8 @@ export const MODEL_FAMILY_SERVICE: {
 } = {
   turbo: "openai",
   gpt4: "openai",
+  "o1": "openai",
+  "o1-mini": "openai",
   "gpt4-turbo": "openai",
   "gpt4-32k": "openai",
   "gpt4o": "openai",
