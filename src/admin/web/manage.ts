@@ -124,7 +124,7 @@ router.post("/create-user", (req, res) => {
         .max(10080 * 4),
     })
     .merge(
-      MODEL_FAMILIES.reduce((schema, model) => {
+      MODEL_FAMILIES.reduce((schema: z.ZodSchema, model: string) => {
         return schema.extend({
           [`temporaryUserQuota_${model}`]: z.coerce.number().int().min(0),
         });
