@@ -17,6 +17,8 @@ const MODEL_FAMILY_FRIENDLY_NAME: { [f in ModelFamily]: string } = {
   "gpt4-32k": "GPT-4 32k",
   "gpt4-turbo": "GPT-4 Turbo",
   gpt4o: "GPT-4o",
+  "o1": "OpenAI o1",
+  "o1-mini": "OpenAI o1 Mini",
   "dall-e": "DALL-E",
   claude: "Claude (Sonnet)",
   "claude-opus": "Claude (Opus)",
