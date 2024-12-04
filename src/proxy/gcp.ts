@@ -151,7 +151,7 @@ function maybeReassignModel(req: Request) {
     return;
   }
 
-  const [_, _cl, instant, _v, major, _sep, minor, _ctx, name, _rev] = match;
+  const [_, _cl, instant, _v, major, _sep, minor, _ctx, name, rev] = match;
 
   // TODO: rework this to function similarly to aws-claude.ts maybeReassignModel
   const ver = minor ? `${major}.${minor}` : major;
@@ -167,12 +167,25 @@ function maybeReassignModel(req: Request) {
       }
       return;
     case "3.5":
-      if (name.includes("sonnet")) {
-        req.body.model = "claude-3-5-sonnet@20241022";
-      } else if (name.includes("haiku")) {
-        req.body.model = "claude-3-5-haiku@20241022";
+      switch (name) {
+        case "sonnet":
+          switch (rev) {
+            case "20241022":
+            case "latest":
+              req.body.model = "claude-3-5-sonnet-v2@20241022";
+              return;
+            case "20240620":
+              req.body.model = "claude-3-5-sonnet@20240620";
+              return;
+          }
+          break;
+        case "haiku":
+          req.body.model = "claude-3-5-haiku@20241022";
+          return;
+        case "opus":
+          // Add after model ids are announced late 2024
+          break;
       }
-      return;
   }
 
   // Fallback to Claude3 Sonnet
