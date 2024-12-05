@@ -602,16 +602,37 @@ async function handleGoogleAIBadRequestError(
 }
 
 //{"error":{"code":429,"message":"Resource has been exhausted (e.g. check quota).","status":"RESOURCE_EXHAUSTED"}
+//
 async function handleGoogleAIRateLimitError(
   req: Request,
   errorPayload: ProxiedErrorPayload
 ) {
   const status = errorPayload.error?.status;
+  const text = JSON.stringify(errorPayload.error);
+
+  // sometimes they block keys by rate limiting them to 0 requests per minute
+  // for some indefinite period of time
+  const keyDeadMsgs = [
+    /GenerateContentRequestsPerMinutePerProjectPerRegion/i,
+    /"quota_limit_value":"0"/i,
+  ];
+
   switch (status) {
-    case "RESOURCE_EXHAUSTED":
+    case "RESOURCE_EXHAUSTED": {
+      if (keyDeadMsgs.every((msg) => text.match(msg))) {
+        req.log.warn(
+          { key: req.key?.hash, error: text },
+          "Google API key appears to be temporarily inoperative and will be disabled."
+        );
+        keyPool.disable(req.key!, "revoked");
+        errorPayload.proxy_note = `Assigned API key cannot be used.`;
+        return;
+      }
+
       keyPool.markRateLimited(req.key!);
       await reenqueueRequest(req);
       throw new RetryableError("Rate-limited request re-enqueued.");
+    }
     default:
       errorPayload.proxy_note = `Unrecognized rate limit error from Google AI (${status}). Please report this.`;
       break;

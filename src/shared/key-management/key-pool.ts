@@ -178,8 +178,9 @@ export class KeyPool {
 
     const job = schedule.scheduleJob(crontab, () => {
       const next = job.nextInvocation();
-      logger.info({ next }, "Performing periodic recheck of OpenAI keys");
+      logger.info({ next }, "Performing periodic recheck.");
       this.recheck("openai");
+      this.recheck("google-ai");
     });
     logger.info(
       { rule: crontab, next: job.nextInvocation() },
