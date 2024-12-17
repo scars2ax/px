@@ -1,13 +1,15 @@
 import crypto from "crypto";
-import { Key, KeyProvider } from "..";
 import { config } from "../../../config";
 import { logger } from "../../../logger";
-import type { GoogleAIModelFamily } from "../../models";
-import { HttpError, PaymentRequiredError } from "../../errors";
+import { PaymentRequiredError } from "../../errors";
+import { getGoogleAIModelFamily, type GoogleAIModelFamily } from "../../models";
+import { createGenericGetLockoutPeriod, Key, KeyProvider } from "..";
+import { prioritizeKeys } from "../prioritize-keys";
+import { GoogleAIKeyChecker } from "./checker";
 
-// Note that Google AI is not the same as Vertex AI, both are provided by Google
-// but Vertex is the GCP product for enterprise. while Google AI is the
-// consumer-ish product. The API is different, and keys are not compatible.
+// Note that Google AI is not the same as Vertex AI, both are provided by
+// Google but Vertex is the GCP product for enterprise, while Google API is a
+// development/hobbyist product. They use completely different APIs and keys.
 // https://ai.google.dev/docs/migrate_to_cloud
 
 export type GoogleAIKeyUpdate = Omit<
@@ -27,10 +29,8 @@ type GoogleAIKeyUsage = {
 export interface GoogleAIKey extends Key, GoogleAIKeyUsage {
   readonly service: "google-ai";
   readonly modelFamilies: GoogleAIModelFamily[];
-  /** The time at which this key was last rate limited. */
-  rateLimitedAt: number;
-  /** The time until which this key is rate limited. */
-  rateLimitedUntil: number;
+  /** All detected model IDs on this key. */
+  modelIds: string[];
 }
 
 /**
@@ -49,6 +49,7 @@ export class GoogleAIKeyProvider implements KeyProvider<GoogleAIKey> {
   readonly service = "google-ai";
 
   private keys: GoogleAIKey[] = [];
+  private checker?: GoogleAIKeyChecker;
   private log = logger.child({ module: "key-provider", service: this.service });
 
   constructor() {
@@ -78,49 +79,40 @@ export class GoogleAIKeyProvider implements KeyProvider<GoogleAIKey> {
           .digest("hex")
           .slice(0, 8)}`,
         lastChecked: 0,
+        "gemini-flashTokens": 0,
         "gemini-proTokens": 0,
+        "gemini-ultraTokens": 0,
+        modelIds: [],
       };
       this.keys.push(newKey);
     }
     this.log.info({ keyCount: this.keys.length }, "Loaded Google AI keys.");
   }
 
-  public init() {}
+  public init() {
+    if (config.checkKeys) {
+      this.checker = new GoogleAIKeyChecker(this.keys, this.update.bind(this));
+      this.checker.start();
+    }
+  }
 
   public list() {
     return this.keys.map((k) => Object.freeze({ ...k, key: undefined }));
   }
 
-  public get(_model: string) {
-    const availableKeys = this.keys.filter((k) => !k.isDisabled);
+  public get(model: string) {
+    const neededFamily = getGoogleAIModelFamily(model);
+    const availableKeys = this.keys.filter(
+      (k) => !k.isDisabled && k.modelFamilies.includes(neededFamily)
+    );
     if (availableKeys.length === 0) {
       throw new PaymentRequiredError("No Google AI keys available");
     }
 
-    // (largely copied from the OpenAI provider, without trial key support)
-    // Select a key, from highest priority to lowest priority:
-    // 1. Keys which are not rate limited
-    //    a. If all keys were rate limited recently, select the least-recently
-    //       rate limited key.
-    // 3. Keys which have not been used in the longest time
-
-    const now = Date.now();
-
-    const keysByPriority = availableKeys.sort((a, b) => {
-      const aRateLimited = now - a.rateLimitedAt < RATE_LIMIT_LOCKOUT;
-      const bRateLimited = now - b.rateLimitedAt < RATE_LIMIT_LOCKOUT;
-
-      if (aRateLimited && !bRateLimited) return 1;
-      if (!aRateLimited && bRateLimited) return -1;
-      if (aRateLimited && bRateLimited) {
-        return a.rateLimitedAt - b.rateLimitedAt;
-      }
-
-      return a.lastUsed - b.lastUsed;
-    });
+    const keysByPriority = prioritizeKeys(availableKeys);
 
     const selectedKey = keysByPriority[0];
-    selectedKey.lastUsed = now;
+    selectedKey.lastUsed = Date.now();
     this.throttle(selectedKey.hash);
     return { ...selectedKey };
   }
@@ -141,29 +133,14 @@ export class GoogleAIKeyProvider implements KeyProvider<GoogleAIKey> {
     return this.keys.filter((k) => !k.isDisabled).length;
   }
 
-  public incrementUsage(hash: string, _model: string, tokens: number) {
+  public incrementUsage(hash: string, model: string, tokens: number) {
     const key = this.keys.find((k) => k.hash === hash);
     if (!key) return;
     key.promptCount++;
-    key["gemini-proTokens"] += tokens;
+    key[`${getGoogleAIModelFamily(model)}Tokens`] += tokens;
   }
 
-  public getLockoutPeriod() {
-    const activeKeys = this.keys.filter((k) => !k.isDisabled);
-    // Don't lock out if there are no keys available or the queue will stall.
-    // Just let it through so the add-key middleware can throw an error.
-    if (activeKeys.length === 0) return 0;
-
-    const now = Date.now();
-    const rateLimitedKeys = activeKeys.filter((k) => now < k.rateLimitedUntil);
-    const anyNotRateLimited = rateLimitedKeys.length < activeKeys.length;
-
-    if (anyNotRateLimited) return 0;
-
-    // If all keys are rate-limited, return the time until the first key is
-    // ready.
-    return Math.min(...activeKeys.map((k) => k.rateLimitedUntil - now));
-  }
+  getLockoutPeriod = createGenericGetLockoutPeriod(() => this.keys);
 
   /**
    * This is called when we receive a 429, which means there are already five

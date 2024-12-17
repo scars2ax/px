@@ -23,6 +23,7 @@ import { init as initTokenizers } from "./shared/tokenization";
 import { checkOrigin } from "./proxy/check-origin";
 import { sendErrorToClient } from "./proxy/middleware/response/error-generator";
 import { initializeDatabase, getDatabase } from "./shared/database";
+import { initializeFirebase } from "./shared/firebase";
 
 const PORT = config.port;
 const BIND_ADDRESS = config.bindAddress;
@@ -49,6 +50,7 @@ app.use(
         // Don't log the prompt text on transform errors
         "body.messages",
         "body.prompt",
+        "body.contents",
       ],
       censor: "********",
     },
@@ -87,6 +89,15 @@ app.use(blacklist);
 app.use(checkOrigin);
 
 app.use("/admin", adminRouter);
+app.use((req, _, next) => {
+  // For whatever reason SillyTavern just ignores the path a user provides
+  // when using Google AI with reverse proxy.  We'll fix it here.
+  if (req.path.startsWith("/v1beta/models/")) {
+    req.url = `${config.proxyEndpointRoute}/google-ai${req.url}`;
+    return next();
+  }
+  next();
+});
 app.use(config.proxyEndpointRoute, proxyRouter);
 app.use("/user", userRouter);
 if (config.staticServiceInfo) {
@@ -127,6 +138,12 @@ async function start() {
   logger.info("Checking configs and external dependencies...");
   await assertConfigIsValid();
 
+  if (config.gatekeeperStore.startsWith("firebase")) {
+    logger.info("Testing Firebase connection...");
+    await initializeFirebase();
+    logger.info("Firebase connection successful.");
+  }
+
   keyPool.init();
 
   await initTokenizers();
@@ -156,7 +173,7 @@ async function start() {
   app.listen(PORT, BIND_ADDRESS, () => {
     logger.info(
       { port: PORT, interface: BIND_ADDRESS },
-      "Now listening for connections."
+      "Server ready to accept connections."
     );
     registerUncaughtExceptionHandler();
   });

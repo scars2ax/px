@@ -2,7 +2,6 @@ import pino from "pino";
 import { Transform, TransformOptions } from "stream";
 import { Message } from "@smithy/eventstream-codec";
 import { APIFormat } from "../../../../shared/key-management";
-import { buildSpoofedSSE } from "../error-generator";
 import { BadRequestError, RetryableError } from "../../../../shared/errors";
 
 type SSEStreamAdapterOptions = TransformOptions & {
@@ -20,7 +19,6 @@ type SSEStreamAdapterOptions = TransformOptions & {
  */
 export class SSEStreamAdapter extends Transform {
   private readonly isAwsStream;
-  private readonly isGoogleStream;
   private api: APIFormat;
   private partialMessage = "";
   private textDecoder = new TextDecoder("utf8");
@@ -30,7 +28,6 @@ export class SSEStreamAdapter extends Transform {
     super({ ...options, objectMode: true });
     this.isAwsStream =
       options?.contentType === "application/vnd.amazon.eventstream";
-    this.isGoogleStream = options?.api === "google-ai";
     this.api = options.api;
     this.log = options.logger.child({ module: "sse-stream-adapter" });
   }
@@ -55,8 +52,10 @@ export class SSEStreamAdapter extends Transform {
 
           if ("completion" in eventObj) {
             return ["event: completion", `data: ${event}`].join(`\n`);
-          } else {
+          } else if (eventObj.type) {
             return [`event: ${eventObj.type}`, `data: ${event}`].join(`\n`);
+          } else {
+            return `data: ${event}`;
           }
         }
       // noinspection FallThroughInSwitchStatementJS -- non-JSON data is unexpected
@@ -108,43 +107,11 @@ export class SSEStreamAdapter extends Transform {
     }
   }
 
-  /** Processes an incoming array element from the Google AI JSON stream. */
-  protected processGoogleObject(data: any): string | null {
-    // Sometimes data has fields key and value, sometimes it's just the
-    // candidates array.
-    const candidates = data.value?.candidates ?? data.candidates ?? [{}];
-    try {
-      const hasParts = candidates[0].content?.parts?.length > 0;
-      if (hasParts) {
-        return `data: ${JSON.stringify(data.value ?? data)}\n`;
-      } else {
-        this.log.error({ event: data }, "Received bad Google AI event");
-        return `data: ${buildSpoofedSSE({
-          format: "google-ai",
-          title: "Proxy stream error",
-          message:
-            "The proxy received malformed or unexpected data from Google AI while streaming.",
-          obj: data,
-          reqId: "proxy-sse-adapter-message",
-          model: "",
-        })}`;
-      }
-    } catch (error) {
-      error.lastEvent = data;
-      this.emit("error", error);
-    }
-    return null;
-  }
-
   _transform(data: any, _enc: string, callback: (err?: Error | null) => void) {
     try {
       if (this.isAwsStream) {
         // `data` is a Message object
         const message = this.processAwsMessage(data);
-        if (message) this.push(message + "\n\n");
-      } else if (this.isGoogleStream) {
-        // `data` is an element from the Google AI JSON stream
-        const message = this.processGoogleObject(data);
         if (message) this.push(message + "\n\n");
       } else {
         // `data` is a string, but possibly only a partial message

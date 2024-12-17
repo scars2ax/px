@@ -13,6 +13,7 @@
 
 import crypto from "crypto";
 import { Handler, Request } from "express";
+import { config } from "../config";
 import { BadRequestError, TooManyRequestsError } from "../shared/errors";
 import { keyPool } from "../shared/key-management";
 import {
@@ -22,24 +23,25 @@ import {
 } from "../shared/models";
 import { initializeSseStream } from "../shared/streaming";
 import { logger } from "../logger";
-import { getUniqueIps, SHARED_IP_ADDRESSES } from "./rate-limit";
-import { RequestPreprocessor } from "./middleware/request";
-import { handleProxyError } from "./middleware/common";
+import { getUniqueIps } from "./rate-limit";
+import { ProxyReqMutator, RequestPreprocessor } from "./middleware/request";
 import { sendErrorToClient } from "./middleware/response/error-generator";
+import { ProxyReqManager } from "./middleware/request/proxy-req-manager";
+import { classifyErrorAndSend } from "./middleware/common";
 
 const queue: Request[] = [];
 const log = logger.child({ module: "request-queue" });
 
 /** Maximum number of queue slots for individual users. */
-const USER_CONCURRENCY_LIMIT = parseInt(process.env.USER_CONCURRENCY_LIMIT ?? "1");
-/** Maximum number of queue slots for Agnai.chat requests. */
-const AGNAI_CONCURRENCY_LIMIT = USER_CONCURRENCY_LIMIT * 5;
+const USER_CONCURRENCY_LIMIT = parseInt(
+  process.env.USER_CONCURRENCY_LIMIT ?? "1"
+);
 const MIN_HEARTBEAT_SIZE = parseInt(process.env.MIN_HEARTBEAT_SIZE_B ?? "512");
 const MAX_HEARTBEAT_SIZE =
   1024 * parseInt(process.env.MAX_HEARTBEAT_SIZE_KB ?? "1024");
 const HEARTBEAT_INTERVAL =
   1000 * parseInt(process.env.HEARTBEAT_INTERVAL_SEC ?? "5");
-const LOAD_THRESHOLD = parseFloat(process.env.LOAD_THRESHOLD ?? "50");
+const LOAD_THRESHOLD = parseFloat(process.env.LOAD_THRESHOLD ?? "150");
 const PAYLOAD_SCALE_FACTOR = parseFloat(
   process.env.PAYLOAD_SCALE_FACTOR ?? "6"
 );
@@ -58,39 +60,28 @@ const QUEUE_JOIN_TIMEOUT = 5000;
 function getIdentifier(req: Request) {
   if (req.user) return req.user.token;
   if (req.risuToken) return req.risuToken;
-  if (isFromSharedIp(req)) return "shared-ip";
+  // if (isFromSharedIp(req)) return "shared-ip";
   return req.ip;
 }
 
 const sharesIdentifierWith = (incoming: Request) => (queued: Request) =>
   getIdentifier(queued) === getIdentifier(incoming);
 
-const isFromSharedIp = (req: Request) => SHARED_IP_ADDRESSES.has(req.ip);
-
 async function enqueue(req: Request) {
-  const enqueuedRequestCount = queue.filter(sharesIdentifierWith(req)).length;
-  let isGuest = req.user?.token === undefined;
+  if (req.socket.destroyed || req.res?.writableEnded) {
+    // In rare cases, a request can be disconnected after it is dequeued for a
+    // retry, but before it is re-enqueued. In this case we may miss the abort
+    // and the request will loop in the queue forever.
+    req.log.warn("Attempt to enqueue aborted request.");
+    throw new Error("Attempt to enqueue aborted request.");
+  }
 
-  // Requests from shared IP addresses such as Agnai.chat are exempt from IP-
-  // based rate limiting but can only occupy a certain number of slots in the
-  // queue. Authenticated users always get a single spot in the queue.
-  const isSharedIp = isFromSharedIp(req);
-  const maxConcurrentQueuedRequests =
-    isGuest && isSharedIp ? AGNAI_CONCURRENCY_LIMIT : USER_CONCURRENCY_LIMIT;
-  if (enqueuedRequestCount >= maxConcurrentQueuedRequests) {
-    if (isSharedIp) {
-      // Re-enqueued requests are not counted towards the limit since they
-      // already made it through the queue once.
-      if (req.retryCount === 0) {
-        throw new TooManyRequestsError(
-          "Too many agnai.chat requests are already queued"
-        );
-      }
-    } else {
-      throw new TooManyRequestsError(
-        "Your IP or user token already has another request in the queue."
-      );
-    }
+  const enqueuedRequestCount = queue.filter(sharesIdentifierWith(req)).length;
+
+  if (enqueuedRequestCount >= USER_CONCURRENCY_LIMIT) {
+    throw new TooManyRequestsError(
+      "Your IP or user token already has another request in the queue."
+    );
   }
 
   // shitty hack to remove hpm's event listeners on retried requests
@@ -146,19 +137,7 @@ export async function reenqueueRequest(req: Request) {
 }
 
 function getQueueForPartition(partition: ModelFamily): Request[] {
-  return queue
-    .filter((req) => getModelFamilyForRequest(req) === partition)
-    .sort((a, b) => {
-      // Certain requests are exempted from IP-based rate limiting because they
-      // come from a shared IP address. To prevent these requests from starving
-      // out other requests during periods of high traffic, we sort them to the
-      // end of the queue.
-      const aIsExempted = isFromSharedIp(a);
-      const bIsExempted = isFromSharedIp(b);
-      if (aIsExempted && !bIsExempted) return 1;
-      if (!aIsExempted && bIsExempted) return -1;
-      return 0;
-    });
+  return queue.filter((req) => getModelFamilyForRequest(req) === partition);
 }
 
 export function dequeue(partition: ModelFamily): Request | undefined {
@@ -169,7 +148,14 @@ export function dequeue(partition: ModelFamily): Request | undefined {
   }
 
   const req = modelQueue.reduce((prev, curr) =>
-    prev.startTime < curr.startTime ? prev : curr
+    prev.startTime +
+      config.tokensPunishmentFactor *
+        ((prev.promptTokens ?? 0) + (prev.outputTokens ?? 0)) <
+    curr.startTime +
+      config.tokensPunishmentFactor *
+        ((curr.promptTokens ?? 0) + (curr.outputTokens ?? 0))
+      ? prev
+      : curr
   );
   queue.splice(queue.indexOf(req), 1);
 
@@ -261,7 +247,6 @@ let waitTimes: {
   partition: ModelFamily;
   start: number;
   end: number;
-  isDeprioritized: boolean;
 }[] = [];
 
 /** Adds a successful request to the list of wait times. */
@@ -270,7 +255,6 @@ export function trackWaitTime(req: Request) {
     partition: getModelFamilyForRequest(req),
     start: req.startTime!,
     end: req.queueOutTime ?? Date.now(),
-    isDeprioritized: isFromSharedIp(req),
   });
 }
 
@@ -296,8 +280,7 @@ function calculateWaitTime(partition: ModelFamily) {
     .filter((wait) => {
       const isSamePartition = wait.partition === partition;
       const isRecent = now - wait.end < 300 * 1000;
-      const isNormalPriority = !wait.isDeprioritized;
-      return isSamePartition && isRecent && isNormalPriority;
+      return isSamePartition && isRecent;
     })
     .map((wait) => wait.end - wait.start);
   const recentAverage = recentWaits.length
@@ -311,11 +294,7 @@ function calculateWaitTime(partition: ModelFamily) {
   );
 
   const currentWaits = queue
-    .filter((req) => {
-      const isSamePartition = getModelFamilyForRequest(req) === partition;
-      const isNormalPriority = !isFromSharedIp(req);
-      return isSamePartition && isNormalPriority;
-    })
+    .filter((req) => getModelFamilyForRequest(req) === partition)
     .map((req) => now - req.startTime!);
   const longestCurrentWait = Math.max(...currentWaits, 0);
 
@@ -343,26 +322,35 @@ export function getQueueLength(partition: ModelFamily | "all" = "all") {
 }
 
 export function createQueueMiddleware({
-  beforeProxy,
+  mutations = [],
   proxyMiddleware,
 }: {
-  beforeProxy?: RequestPreprocessor;
+  mutations?: ProxyReqMutator[];
   proxyMiddleware: Handler;
 }): Handler {
   return async (req, res, next) => {
     req.proceed = async () => {
-      if (beforeProxy) {
-        try {
-          // Hack to let us run asynchronous middleware before the
-          // http-proxy-middleware handler. This is used to sign AWS requests
-          // before they are proxied, as the signing is asynchronous.
-          // Unlike RequestPreprocessors, this runs every time the request is
-          // dequeued, not just the first time.
-          await beforeProxy(req);
-        } catch (err) {
-          return handleProxyError(err, req, res);
+      // canonicalize the stream field which is set in a few places not always
+      // consistently
+      req.isStreaming = req.isStreaming || String(req.body.stream) === "true";
+      req.body.stream = req.isStreaming;
+
+      try {
+        // Just before executing the proxyMiddleware, we will create a
+        // ProxyReqManager to track modifications to the request. This allows
+        // us to revert those changes if the proxied request fails with a
+        // retryable error. That happens in proxyMiddleware's onProxyRes
+        // handler.
+        const changeManager = new ProxyReqManager(req);
+        req.changeManager = changeManager;
+        for (const mutator of mutations) {
+          await mutator(changeManager);
         }
+      } catch (err) {
+        // Failure during request preparation is a fatal error.
+        return classifyErrorAndSend(err, req, res);
       }
+
       proxyMiddleware(req, res, next);
     };
 

@@ -47,9 +47,9 @@ type GoogleAIChatTokenCountRequest = {
 };
 
 type MistralAIChatTokenCountRequest = {
-  prompt: MistralAIChatMessage[];
+  prompt: string | MistralAIChatMessage[];
   completion?: never;
-  service: "mistral-ai";
+  service: "mistral-ai" | "mistral-text";
 };
 
 type FlatPromptTokenCountRequest = {
@@ -86,6 +86,8 @@ type TokenCountRequest = { req: Request } & (
 
 type TokenCountResult = {
   token_count: number;
+  /** Additional tokens for reasoning, if applicable. */
+  reasoning_tokens?: number;
   tokenizer: string;
   tokenization_duration_ms: number;
 };
@@ -128,6 +130,7 @@ export async function countTokens({
         tokenization_duration_ms: getElapsedMs(time),
       };
     case "mistral-ai":
+    case "mistral-text":
       return {
         ...getMistralAITokenCount(prompt ?? completion),
         tokenization_duration_ms: getElapsedMs(time),

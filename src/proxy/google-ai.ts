@@ -1,21 +1,15 @@
 import { Request, RequestHandler, Router } from "express";
-import { createProxyMiddleware } from "http-proxy-middleware";
 import { v4 } from "uuid";
+import { GoogleAIKey, keyPool } from "../shared/key-management";
 import { config } from "../config";
-import { logger } from "../logger";
-import { createQueueMiddleware } from "./queue";
 import { ipLimiter } from "./rate-limit";
-import { handleProxyError } from "./middleware/common";
 import {
-  createOnProxyReqHandler,
   createPreprocessorMiddleware,
   finalizeSignedRequest,
 } from "./middleware/request";
-import {
-  createOnProxyResHandler,
-  ProxyResHandlerWithBody,
-} from "./middleware/response";
-import { addGoogleAIKey } from "./middleware/request/preprocessors/add-google-ai-key";
+import { ProxyResHandlerWithBody } from "./middleware/response";
+import { addGoogleAIKey } from "./middleware/request/mutators/add-google-ai-key";
+import { createQueuedProxyMiddleware } from "./middleware/request/proxy-middleware-factory";
 
 let modelsCache: any = null;
 let modelsCacheTime = 0;
@@ -30,14 +24,19 @@ const getModelsResponse = () => {
 
   if (!config.googleAIKey) return { object: "list", data: [] };
 
-  const googleAIVariants = [
-    "gemini-pro",
-    "gemini-1.0-pro",
-    "gemini-1.5-pro",
-    "gemini-1.5-pro-latest",
-  ];
+  const keys = keyPool
+    .list()
+    .filter((k) => k.service === "google-ai") as GoogleAIKey[];
+  if (keys.length === 0) {
+    modelsCache = { object: "list", data: [] };
+    modelsCacheTime = new Date().getTime();
+    return modelsCache;
+  }
 
-  const models = googleAIVariants.map((id) => ({
+  const modelIds = Array.from(
+    new Set(keys.map((k) => k.modelIds).flat())
+  ).filter((id) => id.startsWith("models/gemini"));
+  const models = modelIds.map((id) => ({
     id,
     object: "model",
     created: new Date().getTime(),
@@ -57,8 +56,7 @@ const handleModelRequest: RequestHandler = (_req, res) => {
   res.status(200).json(getModelsResponse());
 };
 
-/** Only used for non-streaming requests. */
-const googleAIResponseHandler: ProxyResHandlerWithBody = async (
+const googleAIBlockingResponseHandler: ProxyResHandlerWithBody = async (
   _proxyRes,
   req,
   res,
@@ -104,27 +102,30 @@ function transformGoogleAIResponse(
   };
 }
 
-const googleAIProxy = createQueueMiddleware({
-  beforeProxy: addGoogleAIKey,
-  proxyMiddleware: createProxyMiddleware({
-    target: "bad-target-will-be-rewritten",
-    router: ({ signedRequest }) => {
-      const { protocol, hostname, path } = signedRequest;
-      return `${protocol}//${hostname}${path}`;
-    },
-    changeOrigin: true,
-    selfHandleResponse: true,
-    logger,
-    on: {
-      proxyReq: createOnProxyReqHandler({ pipeline: [finalizeSignedRequest] }),
-      proxyRes: createOnProxyResHandler([googleAIResponseHandler]),
-      error: handleProxyError,
-    },
-  }),
+const googleAIProxy = createQueuedProxyMiddleware({
+  target: ({ signedRequest }) => {
+    if (!signedRequest) throw new Error("Must sign request before proxying");
+    const { protocol, hostname} = signedRequest;
+    return `${protocol}//${hostname}`;
+  },
+  mutations: [addGoogleAIKey, finalizeSignedRequest],
+  blockingResponseHandler: googleAIBlockingResponseHandler,
 });
 
 const googleAIRouter = Router();
 googleAIRouter.get("/v1/models", handleModelRequest);
+
+// Native Google AI chat completion endpoint
+googleAIRouter.post(
+  "/v1beta/models/:modelId:(generateContent|streamGenerateContent)",
+  ipLimiter,
+  createPreprocessorMiddleware(
+    { inApi: "google-ai", outApi: "google-ai", service: "google-ai" },
+    { beforeTransform: [maybeReassignModel], afterTransform: [setStreamFlag] }
+  ),
+  googleAIProxy
+);
+
 // OpenAI-to-Google AI compatibility endpoint.
 googleAIRouter.post(
   "/v1/chat/completions",
@@ -136,14 +137,40 @@ googleAIRouter.post(
   googleAIProxy
 );
 
-/** Replaces requests for non-Google AI models with gemini-pro-1.5-latest. */
+function setStreamFlag(req: Request) {
+  const isStreaming = req.url.includes("streamGenerateContent");
+  if (isStreaming) {
+    req.body.stream = true;
+    req.isStreaming = true;
+  } else {
+    req.body.stream = false;
+    req.isStreaming = false;
+  }
+}
+
+/**
+ * Replaces requests for non-Google AI models with gemini-1.5-pro-latest.
+ * Also strips models/ from the beginning of the model IDs.
+ **/
 function maybeReassignModel(req: Request) {
-  const requested = req.body.model;
+  // Ensure model is on body as a lot of middleware will expect it.
+  const model = req.body.model || req.url.split("/").pop()?.split(":").shift();
+  if (!model) {
+    throw new Error("You must specify a model with your request.");
+  }
+  req.body.model = model;
+
+  const requested = model;
+  if (requested.startsWith("models/")) {
+    req.body.model = requested.slice("models/".length);
+  }
+
   if (requested.includes("gemini")) {
     return;
   }
-  req.log.info({ requested }, "Reassigning model to gemini-pro-1.5-latest");
-  req.body.model = "gemini-pro-1.5-latest";
+
+  req.log.info({ requested }, "Reassigning model to gemini-1.5-pro-latest");
+  req.body.model = "gemini-1.5-pro-latest";
 }
 
 export const googleAI = googleAIRouter;

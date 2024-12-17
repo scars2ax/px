@@ -1,22 +1,15 @@
-import { RequestHandler, Router, Request } from "express";
-import { createProxyMiddleware } from "http-proxy-middleware";
-import { config } from "../config";
-import { logger } from "../logger";
-import { createQueueMiddleware } from "./queue";
+import { Request, RequestHandler, Router } from "express";
+import { OpenAIImageGenerationResult } from "../shared/file-storage/mirror-generated-image";
+import { generateModelList } from "./openai";
 import { ipLimiter } from "./rate-limit";
-import { handleProxyError } from "./middleware/common";
 import {
   addKey,
   createPreprocessorMiddleware,
   finalizeBody,
-  createOnProxyReqHandler,
 } from "./middleware/request";
-import {
-  createOnProxyResHandler,
-  ProxyResHandlerWithBody,
-} from "./middleware/response";
-import { generateModelList } from "./openai";
-import { OpenAIImageGenerationResult } from "../shared/file-storage/mirror-generated-image";
+import { ProxyResHandlerWithBody } from "./middleware/response";
+import { ProxyReqManager } from "./middleware/request/proxy-req-manager";
+import { createQueuedProxyMiddleware } from "./middleware/request/proxy-middleware-factory";
 
 const KNOWN_MODELS = ["dall-e-2", "dall-e-3"];
 
@@ -26,7 +19,9 @@ const handleModelRequest: RequestHandler = (_req, res) => {
   if (new Date().getTime() - modelListValid < 1000 * 60) {
     return res.status(200).json(modelListCache);
   }
-  const result = generateModelList(KNOWN_MODELS);
+  const result = generateModelList("openai").filter((m: { id: string }) =>
+    KNOWN_MODELS.includes(m.id)
+  );
   modelListCache = { object: "list", data: result };
   modelListValid = new Date().getTime();
   res.status(200).json(modelListCache);
@@ -94,21 +89,19 @@ function transformResponseForChat(
   };
 }
 
-const openaiImagesProxy = createQueueMiddleware({
-  proxyMiddleware: createProxyMiddleware({
-    target: "https://api.openai.com",
-    changeOrigin: true,
-    selfHandleResponse: true,
-    logger,
-    pathRewrite: {
-      "^/v1/chat/completions": "/v1/images/generations",
-    },
-    on: {
-      proxyReq: createOnProxyReqHandler({ pipeline: [addKey, finalizeBody] }),
-      proxyRes: createOnProxyResHandler([openaiImagesResponseHandler]),
-      error: handleProxyError,
-    },
-  }),
+function replacePath(manager: ProxyReqManager) {
+  const req = manager.request;
+  const pathname = req.url.split("?")[0];
+  req.log.debug({ pathname }, "OpenAI image path filter");
+  if (req.path.startsWith("/v1/chat/completions")) {
+    manager.setPath("/v1/images/generations");
+  }
+}
+
+const openaiImagesProxy = createQueuedProxyMiddleware({
+  target: "https://api.openai.com",
+  mutations: [replacePath, addKey, finalizeBody],
+  blockingResponseHandler: openaiImagesResponseHandler,
 });
 
 const openaiImagesRouter = Router();

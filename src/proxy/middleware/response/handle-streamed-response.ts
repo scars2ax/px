@@ -1,6 +1,5 @@
 import express from "express";
 import { pipeline, Readable, Transform } from "stream";
-import StreamArray from "stream-json/streamers/StreamArray";
 import { StringDecoder } from "string_decoder";
 import { promisify } from "util";
 import type { logger } from "../../../logger";
@@ -18,43 +17,45 @@ import { getAwsEventStreamDecoder } from "./streaming/aws-event-stream-decoder";
 import { EventAggregator } from "./streaming/event-aggregator";
 import { SSEMessageTransformer } from "./streaming/sse-message-transformer";
 import { SSEStreamAdapter } from "./streaming/sse-stream-adapter";
+import { getStreamDecompressor } from "./compression";
 
 const pipelineAsync = promisify(pipeline);
 
 /**
- * `handleStreamedResponse` consumes and transforms a streamed response from the
- * upstream service, forwarding events to the client in their requested format.
+ * `handleStreamedResponse` consumes a streamed response from the upstream API,
+ * decodes chunk-by-chunk into a stream of events, transforms those events into
+ * the client's requested format, and forwards the result to the client.
+ *
  * After the entire stream has been consumed, it resolves with the full response
  * body so that subsequent middleware in the chain can process it as if it were
- * a non-streaming response.
+ * a non-streaming response (to count output tokens, track usage, etc).
  *
- * In the event of an error, the request's streaming flag is unset and the non-
- * streaming response handler is called instead.
- *
- * If the error is retryable, that handler will re-enqueue the request and also
- * reset the streaming flag. Unfortunately the streaming flag is set and unset
- * in multiple places, so it's hard to keep track of.
+ * In the event of an error, the request's streaming flag is unset and the
+ * request is bounced back to the non-streaming response handler. If the error
+ * is retryable, that handler will re-enqueue the request and also reset the
+ * streaming flag. Unfortunately the streaming flag is set and unset in multiple
+ * places, so it's hard to keep track of.
  */
 export const handleStreamedResponse: RawResponseBodyHandler = async (
   proxyRes,
   req,
   res
 ) => {
-  const { hash } = req.key!;
+  const { headers, statusCode } = proxyRes;
   if (!req.isStreaming) {
     throw new Error("handleStreamedResponse called for non-streaming request.");
   }
 
-  if (proxyRes.statusCode! > 201) {
+  if (statusCode! > 201) {
     req.isStreaming = false;
     req.log.warn(
-      { statusCode: proxyRes.statusCode, key: hash },
+      { statusCode },
       `Streaming request returned error status code. Falling back to non-streaming response handler.`
     );
     return handleBlockingResponse(proxyRes, req, res);
   }
 
-  req.log.debug({ headers: proxyRes.headers }, `Starting to proxy SSE stream.`);
+  req.log.debug({ headers }, `Starting to proxy SSE stream.`);
 
   // Typically, streaming will have already been initialized by the request
   // queue to send heartbeat pings.
@@ -65,18 +66,25 @@ export const handleStreamedResponse: RawResponseBodyHandler = async (
 
   const prefersNativeEvents = req.inboundApi === req.outboundApi;
   const streamOptions = {
-    contentType: proxyRes.headers["content-type"],
+    contentType: headers["content-type"],
     api: req.outboundApi,
     logger: req.log,
   };
 
-  // Decoder turns the raw response stream into a stream of events in some
-  // format (text/event-stream, vnd.amazon.event-stream, streaming JSON, etc).
+  // While the request is streaming, aggregator collects all events so that we
+  // can compile them into a single response object and publish that to the
+  // remaining middleware. Because we have an OpenAI transformer for every
+  // supported format, EventAggregator always consumes OpenAI events so that we
+  // only have to write one aggregator (OpenAI input) for each output format.
+  const aggregator = new EventAggregator(req);
+
+  const decompressor = getStreamDecompressor(headers["content-encoding"]);
+  // Decoder reads from the response bytes to produce a stream of plaintext.
   const decoder = getDecoder({ ...streamOptions, input: proxyRes });
-  // Adapter transforms the decoded events into server-sent events.
+  // Adapter consumes the decoded text and produces server-sent events so we
+  // have a standard event format for the client and to translate between API
+  // message formats.
   const adapter = new SSEStreamAdapter(streamOptions);
-  // Aggregator compiles all events into a single response object.
-  const aggregator = new EventAggregator({ format: req.outboundApi });
   // Transformer converts server-sent events from one vendor's API message
   // format to another.
   const transformer = new SSEMessageTransformer({
@@ -98,7 +106,7 @@ export const handleStreamedResponse: RawResponseBodyHandler = async (
   try {
     await Promise.race([
       handleAbortedStream(req, res),
-      pipelineAsync(proxyRes, decoder, adapter, transformer),
+      pipelineAsync(proxyRes, decompressor, decoder, adapter, transformer),
     ]);
     req.log.debug(`Finished proxying SSE stream.`);
     res.end();
@@ -165,14 +173,13 @@ function getDecoder(options: {
   logger: typeof logger;
   contentType?: string;
 }) {
-  const { api, contentType, input, logger } = options;
+  const { contentType, input, logger } = options;
   if (contentType?.includes("application/vnd.amazon.eventstream")) {
     return getAwsEventStreamDecoder({ input, logger });
-  } else if (api === "google-ai") {
-    return StreamArray.withParser();
+  } else if (contentType?.includes("application/json")) {
+    throw new Error("JSON streaming not supported, request SSE instead");
   } else {
-    // Passthrough stream, but ensures split chunks across multi-byte characters
-    // are handled correctly.
+    // Ensures split chunks across multi-byte characters are handled correctly.
     const stringDecoder = new StringDecoder("utf8");
     return new Transform({
       readableObjectMode: true,

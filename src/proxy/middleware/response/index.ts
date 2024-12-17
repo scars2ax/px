@@ -47,7 +47,7 @@ export type ProxyResHandlerWithBody = (
    */
   body: string | Record<string, any>
 ) => Promise<void>;
-export type ProxyResMiddleware = ProxyResHandlerWithBody[];
+export type ProxyResMiddleware = ProxyResHandlerWithBody[] | undefined;
 
 /**
  * Returns a on.proxyRes handler that executes the given middleware stack after
@@ -71,10 +71,21 @@ export const createOnProxyResHandler = (apiMiddleware: ProxyResMiddleware) => {
     req: Request,
     res: Response
   ) => {
-    const initialHandler: RawResponseBodyHandler = req.isStreaming
+    // Proxied request has by now been sent to the upstream API, so we revert
+    // tracked mutations that were only needed to send the request.
+    // This generally means path adjustment, headers, and body serialization.
+    if (req.changeManager) {
+      req.changeManager.revert();
+    }
+
+    const initialHandler = req.isStreaming
       ? handleStreamedResponse
       : handleBlockingResponse;
     let lastMiddleware = initialHandler.name;
+
+    if (Buffer.isBuffer(req.body)) {
+      req.body = JSON.parse(req.body.toString());
+    }
 
     try {
       const body = await initialHandler(proxyRes, req, res);
@@ -100,7 +111,7 @@ export const createOnProxyResHandler = (apiMiddleware: ProxyResMiddleware) => {
           saveImage,
           logPrompt,
           logEvent,
-          ...apiMiddleware
+          ...(apiMiddleware ?? [])
         );
       }
 
@@ -124,15 +135,15 @@ export const createOnProxyResHandler = (apiMiddleware: ProxyResMiddleware) => {
       }
 
       const { stack, message } = error;
-      const info = { stack, lastMiddleware, key: req.key?.hash };
+      const details = { stack, message, lastMiddleware, key: req.key?.hash };
       const description = `Error while executing proxy response middleware: ${lastMiddleware} (${message})`;
 
       if (res.headersSent) {
-        req.log.error(info, description);
+        req.log.error(details, description);
         if (!res.writableEnded) res.end();
         return;
       } else {
-        req.log.error(info, description);
+        req.log.error(details, description);
         res
           .status(500)
           .json({ error: "Internal server error", proxy_note: description });
@@ -163,53 +174,64 @@ const handleUpstreamErrors: ProxyResHandlerWithBody = async (
 ) => {
   const statusCode = proxyRes.statusCode || 500;
   const statusMessage = proxyRes.statusMessage || "Internal Server Error";
-  let errorPayload: ProxiedErrorPayload;
-
+  const service = req.key!.service;
+  // Not an error, continue to next response handler
   if (statusCode < 400) return;
 
+  // Parse the error response body
+  let errorPayload: ProxiedErrorPayload;
   try {
     assertJsonResponse(body);
     errorPayload = body;
   } catch (parseError) {
-    // Likely Bad Gateway or Gateway Timeout from upstream's reverse proxy
-    const hash = req.key?.hash;
-    req.log.warn({ statusCode, statusMessage, key: hash }, parseError.message);
+    const strBody = String(body).slice(0, 128);
+    req.log.error({ statusCode, strBody }, "Error body is not JSON");
 
-    const errorObject = {
+    const details = {
       error: parseError.message,
       status: statusCode,
       statusMessage,
-      proxy_note: `Proxy got back an error, but it was not in JSON format. This is likely a temporary problem with the upstream service.`,
+      proxy_note: `Proxy got back an error, but it was not in JSON format. This is likely a temporary problem with the upstream service. Response body: ${strBody}`,
     };
 
-    sendProxyError(req, res, statusCode, statusMessage, errorObject);
+    sendProxyError(req, res, statusCode, statusMessage, details);
     throw new HttpError(statusCode, parseError.message);
   }
 
+  // Extract the error type from the response body depending on the service
+  if (service === "gcp") {
+    if (Array.isArray(errorPayload)) {
+      errorPayload = errorPayload[0];
+    }
+  }
   const errorType =
     errorPayload.error?.code ||
     errorPayload.error?.type ||
     getAwsErrorType(proxyRes.headers["x-amzn-errortype"]);
 
   req.log.warn(
-    { statusCode, type: errorType, errorPayload, key: req.key?.hash },
-    `Received error response from upstream. (${proxyRes.statusMessage})`
+    { statusCode, statusMessage, errorType, errorPayload, key: req.key?.hash },
+    `API returned an error.`
   );
 
-  // TODO: split upstream error handling into separate modules for each service,
-  // this is out of control.
-
-  const service = req.key!.service;
+  // Try to convert response body to a ProxiedErrorPayload with message/type
   if (service === "aws") {
-    // Try to standardize the error format for AWS
     errorPayload.error = { message: errorPayload.message, type: errorType };
     delete errorPayload.message;
+  } else if (service === "gcp") {
+    if (errorPayload.error?.code) {
+      errorPayload.error = {
+        message: errorPayload.error.message,
+        type: errorPayload.error.status || errorPayload.error.code,
+      };
+    }
   }
 
+  // Figure out what to do with the error
+  // TODO: separate error handling for each service
   if (statusCode === 400) {
     switch (service) {
       case "openai":
-      case "google-ai":
       case "mistral-ai":
       case "azure":
         const filteredCodes = ["content_policy_violation", "content_filter"];
@@ -221,12 +243,16 @@ const handleUpstreamErrors: ProxyResHandlerWithBody = async (
           // same 429 billing error that other models return.
           await handleOpenAIRateLimitError(req, errorPayload);
         } else {
-          errorPayload.proxy_note = `The upstream API rejected the request. Your prompt may be too long for ${req.body?.model}.`;
+          errorPayload.proxy_note = `The upstream API rejected the request. Check the error message for details.`;
         }
         break;
       case "anthropic":
       case "aws":
+      case "gcp":
         await handleAnthropicAwsBadRequestError(req, errorPayload);
+        break;
+      case "google-ai":
+        await handleGoogleAIBadRequestError(req, errorPayload);
         break;
       default:
         assertNever(service);
@@ -242,10 +268,6 @@ const handleUpstreamErrors: ProxyResHandlerWithBody = async (
           errorType === "permission_error" &&
           errorPayload.error?.message?.toLowerCase().includes("multimodal")
         ) {
-          req.log.warn(
-            { key: req.key?.hash },
-            "This Anthropic key does not support multimodal prompts."
-          );
           keyPool.update(req.key!, { allowsMultimodality: false });
           await reenqueueRequest(req);
           throw new RetryableError(
@@ -278,6 +300,12 @@ const handleUpstreamErrors: ProxyResHandlerWithBody = async (
           default:
             errorPayload.proxy_note = `Received 403 error. Key may be invalid.`;
         }
+        return;
+      case "mistral-ai":
+      case "gcp":
+        keyPool.disable(req.key!, "revoked");
+        errorPayload.proxy_note = `Assigned API key is invalid or revoked, please try again.`;
+        return;
     }
   } else if (statusCode === 429) {
     switch (service) {
@@ -289,6 +317,9 @@ const handleUpstreamErrors: ProxyResHandlerWithBody = async (
         break;
       case "aws":
         await handleAwsRateLimitError(req, errorPayload);
+        break;
+      case "gcp":
+        await handleGcpRateLimitError(req, errorPayload);
         break;
       case "azure":
       case "mistral-ai":
@@ -304,7 +335,7 @@ const handleUpstreamErrors: ProxyResHandlerWithBody = async (
     // Most likely model not found
     switch (service) {
       case "openai":
-        if (errorPayload.error?.code === "model_not_found") {
+        if (errorType === "model_not_found") {
           const requestedModel = req.body.model;
           const modelFamily = getOpenAIModelFamily(requestedModel);
           errorPayload.proxy_note = `The key assigned to your prompt does not support the requested model (${requestedModel}, family: ${modelFamily}).`;
@@ -315,28 +346,35 @@ const handleUpstreamErrors: ProxyResHandlerWithBody = async (
         }
         break;
       case "anthropic":
-        errorPayload.proxy_note = `The requested Claude model might not exist, or the key might not be provisioned for it.`;
-        break;
       case "google-ai":
-        errorPayload.proxy_note = `The requested Google AI model might not exist, or the key might not be provisioned for it.`;
-        break;
       case "mistral-ai":
-        errorPayload.proxy_note = `The requested Mistral AI model might not exist, or the key might not be provisioned for it.`;
-        break;
       case "aws":
-        errorPayload.proxy_note = `The requested AWS resource might not exist, or the key might not have access to it.`;
-        break;
+      case "gcp":
       case "azure":
-        errorPayload.proxy_note = `The assigned Azure deployment does not support the requested model.`;
+        errorPayload.proxy_note = `The key assigned to your prompt does not support the requested model.`;
         break;
       default:
         assertNever(service);
+    }
+  } else if (statusCode === 503) {
+    switch (service) {
+      case "aws":
+        if (
+          errorType === "ServiceUnavailableException" &&
+          errorPayload.error?.message?.match(/too many connections/i)
+        ) {
+          errorPayload.proxy_note = `The requested AWS Bedrock model is overloaded. Try again in a few minutes, or try another model.`;
+        }
+        break;
+      default:
+        errorPayload.proxy_note = `Upstream service unavailable. Try again later.`;
+        break;
     }
   } else {
     errorPayload.proxy_note = `Unrecognized error from upstream service.`;
   }
 
-  // Some OAI errors contain the organization ID, which we don't want to reveal.
+  // Redact the OpenAI org id from the error message
   if (errorPayload.error?.message) {
     errorPayload.error.message = errorPayload.error.message.replace(
       /org-.{24}/gm,
@@ -344,9 +382,10 @@ const handleUpstreamErrors: ProxyResHandlerWithBody = async (
     );
   }
 
+  // Send the error to the client
   sendProxyError(req, res, statusCode, statusMessage, errorPayload);
-  // This is bubbled up to onProxyRes's handler for logging but will not trigger
-  // a write to the response as `sendProxyError` has just done that.
+
+  // Re-throw the error to bubble up to onProxyRes's handler for logging
   throw new HttpError(statusCode, errorPayload.error?.message);
 };
 
@@ -432,6 +471,19 @@ async function handleAwsRateLimitError(
   }
 }
 
+async function handleGcpRateLimitError(
+  req: Request,
+  errorPayload: ProxiedErrorPayload
+) {
+  if (errorPayload.error?.type === "RESOURCE_EXHAUSTED") {
+    keyPool.markRateLimited(req.key!);
+    await reenqueueRequest(req);
+    throw new RetryableError("GCP rate-limited request re-enqueued.");
+  } else {
+    errorPayload.proxy_note = `Unrecognized 429 Too Many Requests error from GCP.`;
+  }
+}
+
 async function handleOpenAIRateLimitError(
   req: Request,
   errorPayload: ProxiedErrorPayload
@@ -466,56 +518,6 @@ async function handleOpenAIRateLimitError(
       // Per-minute request or token rate limit is exceeded, which we can retry
       await reenqueueRequest(req);
       throw new RetryableError("Rate-limited request re-enqueued.");
-    // WIP/nonfunctional
-    // case "tokens_usage_based":
-    //   // Weird new rate limit type that seems limited to preview models.
-    //   // Distinct from `tokens` type. Can be per-minute or per-day.
-    //
-    //   // I've seen reports of this error for 500k tokens/day and 10k tokens/min.
-    //   // 10k tokens per minute is problematic, because this is much less than
-    //   // GPT4-Turbo's max context size for a single prompt and is effectively a
-    //   // cap on the max context size for just that key+model, which the app is
-    //   // not able to deal with.
-    //
-    //   // Similarly if there is a 500k tokens per day limit and 450k tokens have
-    //   // been used today, the max context for that key becomes 50k tokens until
-    //   // the next day and becomes progressively smaller as more tokens are used.
-    //
-    //   // To work around these keys we will first retry the request a few times.
-    //   // After that we will reject the request, and if it's a per-day limit we
-    //   // will also disable the key.
-    //
-    //   // "Rate limit reached for gpt-4-1106-preview in organization org-xxxxxxxxxxxxxxxxxxx on tokens_usage_based per day: Limit 500000, Used 460000, Requested 50000"
-    //   // "Rate limit reached for gpt-4-1106-preview in organization org-xxxxxxxxxxxxxxxxxxx on tokens_usage_based per min: Limit 10000, Requested 40000"
-    //
-    //   const regex =
-    //     /Rate limit reached for .+ in organization .+ on \w+ per (day|min): Limit (\d+)(?:, Used (\d+))?, Requested (\d+)/;
-    //   const [, period, limit, used, requested] =
-    //     errorPayload.error?.message?.match(regex) || [];
-    //
-    //   req.log.warn(
-    //     { key: req.key?.hash, period, limit, used, requested },
-    //     "Received `tokens_usage_based` rate limit error from OpenAI."
-    //   );
-    //
-    //   if (!period || !limit || !requested) {
-    //     errorPayload.proxy_note = `Unrecognized rate limit error from OpenAI. (${errorPayload.error?.message})`;
-    //     break;
-    //   }
-    //
-    //   if (req.retryCount < 2) {
-    //     await reenqueueRequest(req);
-    //     throw new RetryableError("Rate-limited request re-enqueued.");
-    //   }
-    //
-    //   if (period === "min") {
-    //     errorPayload.proxy_note = `Assigned key can't be used for prompts longer than ${limit} tokens, and no other keys are available right now. Reduce the length of your prompt or try again in a few minutes.`;
-    //   } else {
-    //     errorPayload.proxy_note = `Assigned key  has reached its per-day request limit for this model. Try another model.`;
-    //   }
-    //
-    //   keyPool.markRateLimited(req.key!);
-    //   break;
     default:
       errorPayload.proxy_note = `This is likely a temporary error with the API. Try again in a few seconds.`;
       break;
@@ -539,17 +541,98 @@ async function handleAzureRateLimitError(
   }
 }
 
+//{"error":{"code":400,"message":"API Key not found. Please pass a valid API key.","status":"INVALID_ARGUMENT","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"API_KEY_INVALID","domain":"googleapis.com","metadata":{"service":"generativelanguage.googleapis.com"}}]}}
+//{"error":{"code":400,"message":"Gemini API free tier is not available in your country. Please enable billing on your project in Google AI Studio.","status":"FAILED_PRECONDITION"}}
+async function handleGoogleAIBadRequestError(
+  req: Request,
+  errorPayload: ProxiedErrorPayload
+) {
+  const error = errorPayload.error || {};
+  // google changes this shit every few months
+  // i don't want to deal with it
+  const keyDeadMsgs = [
+    /please enable billing/i,
+    /API key not valid/i,
+    /API key expired/i,
+    /pass a valid API/i,
+  ];
+  const text = JSON.stringify(error);
+  if (keyDeadMsgs.some((msg) => text.match(msg))) {
+    req.log.warn(
+      { key: req.key?.hash, error: text },
+      "Google API key appears to be inoperative."
+    );
+    keyPool.disable(req.key!, "revoked");
+    errorPayload.proxy_note = `Assigned API key cannot be used.`;
+  } else {
+    req.log.warn(
+      { key: req.key?.hash, error: text },
+      "Unknown Google API error."
+    );
+    errorPayload.proxy_note = `Unrecognized error from Google AI.`;
+  }
+
+  // const { message, status, details } = error;
+  //
+  // if (status === "INVALID_ARGUMENT") {
+  //   const reason = details?.[0]?.reason;
+  //   if (reason === "API_KEY_INVALID") {
+  //     req.log.warn(
+  //       { key: req.key?.hash, status, reason, msg: error.message },
+  //       "Received `API_KEY_INVALID` error from Google AI. Check the configured API key."
+  //     );
+  //     keyPool.disable(req.key!, "revoked");
+  //     errorPayload.proxy_note = `Assigned API key is invalid.`;
+  //   }
+  // } else if (status === "FAILED_PRECONDITION") {
+  //   if (message.match(/please enable billing/i)) {
+  //     req.log.warn(
+  //       { key: req.key?.hash, status, msg: error.message },
+  //       "Cannot use key due to billing restrictions."
+  //     );
+  //     keyPool.disable(req.key!, "revoked");
+  //     errorPayload.proxy_note = `Assigned API key cannot be used.`;
+  //   }
+  // } else {
+  //   req.log.warn(
+  //     { key: req.key?.hash, status, msg: error.message },
+  //     "Received unexpected 400 error from Google AI."
+  //   );
+  // }
+}
+
 //{"error":{"code":429,"message":"Resource has been exhausted (e.g. check quota).","status":"RESOURCE_EXHAUSTED"}
+//
 async function handleGoogleAIRateLimitError(
   req: Request,
   errorPayload: ProxiedErrorPayload
 ) {
   const status = errorPayload.error?.status;
+  const text = JSON.stringify(errorPayload.error);
+
+  // sometimes they block keys by rate limiting them to 0 requests per minute
+  // for some indefinite period of time
+  const keyDeadMsgs = [
+    /GenerateContentRequestsPerMinutePerProjectPerRegion/i,
+    /"quota_limit_value":"0"/i,
+  ];
+
   switch (status) {
-    case "RESOURCE_EXHAUSTED":
+    case "RESOURCE_EXHAUSTED": {
+      if (keyDeadMsgs.every((msg) => text.match(msg))) {
+        req.log.warn(
+          { key: req.key?.hash, error: text },
+          "Google API key appears to be temporarily inoperative and will be disabled."
+        );
+        keyPool.disable(req.key!, "revoked");
+        errorPayload.proxy_note = `Assigned API key cannot be used.`;
+        return;
+      }
+
       keyPool.markRateLimited(req.key!);
       await reenqueueRequest(req);
       throw new RetryableError("Rate-limited request re-enqueued.");
+    }
     default:
       errorPayload.proxy_note = `Unrecognized rate limit error from Google AI (${status}). Please report this.`;
       break;
@@ -599,15 +682,23 @@ const countResponseTokens: ProxyResHandlerWithBody = async (
     const completion = getCompletionFromBody(req, body);
     const tokens = await countTokens({ req, completion, service });
 
+    if (req.service === "openai" || req.service === "azure") {
+      // O1 consumes (a significant amount of) invisible tokens for the chain-
+      // of-thought reasoning. We have no way to count these other than to check
+      // the response body.
+      tokens.reasoning_tokens =
+        body.usage?.completion_tokens_details?.reasoning_tokens;
+    }
+
     req.log.debug(
-      { service, tokens, prevOutputTokens: req.outputTokens },
+      { service, prevOutputTokens: req.outputTokens, tokens },
       `Counted tokens for completion`
     );
     if (req.tokenizerInfo) {
       req.tokenizerInfo.completion_tokens = tokens;
     }
 
-    req.outputTokens = tokens.token_count;
+    req.outputTokens = tokens.token_count + (tokens.reasoning_tokens ?? 0);
   } catch (error) {
     req.log.warn(
       error,
@@ -622,22 +713,25 @@ const trackKeyRateLimit: ProxyResHandlerWithBody = async (proxyRes, req) => {
   keyPool.updateRateLimits(req.key!, proxyRes.headers);
 };
 
+const omittedHeaders = new Set<string>([
+  // Omit content-encoding because we will always decode the response body
+  "content-encoding",
+  // Omit transfer-encoding because we are using response.json which will
+  // set a content-length header, which is not valid for chunked responses.
+  "transfer-encoding",
+  // Don't set cookies from upstream APIs because proxied requests are stateless
+  "set-cookie",
+  "openai-organization",
+  "x-request-id",
+  "cf-ray",
+]);
 const copyHttpHeaders: ProxyResHandlerWithBody = async (
   proxyRes,
   _req,
   res
 ) => {
   Object.keys(proxyRes.headers).forEach((key) => {
-    // Omit content-encoding because we will always decode the response body
-    if (key === "content-encoding") {
-      return;
-    }
-    // We're usually using res.json() to send the response, which causes express
-    // to set content-length. That's not valid for chunked responses and some
-    // clients will reject it so we need to omit it.
-    if (key === "transfer-encoding") {
-      return;
-    }
+    if (omittedHeaders.has(key)) return;
     res.setHeader(key, proxyRes.headers[key] as string);
   });
 };
@@ -681,6 +775,6 @@ function getAwsErrorType(header: string | string[] | undefined) {
 
 function assertJsonResponse(body: any): asserts body is Record<string, any> {
   if (typeof body !== "object") {
-    throw new Error("Expected response to be an object");
+    throw new Error(`Expected response to be an object, got ${typeof body}`);
   }
 }

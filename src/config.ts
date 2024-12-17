@@ -46,6 +46,13 @@ type Config = {
    */
   awsCredentials?: string;
   /**
+   * Comma-delimited list of GCP credentials. Each credential item should be a
+   * colon-delimited list of access key, secret key, and GCP region.
+   *
+   * @example `GCP_CREDENTIALS=project1:1@1.com:us-east5:-----BEGIN PRIVATE KEY-----xxx-----END PRIVATE KEY-----,project2:2@2.com:us-east5:-----BEGIN PRIVATE KEY-----xxx-----END PRIVATE KEY-----`
+   */
+  gcpCredentials?: string;
+  /**
    * Comma-delimited list of Azure OpenAI credentials. Each credential item
    * should be a colon-delimited list of Azure resource name, deployment ID, and
    * API key.
@@ -349,7 +356,7 @@ type Config = {
    *
    * Defaults to no services, meaning image prompts are disabled. Use a comma-
    * separated list. Available services are:
-   * openai,anthropic,google-ai,mistral-ai,aws,azure
+   * openai,anthropic,google-ai,mistral-ai,aws,gcp,azure
    */
   allowedVisionServices: LLMService[];
   /**
@@ -371,6 +378,43 @@ type Config = {
    * Takes precedence over the adminWhitelist.
    */
   ipBlacklist: string[];
+  /**
+   * If set, pushes requests further back into the queue according to their
+   * token costs by factor*tokens*milliseconds (or more intuitively
+   * factor*thousands_of_tokens*seconds).
+   * Accepts floats.
+   */
+  tokensPunishmentFactor: number;
+  /**
+   * Configuration for HTTP requests made by the proxy to other servers, such
+   * as when checking keys or forwarding users' requests to external services.
+   * If not set, all requests will be made using the default agent.
+   *
+   * If set, the proxy may make requests to other servers using the specified
+   * settings. This is useful if you wish to route users' requests through
+   * another proxy or VPN, or if you have multiple network interfaces and want
+   * to use a specific one for outgoing requests.
+   */
+  httpAgent?: {
+    /**
+     * The name of the network interface to use. The first external IPv4 address
+     * belonging to this interface will be used for outgoing requests.
+     */
+    interface?: string;
+    /**
+     * The URL of a proxy server to use. Supports SOCKS4, SOCKS5, HTTP, and
+     * HTTPS. If not set, the proxy will be made using the default agent.
+     * - SOCKS4: `socks4://some-socks-proxy.com:9050`
+     * - SOCKS5: `socks5://username:password@some-socks-proxy.com:9050`
+     * - HTTP: `http://proxy-server-over-tcp.com:3128`
+     * - HTTPS: `https://proxy-server-over-tls.com:3129`
+     *
+     * **Note:** If your proxy server issues a certificate, you may need to set
+     * `NODE_EXTRA_CA_CERTS` to the path to your certificate, otherwise this
+     * application will reject TLS connections.
+     */
+    proxyUrl?: string;
+  };
 };
 
 // To change configs, create a file called .env in the root directory.
@@ -383,6 +427,7 @@ export const config: Config = {
   googleAIKey: getEnvWithDefault("GOOGLE_AI_KEY", ""),
   mistralAIKey: getEnvWithDefault("MISTRAL_AI_KEY", ""),
   awsCredentials: getEnvWithDefault("AWS_CREDENTIALS", ""),
+  gcpCredentials: getEnvWithDefault("GCP_CREDENTIALS", ""),
   azureCredentials: getEnvWithDefault("AZURE_CREDENTIALS", ""),
   proxyKey: getEnvWithDefault("PROXY_KEY", ""),
   adminKey: getEnvWithDefault("ADMIN_KEY", ""),
@@ -407,40 +452,23 @@ export const config: Config = {
   firebaseKey: getEnvWithDefault("FIREBASE_KEY", undefined),
   textModelRateLimit: getEnvWithDefault("TEXT_MODEL_RATE_LIMIT", 4),
   imageModelRateLimit: getEnvWithDefault("IMAGE_MODEL_RATE_LIMIT", 4),
-  maxContextTokensOpenAI: getEnvWithDefault("MAX_CONTEXT_TOKENS_OPENAI", 16384),
+  maxContextTokensOpenAI: getEnvWithDefault("MAX_CONTEXT_TOKENS_OPENAI", 32768),
   maxContextTokensAnthropic: getEnvWithDefault(
     "MAX_CONTEXT_TOKENS_ANTHROPIC",
-    0
+    32768
   ),
   maxOutputTokensOpenAI: getEnvWithDefault(
     ["MAX_OUTPUT_TOKENS_OPENAI", "MAX_OUTPUT_TOKENS"],
-    400
+    1024
   ),
   maxOutputTokensAnthropic: getEnvWithDefault(
     ["MAX_OUTPUT_TOKENS_ANTHROPIC", "MAX_OUTPUT_TOKENS"],
-    400
+    1024
   ),
-  allowedModelFamilies: getEnvWithDefault("ALLOWED_MODEL_FAMILIES", [
-    "turbo",
-    "gpt4",
-    "gpt4-32k",
-    "gpt4-turbo",
-    "gpt4o",
-    "claude",
-    "claude-opus",
-    "gemini-pro",
-    "mistral-tiny",
-    "mistral-small",
-    "mistral-medium",
-    "mistral-large",
-    "aws-claude",
-    "aws-claude-opus",
-    "azure-turbo",
-    "azure-gpt4",
-    "azure-gpt4-32k",
-    "azure-gpt4-turbo",
-    "azure-gpt4o",
-  ]),
+  allowedModelFamilies: getEnvWithDefault(
+    "ALLOWED_MODEL_FAMILIES",
+    getDefaultModelFamilies()
+  ),
   rejectPhrases: parseCsv(getEnvWithDefault("REJECT_PHRASES", "")),
   rejectMessage: getEnvWithDefault(
     "REJECT_MESSAGE",
@@ -492,6 +520,11 @@ export const config: Config = {
     getEnvWithDefault("ADMIN_WHITELIST", "0.0.0.0/0,::/0")
   ),
   ipBlacklist: parseCsv(getEnvWithDefault("IP_BLACKLIST", "")),
+  tokensPunishmentFactor: getEnvWithDefault("TOKENS_PUNISHMENT_FACTOR", 0.0),
+  httpAgent: {
+    interface: getEnvWithDefault("HTTP_AGENT_INTERFACE", undefined),
+    proxyUrl: getEnvWithDefault("HTTP_AGENT_PROXY_URL", undefined),
+  },
 } as const;
 
 function generateSigningKey() {
@@ -509,6 +542,7 @@ function generateSigningKey() {
     config.googleAIKey,
     config.mistralAIKey,
     config.awsCredentials,
+    config.gcpCredentials,
     config.azureCredentials,
   ];
   if (secrets.filter((s) => s).length === 0) {
@@ -527,7 +561,7 @@ function generateSigningKey() {
 }
 
 const signingKey = generateSigningKey();
-export const COOKIE_SECRET = signingKey;
+export const SECRET_SIGNING_KEY = signingKey;
 
 export async function assertConfigIsValid() {
   if (process.env.MODEL_RATE_LIMIT !== undefined) {
@@ -610,6 +644,16 @@ export async function assertConfigIsValid() {
     );
   }
 
+  if (Object.values(config.httpAgent || {}).filter(Boolean).length === 0) {
+    delete config.httpAgent;
+  } else if (config.httpAgent) {
+    if (config.httpAgent.interface && config.httpAgent.proxyUrl) {
+      throw new Error(
+        "Cannot set both `HTTP_AGENT_INTERFACE` and `HTTP_AGENT_PROXY_URL`."
+      );
+    }
+  }
+
   // Ensure forks which add new secret-like config keys don't unwittingly expose
   // them to users.
   for (const key of getKeys(config)) {
@@ -623,15 +667,16 @@ export async function assertConfigIsValid() {
         `Config key "${key}" may be sensitive but is exposed. Add it to SENSITIVE_KEYS or OMITTED_KEYS.`
       );
   }
-
-  await maybeInitializeFirebase();
 }
 
 /**
  * Config keys that are masked on the info page, but not hidden as their
  * presence may be relevant to the user due to privacy implications.
  */
-export const SENSITIVE_KEYS: (keyof Config)[] = ["googleSheetsSpreadsheetId"];
+export const SENSITIVE_KEYS: (keyof Config)[] = [
+  "googleSheetsSpreadsheetId",
+  "httpAgent",
+];
 
 /**
  * Config keys that are not displayed on the info page at all, generally because
@@ -646,6 +691,7 @@ export const OMITTED_KEYS = [
   "googleAIKey",
   "mistralAIKey",
   "awsCredentials",
+  "gcpCredentials",
   "azureCredentials",
   "proxyKey",
   "adminKey",
@@ -736,6 +782,7 @@ function getEnvWithDefault<T>(env: string | string[], defaultValue: T): T {
         "ANTHROPIC_KEY",
         "GOOGLE_AI_KEY",
         "AWS_CREDENTIALS",
+        "GCP_CREDENTIALS",
         "AZURE_CREDENTIALS",
       ].includes(String(env))
     ) {
@@ -753,36 +800,16 @@ function getEnvWithDefault<T>(env: string | string[], defaultValue: T): T {
   }
 }
 
-let firebaseApp: firebase.app.App | undefined;
-
-async function maybeInitializeFirebase() {
-  if (!config.gatekeeperStore.startsWith("firebase")) {
-    return;
-  }
-
-  const firebase = await import("firebase-admin");
-  const firebaseKey = Buffer.from(config.firebaseKey!, "base64").toString();
-  const app = firebase.initializeApp({
-    credential: firebase.credential.cert(JSON.parse(firebaseKey)),
-    databaseURL: config.firebaseRtdbUrl,
-  });
-
-  await app.database().ref("connection-test").set(Date.now());
-
-  firebaseApp = app;
-}
-
-export function getFirebaseApp(): firebase.app.App {
-  if (!firebaseApp) {
-    throw new Error("Firebase app not initialized.");
-  }
-  return firebaseApp;
-}
-
 function parseCsv(val: string): string[] {
   if (!val) return [];
 
   const regex = /(".*?"|[^",]+)(?=\s*,|\s*$)/g;
   const matches = val.match(regex) || [];
   return matches.map((item) => item.replace(/^"|"$/g, "").trim());
+}
+
+function getDefaultModelFamilies(): ModelFamily[] {
+  return MODEL_FAMILIES.filter(
+    (f) => !f.includes("dall-e") && !f.includes("o1")
+  ) as ModelFamily[];
 }

@@ -1,8 +1,10 @@
-import axios, { AxiosError } from "axios";
-import type { MistralAIModelFamily } from "../../models";
+import { AxiosError } from "axios";
+import { MistralAIModelFamily, getMistralAIModelFamily } from "../../models";
+import { getAxiosInstance } from "../../network";
 import { KeyCheckerBase } from "../key-checker-base";
 import type { MistralAIKey, MistralAIKeyProvider } from "./provider";
-import { getMistralAIModelFamily } from "../../models";
+
+const axios = getAxiosInstance();
 
 const MIN_CHECK_INTERVAL = 3 * 1000; // 3 seconds
 const KEY_CHECK_PERIOD = 60 * 60 * 1000; // 1 hour
@@ -69,9 +71,9 @@ export class MistralAIKeyChecker extends KeyCheckerBase<MistralAIKey> {
   protected handleAxiosError(key: MistralAIKey, error: AxiosError) {
     if (error.response && MistralAIKeyChecker.errorIsMistralAIError(error)) {
       const { status, data } = error.response;
-      if (status === 401) {
+      if ([401, 403].includes(status)) {
         this.log.warn(
-          { key: key.hash, error: data },
+          { key: key.hash, error: data, status },
           "Key is invalid or revoked. Disabling key."
         );
         this.updateKey(key.hash, {

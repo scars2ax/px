@@ -1,22 +1,14 @@
-import { Request, Response, RequestHandler, Router } from "express";
-import { createProxyMiddleware } from "http-proxy-middleware";
+import { Request, RequestHandler, Router } from "express";
 import { config } from "../config";
-import { logger } from "../logger";
-import { createQueueMiddleware } from "./queue";
 import { ipLimiter } from "./rate-limit";
-import { handleProxyError } from "./middleware/common";
 import {
   addKey,
-  addAnthropicPreamble,
   createPreprocessorMiddleware,
   finalizeBody,
-  createOnProxyReqHandler,
 } from "./middleware/request";
-import {
-  ProxyResHandlerWithBody,
-  createOnProxyResHandler,
-} from "./middleware/response";
-import { sendErrorToClient } from "./middleware/response/error-generator";
+import { ProxyResHandlerWithBody } from "./middleware/response";
+import { createQueuedProxyMiddleware } from "./middleware/request/proxy-middleware-factory";
+import { ProxyReqManager } from "./middleware/request/proxy-req-manager";
 
 let modelsCache: any = null;
 let modelsCacheTime = 0;
@@ -44,9 +36,13 @@ const getModelsResponse = () => {
     "claude-2.0",
     "claude-2.1",
     "claude-3-haiku-20240307",
+    "claude-3-5-haiku-20241022",
     "claude-3-opus-20240229",
+    "claude-3-opus-latest",
     "claude-3-sonnet-20240229",
-    "claude-3-5-sonnet-20240620"
+    "claude-3-5-sonnet-20240620",
+    "claude-3-5-sonnet-20241022",
+    "claude-3-5-sonnet-latest",
   ];
 
   const models = claudeVariants.map((id) => ({
@@ -69,8 +65,7 @@ const handleModelRequest: RequestHandler = (_req, res) => {
   res.status(200).json(getModelsResponse());
 };
 
-/** Only used for non-streaming requests. */
-const anthropicResponseHandler: ProxyResHandlerWithBody = async (
+const anthropicBlockingResponseHandler: ProxyResHandlerWithBody = async (
   _proxyRes,
   req,
   res,
@@ -123,12 +118,6 @@ export function transformAnthropicChatResponseToAnthropicText(
   };
 }
 
-/**
- * Transforms a model response from the Anthropic API to match those from the
- * OpenAI API, for users using Claude via the OpenAI-compatible endpoint. This
- * is only used for non-streaming requests as streaming requests are handled
- * on-the-fly.
- */
 function transformAnthropicTextResponseToOpenAI(
   anthropicBody: Record<string, any>,
   req: Request
@@ -179,39 +168,58 @@ export function transformAnthropicChatResponseToOpenAI(
   };
 }
 
-const anthropicProxy = createQueueMiddleware({
-  proxyMiddleware: createProxyMiddleware({
-    target: "https://api.anthropic.com",
-    changeOrigin: true,
-    selfHandleResponse: true,
-    logger,
-    on: {
-      proxyReq: createOnProxyReqHandler({
-        pipeline: [addKey, addAnthropicPreamble, finalizeBody],
-      }),
-      proxyRes: createOnProxyResHandler([anthropicResponseHandler]),
-      error: handleProxyError,
-    },
-    // Abusing pathFilter to rewrite the paths dynamically.
-    pathFilter: (pathname, req) => {
-      const isText = req.outboundApi === "anthropic-text";
-      const isChat = req.outboundApi === "anthropic-chat";
-      if (isChat && pathname === "/v1/complete") {
-        req.url = "/v1/messages";
-      }
-      if (isText && pathname === "/v1/chat/completions") {
-        req.url = "/v1/complete";
-      }
-      if (isChat && pathname === "/v1/chat/completions") {
-        req.url = "/v1/messages";
-      }
-      if (isChat && ["sonnet", "opus"].includes(req.params.type)) {
-        req.url = "/v1/messages";
-      }
-      return true;
-    },
-  }),
+/**
+ * If a client using the OpenAI compatibility endpoint requests an actual OpenAI
+ * model, reassigns it to Sonnet.
+ */
+function maybeReassignModel(req: Request) {
+  const model = req.body.model;
+  if (model.includes("claude")) return; // use whatever model the user requested
+  req.body.model = "claude-3-5-sonnet-latest";
+}
+
+/**
+ * If client requests more than 4096 output tokens the request must have a
+ * particular version header.
+ * https://docs.anthropic.com/en/release-notes/api#july-15th-2024
+ */
+function setAnthropicBetaHeader(req: Request) {
+  const { max_tokens_to_sample } = req.body;
+  if (max_tokens_to_sample > 4096) {
+    req.headers["anthropic-beta"] = "max-tokens-3-5-sonnet-2024-07-15";
+  }
+}
+
+function selectUpstreamPath(manager: ProxyReqManager) {
+  const req = manager.request;
+  const pathname = req.url.split("?")[0];
+  req.log.debug({ pathname }, "Anthropic path filter");
+  const isText = req.outboundApi === "anthropic-text";
+  const isChat = req.outboundApi === "anthropic-chat";
+  if (isChat && pathname === "/v1/complete") {
+    manager.setPath("/v1/messages");
+  }
+  if (isText && pathname === "/v1/chat/completions") {
+    manager.setPath("/v1/complete");
+  }
+  if (isChat && pathname === "/v1/chat/completions") {
+    manager.setPath("/v1/messages");
+  }
+  if (isChat && ["sonnet", "opus"].includes(req.params.type)) {
+    manager.setPath("/v1/messages");
+  }
+}
+
+const anthropicProxy = createQueuedProxyMiddleware({
+  target: "https://api.anthropic.com",
+  mutations: [selectUpstreamPath, addKey, finalizeBody],
+  blockingResponseHandler: anthropicBlockingResponseHandler,
 });
+
+const nativeAnthropicChatPreprocessor = createPreprocessorMiddleware(
+  { inApi: "anthropic-chat", outApi: "anthropic-chat", service: "anthropic" },
+  { afterTransform: [setAnthropicBetaHeader] }
+);
 
 const nativeTextPreprocessor = createPreprocessorMiddleware({
   inApi: "anthropic-text",
@@ -268,11 +276,7 @@ anthropicRouter.get("/v1/models", handleModelRequest);
 anthropicRouter.post(
   "/v1/messages",
   ipLimiter,
-  createPreprocessorMiddleware({
-    inApi: "anthropic-chat",
-    outApi: "anthropic-chat",
-    service: "anthropic",
-  }),
+  nativeAnthropicChatPreprocessor,
   anthropicProxy
 );
 // Anthropic text completion endpoint. Translates to Anthropic chat completion
@@ -292,65 +296,5 @@ anthropicRouter.post(
   preprocessOpenAICompatRequest,
   anthropicProxy
 );
-// Temporarily force Anthropic Text to Anthropic Chat for frontends which do not
-// yet support the new model. Forces claude-3. Will be removed once common
-// frontends have been updated.
-anthropicRouter.post(
-  "/v1/:type(sonnet|opus)/:action(complete|messages)",
-  ipLimiter,
-  handleAnthropicTextCompatRequest,
-  createPreprocessorMiddleware({
-    inApi: "anthropic-text",
-    outApi: "anthropic-chat",
-    service: "anthropic",
-  }),
-  anthropicProxy
-);
-
-function handleAnthropicTextCompatRequest(
-  req: Request,
-  res: Response,
-  next: any
-) {
-  const type = req.params.type;
-  const action = req.params.action;
-  const alreadyInChatFormat = Boolean(req.body.messages);
-  const compatModel = `claude-3-${type}-20240229`;
-  req.log.info(
-    { type, inputModel: req.body.model, compatModel, alreadyInChatFormat },
-    "Handling Anthropic compatibility request"
-  );
-
-  if (action === "messages" || alreadyInChatFormat) {
-    return sendErrorToClient({
-      req,
-      res,
-      options: {
-        title: "Unnecessary usage of compatibility endpoint",
-        message: `Your client seems to already support the new Claude API format. This endpoint is intended for clients that do not yet support the new format.\nUse the normal \`/anthropic\` proxy endpoint instead.`,
-        format: "unknown",
-        statusCode: 400,
-        reqId: req.id,
-        obj: {
-          requested_endpoint: "/anthropic/" + type,
-          correct_endpoint: "/anthropic",
-        },
-      },
-    });
-  }
-
-  req.body.model = compatModel;
-  next();
-}
-
-/**
- * If a client using the OpenAI compatibility endpoint requests an actual OpenAI
- * model, reassigns it to Claude 3 Sonnet.
- */
-function maybeReassignModel(req: Request) {
-  const model = req.body.model;
-  if (!model.startsWith("gpt-")) return;
-  req.body.model = "claude-3-sonnet-20240229";
-}
 
 export const anthropic = anthropicRouter;

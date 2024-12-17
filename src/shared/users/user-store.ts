@@ -10,9 +10,13 @@
 import admin from "firebase-admin";
 import schedule from "node-schedule";
 import { v4 as uuid } from "uuid";
-import { config, getFirebaseApp } from "../../config";
+import { config } from "../../config";
+import { logger } from "../../logger";
+import { getFirebaseApp } from "../firebase";
+import { APIFormat } from "../key-management";
 import {
   getAwsBedrockModelFamily,
+  getGcpModelFamily,
   getAzureOpenAIModelFamily,
   getClaudeModelFamily,
   getGoogleAIModelFamily,
@@ -21,10 +25,8 @@ import {
   MODEL_FAMILIES,
   ModelFamily,
 } from "../models";
-import { logger } from "../../logger";
-import { User, UserTokenCounts, UserUpdate } from "./schema";
-import { APIFormat } from "../key-management";
 import { assertNever } from "../utils";
+import { User, UserTokenCounts, UserUpdate } from "./schema";
 
 const log = logger.child({ module: "users" });
 
@@ -70,6 +72,7 @@ export function createUser(createOptions?: {
   type?: User["type"];
   expiresAt?: number;
   tokenLimits?: User["tokenLimits"];
+  tokenRefresh?: User["tokenRefresh"];
 }) {
   const token = uuid();
   const newUser: User = {
@@ -79,6 +82,7 @@ export function createUser(createOptions?: {
     promptCount: 0,
     tokenCounts: { ...INITIAL_TOKENS },
     tokenLimits: createOptions?.tokenLimits ?? { ...config.tokenQuota },
+    tokenRefresh: createOptions?.tokenRefresh ?? { ...INITIAL_TOKENS },
     createdAt: Date.now(),
     meta: {},
   };
@@ -123,6 +127,7 @@ export function upsertUser(user: UserUpdate) {
     promptCount: 0,
     tokenCounts: { ...INITIAL_TOKENS },
     tokenLimits: { ...config.tokenQuota },
+    tokenRefresh: { ...INITIAL_TOKENS },
     createdAt: Date.now(),
     meta: {},
   };
@@ -139,7 +144,6 @@ export function upsertUser(user: UserUpdate) {
     }
   }
 
-  // TODO: Write firebase migration to backfill new fields
   if (updates.tokenCounts) {
     for (const family of MODEL_FAMILIES) {
       updates.tokenCounts[family] ??= 0;
@@ -149,6 +153,16 @@ export function upsertUser(user: UserUpdate) {
     for (const family of MODEL_FAMILIES) {
       updates.tokenLimits[family] ??= 0;
     }
+  }
+  // tokenRefresh is a special case where we want to merge the existing and
+  // updated values for each model family, ignoring falsy values.
+  if (updates.tokenRefresh) {
+    const merged = { ...existing.tokenRefresh };
+    for (const family of MODEL_FAMILIES) {
+      merged[family] =
+        updates.tokenRefresh[family] || existing.tokenRefresh[family];
+    }
+    updates.tokenRefresh = merged;
   }
 
   users.set(user.token, Object.assign(existing, updates));
@@ -245,19 +259,29 @@ export function hasAvailableQuota({
   return tokensConsumed < tokenLimit;
 }
 
+/**
+ * For the given user, sets token limits for each model family to the sum of the
+ * current count and the refresh amount, up to the default limit. If a quota is
+ * not specified for a model family, it is not touched.
+ */
 export function refreshQuota(token: string) {
   const user = users.get(token);
   if (!user) return;
-  const { tokenCounts, tokenLimits } = user;
-  const quotas = Object.entries(config.tokenQuota) as [ModelFamily, number][];
-  quotas
-    // If a quota is not configured, don't touch any existing limits a user may
-    // already have been assigned manually.
-    .filter(([, quota]) => quota > 0)
-    .forEach(
-      ([model, quota]) =>
-        (tokenLimits[model] = (tokenCounts[model] ?? 0) + quota)
-    );
+  const { tokenQuota } = config;
+  const { tokenCounts, tokenLimits, tokenRefresh } = user;
+
+  // Get default quotas for each model family.
+  const defaultQuotas = Object.entries(tokenQuota) as [ModelFamily, number][];
+  // If any user-specific refresh quotas are present, override default quotas.
+  const userQuotas = defaultQuotas.map(
+    ([f, q]) => [f, (tokenRefresh[f] ?? 0) || q] as const /* narrow to tuple */
+  );
+
+  userQuotas
+    // Ignore families with no global or user-specific refresh quota.
+    .filter(([, q]) => q > 0)
+    // Increase family token limit by the family's refresh amount.
+    .forEach(([f, q]) => (tokenLimits[f] = (tokenCounts[f] ?? 0) + q));
   usersToFlush.add(token);
 }
 
@@ -276,10 +300,11 @@ export function disableUser(token: string, reason?: string) {
   if (!user) return;
   user.disabledAt = Date.now();
   user.disabledReason = reason;
-  if (user.meta) {
-    // manually banned tokens cannot be refreshed
-    user.meta.refreshable = false;
+  if (!user.meta) {
+    user.meta = {};
   }
+  // manually banned tokens cannot be refreshed
+  user.meta.refreshable = false;
   usersToFlush.add(token);
 }
 
@@ -307,7 +332,7 @@ function cleanupExpiredTokens() {
       user.meta.refreshable = config.captchaMode !== "none";
       disabled++;
     }
-    const purgeTimeout =  config.powTokenPurgeHours * 60 * 60 * 1000;
+    const purgeTimeout = config.powTokenPurgeHours * 60 * 60 * 1000;
     if (user.disabledAt && user.disabledAt + purgeTimeout < now) {
       users.delete(user.token);
       usersToFlush.add(user.token);
@@ -395,6 +420,8 @@ function getModelFamilyForQuotaUsage(
   // differentiate between Azure and OpenAI variants of the same model.
   if (model.includes("azure")) return getAzureOpenAIModelFamily(model);
   if (model.includes("anthropic.")) return getAwsBedrockModelFamily(model);
+  if (model.startsWith("claude-") && model.includes("@"))
+    return getGcpModelFamily(model);
 
   switch (api) {
     case "openai":
@@ -407,6 +434,7 @@ function getModelFamilyForQuotaUsage(
     case "google-ai":
       return getGoogleAIModelFamily(model);
     case "mistral-ai":
+    case "mistral-text":
       return getMistralAIModelFamily(model);
     default:
       assertNever(api);

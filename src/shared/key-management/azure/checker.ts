@@ -1,7 +1,10 @@
-import axios, { AxiosError } from "axios";
+import { AxiosError } from "axios";
+import { getAzureOpenAIModelFamily } from "../../models";
+import { getAxiosInstance } from "../../network";
 import { KeyCheckerBase } from "../key-checker-base";
 import type { AzureOpenAIKey, AzureOpenAIKeyProvider } from "./provider";
-import { getAzureOpenAIModelFamily } from "../../models";
+
+const axios = getAxiosInstance();
 
 const MIN_CHECK_INTERVAL = 3 * 1000; // 3 seconds
 const KEY_CHECK_PERIOD = 60 * 60 * 1000; // 1 hour
@@ -65,6 +68,14 @@ export class AzureOpenAIKeyChecker extends KeyCheckerBase<AzureOpenAIKey> {
           });
         case "429":
           const headers = error.response.headers;
+          const retryAfter = Number(headers["retry-after"] || 0);
+          if (retryAfter > 3600) {
+            this.log.warn(
+              { key: key.hash, errorType, error: error.response.data, headers },
+              "Key has an excessive rate limit and will be disabled."
+            );
+            return this.updateKey(key.hash, { isDisabled: true });
+          }
           this.log.warn(
             { key: key.hash, errorType, error: error.response.data, headers },
             "Key is rate limited. Rechecking key in 1 minute."
@@ -137,6 +148,7 @@ export class AzureOpenAIKeyChecker extends KeyCheckerBase<AzureOpenAIKey> {
     }
 
     const family = getAzureOpenAIModelFamily(data.model);
+    this.updateKey(key.hash, { modelIds: [data.model] });
 
     // Azure returns "gpt-4" even for GPT-4 Turbo, so we need further checks.
     // Otherwise we can use the model family Azure returned.

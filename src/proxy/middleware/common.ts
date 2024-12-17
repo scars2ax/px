@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import http from "http";
-import httpProxy from "http-proxy";
+import { Socket } from "net";
 import { ZodError } from "zod";
 import { generateErrorMessage } from "zod-error";
 import { HttpError } from "../../shared/errors";
@@ -16,6 +16,7 @@ const ANTHROPIC_COMPLETION_ENDPOINT = "/v1/complete";
 const ANTHROPIC_MESSAGES_ENDPOINT = "/v1/messages";
 const ANTHROPIC_SONNET_COMPAT_ENDPOINT = "/v1/sonnet";
 const ANTHROPIC_OPUS_COMPAT_ENDPOINT = "/v1/opus";
+const GOOGLE_AI_COMPLETION_ENDPOINT = "/v1beta/models";
 
 export function isTextGenerationRequest(req: Request) {
   return (
@@ -27,6 +28,7 @@ export function isTextGenerationRequest(req: Request) {
       ANTHROPIC_MESSAGES_ENDPOINT,
       ANTHROPIC_SONNET_COMPAT_ENDPOINT,
       ANTHROPIC_OPUS_COMPAT_ENDPOINT,
+      GOOGLE_AI_COMPLETION_ENDPOINT,
     ].some((endpoint) => req.path.startsWith(endpoint))
   );
 }
@@ -70,16 +72,23 @@ export function sendProxyError(
   });
 }
 
-export const handleProxyError: httpProxy.ErrorCallback = (err, req, res) => {
-  req.log.error(err, `Error during http-proxy-middleware request`);
-  classifyErrorAndSend(err, req as Request, res as Response);
-};
-
+/**
+ * Handles errors thrown during preparation of a proxy request (before it is
+ * sent to the upstream API), typically due to validation, quota, or other
+ * pre-flight checks. Depending on the error class, this function will send an
+ * appropriate error response to the client, streaming it if necessary.
+ */
 export const classifyErrorAndSend = (
   err: Error,
   req: Request,
-  res: Response
+  res: Response | Socket
 ) => {
+  if (res instanceof Socket) {
+    // We should always have an Express response object here, but http-proxy's
+    // ErrorCallback type says it could be just a Socket.
+    req.log.error(err, "Caught error while proxying request to target but cannot send error response to client.");
+    return res.destroy();
+  }
   try {
     const { statusCode, statusMessage, userMessage, ...errorDetails } =
       classifyError(err);
@@ -221,9 +230,12 @@ export function getCompletionFromBody(req: Request, body: Record<string, any>) {
   switch (format) {
     case "openai":
     case "mistral-ai":
-      // Can be null if the model wants to invoke tools rather than return a
-      // completion.
-      return body.choices[0].message.content || "";
+      // Few possible values:
+      // - choices[0].message.content
+      // - choices[0].message with no content if model is invoking a tool
+      return body.choices?.[0]?.message?.content || "";
+    case "mistral-text":
+      return body.outputs?.[0]?.text || "";
     case "openai-text":
       return body.choices[0].text;
     case "anthropic-chat":
@@ -252,7 +264,15 @@ export function getCompletionFromBody(req: Request, body: Record<string, any>) {
       if ("choices" in body) {
         return body.choices[0].message.content;
       }
-      return body.candidates[0].content.parts[0].text;
+      const text = body.candidates[0].content?.parts?.[0]?.text;
+      if (!text) {
+        req.log.warn(
+          { body: JSON.stringify(body) },
+          "Received empty Google AI text completion"
+        );
+        return "";
+      }
+      return text;
     case "openai-image":
       return body.data?.map((item: any) => item.url).join("\n");
     default:
@@ -260,22 +280,22 @@ export function getCompletionFromBody(req: Request, body: Record<string, any>) {
   }
 }
 
-export function getModelFromBody(req: Request, body: Record<string, any>) {
+export function getModelFromBody(req: Request, resBody: Record<string, any>) {
   const format = req.outboundApi;
   switch (format) {
     case "openai":
     case "openai-text":
+      return resBody.model;
     case "mistral-ai":
-      return body.model;
+    case "mistral-text":
     case "openai-image":
+    case "google-ai":
+      // These formats don't have a model in the response body.
       return req.body.model;
     case "anthropic-chat":
     case "anthropic-text":
       // Anthropic confirms the model in the response, but AWS Claude doesn't.
-      return body.model || req.body.model;
-    case "google-ai":
-      // Google doesn't confirm the model in the response.
-      return req.body.model;
+      return resBody.model || req.body.model;
     default:
       assertNever(format);
   }

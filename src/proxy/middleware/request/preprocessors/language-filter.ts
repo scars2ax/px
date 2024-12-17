@@ -1,4 +1,5 @@
 import { Request } from "express";
+import { z } from "zod";
 import { config } from "../../../../config";
 import { assertNever } from "../../../../shared/utils";
 import { RequestPreprocessor } from "../index";
@@ -8,6 +9,7 @@ import {
   OpenAIChatMessage,
   flattenAnthropicMessages,
 } from "../../../../shared/api-schemas";
+import { GoogleAIV1GenerateContentSchema } from "../../../../shared/api-schemas/google-ai";
 
 const rejectedClients = new Map<string, number>();
 
@@ -50,14 +52,16 @@ export const languageFilter: RequestPreprocessor = async (req) => {
   }
 };
 
+/* 
+TODO: this is not type safe and does not raise errors if request body zod schema
+is changed.
+*/
 function getPromptFromRequest(req: Request) {
   const service = req.outboundApi;
   const body = req.body;
   switch (service) {
     case "anthropic-chat":
       return flattenAnthropicMessages(body.messages);
-    case "anthropic-text":
-      return body.prompt;
     case "openai":
     case "mistral-ai":
       return body.messages
@@ -72,11 +76,18 @@ function getPromptFromRequest(req: Request) {
           return `${msg.role}: ${text}`;
         })
         .join("\n\n");
+    case "anthropic-text":
     case "openai-text":
     case "openai-image":
+    case "mistral-text":
       return body.prompt;
-    case "google-ai":
-      return body.prompt.text;
+    case "google-ai": {
+      const b = body as z.infer<typeof GoogleAIV1GenerateContentSchema>;
+      return [
+        b.systemInstruction?.parts.map((p) => p.text),
+        ...b.contents.flatMap((c) => c.parts.map((p) => p.text)),
+      ].join("\n");
+    }
     default:
       assertNever(service);
   }

@@ -2,7 +2,6 @@ import { RequestPreprocessor } from "../index";
 import { countTokens } from "../../../../shared/tokenization";
 import { assertNever } from "../../../../shared/utils";
 import {
-  AnthropicChatMessage,
   GoogleAIChatMessage,
   MistralAIChatMessage,
   OpenAIChatMessage,
@@ -18,7 +17,7 @@ export const countPromptTokens: RequestPreprocessor = async (req) => {
 
   switch (service) {
     case "openai": {
-      req.outputTokens = req.body.max_tokens;
+      req.outputTokens = req.body.max_completion_tokens || req.body.max_tokens;
       const prompt: OpenAIChatMessage[] = req.body.messages;
       result = await countTokens({ req, prompt, service });
       break;
@@ -31,10 +30,13 @@ export const countPromptTokens: RequestPreprocessor = async (req) => {
     }
     case "anthropic-chat": {
       req.outputTokens = req.body.max_tokens;
-      const prompt = {
-        system: req.body.system ?? "",
-        messages: req.body.messages,
-      };
+      let system = req.body.system ?? "";
+      if (Array.isArray(system)) {
+        system = system
+          .map((m: { type: string; text: string }) => m.text)
+          .join("\n");
+      }
+      const prompt = { system, messages: req.body.messages };
       result = await countTokens({ req, prompt, service });
       break;
     }
@@ -50,9 +52,11 @@ export const countPromptTokens: RequestPreprocessor = async (req) => {
       result = await countTokens({ req, prompt, service });
       break;
     }
-    case "mistral-ai": {
+    case "mistral-ai":
+    case "mistral-text": {
       req.outputTokens = req.body.max_tokens;
-      const prompt: MistralAIChatMessage[] = req.body.messages;
+      const prompt: string | MistralAIChatMessage[] =
+        req.body.messages ?? req.body.prompt;
       result = await countTokens({ req, prompt, service });
       break;
     }

@@ -1,73 +1,30 @@
 import { RequestHandler, Router } from "express";
-import { createProxyMiddleware } from "http-proxy-middleware";
 import { config } from "../config";
-import { keyPool } from "../shared/key-management";
-import {
-  AzureOpenAIModelFamily,
-  getAzureOpenAIModelFamily,
-  ModelFamily,
-} from "../shared/models";
-import { logger } from "../logger";
-import { KNOWN_OPENAI_MODELS } from "./openai";
-import { createQueueMiddleware } from "./queue";
+import { generateModelList } from "./openai";
 import { ipLimiter } from "./rate-limit";
-import { handleProxyError } from "./middleware/common";
 import {
   addAzureKey,
-  createOnProxyReqHandler,
   createPreprocessorMiddleware,
   finalizeSignedRequest,
 } from "./middleware/request";
-import {
-  createOnProxyResHandler,
-  ProxyResHandlerWithBody,
-} from "./middleware/response";
+import { ProxyResHandlerWithBody } from "./middleware/response";
+import { createQueuedProxyMiddleware } from "./middleware/request/proxy-middleware-factory";
 
 let modelsCache: any = null;
 let modelsCacheTime = 0;
 
-function getModelsResponse() {
-  if (new Date().getTime() - modelsCacheTime < 1000 * 60) {
-    return modelsCache;
-  }
-
-  let available = new Set<AzureOpenAIModelFamily>();
-  for (const key of keyPool.list()) {
-    if (key.isDisabled || key.service !== "azure") continue;
-    key.modelFamilies.forEach((family) =>
-      available.add(family as AzureOpenAIModelFamily)
-    );
-  }
-  const allowed = new Set<ModelFamily>(config.allowedModelFamilies);
-  available = new Set([...available].filter((x) => allowed.has(x)));
-
-  const models = KNOWN_OPENAI_MODELS.map((id) => ({
-    id,
-    object: "model",
-    created: new Date().getTime(),
-    owned_by: "azure",
-    permission: [
-      {
-        id: "modelperm-" + id,
-        object: "model_permission",
-        created: new Date().getTime(),
-        organization: "*",
-        group: null,
-        is_blocking: false,
-      },
-    ],
-    root: id,
-    parent: null,
-  })).filter((model) => available.has(getAzureOpenAIModelFamily(model.id)));
-
-  modelsCache = { object: "list", data: models };
-  modelsCacheTime = new Date().getTime();
-
-  return modelsCache;
-}
-
 const handleModelRequest: RequestHandler = (_req, res) => {
-  res.status(200).json(getModelsResponse());
+  if (new Date().getTime() - modelsCacheTime < 1000 * 60) {
+    return res.status(200).json(modelsCache);
+  }
+
+  if (!config.azureCredentials) return { object: "list", data: [] };
+
+  const result = generateModelList("azure");
+
+  modelsCache = { object: "list", data: result };
+  modelsCacheTime = new Date().getTime();
+  res.status(200).json(modelsCache);
 };
 
 const azureOpenaiResponseHandler: ProxyResHandlerWithBody = async (
@@ -83,25 +40,16 @@ const azureOpenaiResponseHandler: ProxyResHandlerWithBody = async (
   res.status(200).json({ ...body, proxy: body.proxy });
 };
 
-const azureOpenAIProxy = createQueueMiddleware({
-  beforeProxy: addAzureKey,
-  proxyMiddleware: createProxyMiddleware({
-    target: "will be set by router",
-    router: (req) => {
-      if (!req.signedRequest) throw new Error("signedRequest not set");
-      const { hostname, path } = req.signedRequest;
-      return `https://${hostname}${path}`;
-    },
-    changeOrigin: true,
-    selfHandleResponse: true,
-    logger,
-    on: {
-      proxyReq: createOnProxyReqHandler({ pipeline: [finalizeSignedRequest] }),
-      proxyRes: createOnProxyResHandler([azureOpenaiResponseHandler]),
-      error: handleProxyError,
-    },
-  }),
+const azureOpenAIProxy = createQueuedProxyMiddleware({
+  target: ({ signedRequest }) => {
+    if (!signedRequest) throw new Error("Must sign request before proxying");
+    const { hostname, protocol } = signedRequest;
+    return `${protocol}//${hostname}`;
+  },
+  mutations: [addAzureKey, finalizeSignedRequest],
+  blockingResponseHandler: azureOpenaiResponseHandler,
 });
+
 
 const azureOpenAIRouter = Router();
 azureOpenAIRouter.get("/v1/models", handleModelRequest);

@@ -17,7 +17,7 @@ import {
 } from "../../shared/users/schema";
 import { getLastNImages } from "../../shared/file-storage/image-history";
 import { blacklists, parseCidrs, whitelists } from "../../shared/cidr";
-import { invalidatePowHmacKey } from "../../user/web/pow-captcha";
+import { invalidatePowChallenges } from "../../user/web/pow-captcha";
 
 const router = Router();
 
@@ -268,7 +268,14 @@ router.post("/maintenance", (req, res) => {
   let flash = { type: "", message: "" };
   switch (action) {
     case "recheck": {
-      const checkable: LLMService[] = ["openai", "anthropic", "aws", "azure"];
+      const checkable: LLMService[] = [
+        "openai",
+        "anthropic",
+        "aws",
+        "gcp",
+        "azure",
+        "google-ai"
+      ];
       checkable.forEach((s) => keyPool.recheck(s));
       const keyCount = keyPool
         .list()
@@ -317,7 +324,7 @@ router.post("/maintenance", (req, res) => {
         user.disabledReason = "Admin forced expiration.";
         userStore.upsertUser(user);
       });
-      invalidatePowHmacKey();
+      invalidatePowChallenges();
       flash.type = "success";
       flash.message = `${temps.length} temporary users marked for expiration.`;
       break;
@@ -338,24 +345,20 @@ router.post("/maintenance", (req, res) => {
     case "setDifficulty": {
       const selected = req.body["pow-difficulty"];
       const valid = ["low", "medium", "high", "extreme"];
-      if (!selected || !valid.includes(selected)) {
-        throw new HttpError(400, "Invalid difficulty" + selected);
+      const isNumber = Number.isInteger(Number(selected));
+      if (!selected || !valid.includes(selected) && !isNumber) {
+        throw new HttpError(400, "Invalid difficulty " + selected);
       }
-      config.powDifficultyLevel = selected;
+      config.powDifficultyLevel = isNumber ? Number(selected) : selected;
+      invalidatePowChallenges();
       break;
     }
     case "generateTempIpReport": {
       const tempUsers = userStore
         .getUsers()
         .filter((u) => u.type === "temporary");
-      const ipv4RangeMap: Map<string, Set<string>> = new Map<
-        string,
-        Set<string>
-      >();
-      const ipv6RangeMap: Map<string, Set<string>> = new Map<
-        string,
-        Set<string>
-      >();
+      const ipv4RangeMap = new Map<string, Set<string>>();
+      const ipv6RangeMap = new Map<string, Set<string>>();
 
       tempUsers.forEach((u) => {
         u.ip.forEach((ip) => {
@@ -365,14 +368,14 @@ router.post("/maintenance", (req, res) => {
               const subnet =
                 parsed.toNormalizedString().split(".").slice(0, 3).join(".") +
                 ".0/24";
-              const userSet = ipv4RangeMap.get(subnet) || new Set<string>();
+              const userSet = ipv4RangeMap.get(subnet) || new Set();
               userSet.add(u.token);
               ipv4RangeMap.set(subnet, userSet);
             } else if (parsed.kind() === "ipv6") {
               const subnet =
                 parsed.toNormalizedString().split(":").slice(0, 4).join(":") +
                 "::/48";
-              const userSet = ipv6RangeMap.get(subnet) || new Set<string>();
+              const userSet = ipv6RangeMap.get(subnet) || new Set();
               userSet.add(u.token);
               ipv6RangeMap.set(subnet, userSet);
             }

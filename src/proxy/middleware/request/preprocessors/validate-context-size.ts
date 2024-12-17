@@ -6,8 +6,9 @@ import { RequestPreprocessor } from "../index";
 
 const CLAUDE_MAX_CONTEXT = config.maxContextTokensAnthropic;
 const OPENAI_MAX_CONTEXT = config.maxContextTokensOpenAI;
-const GOOGLE_AI_MAX_CONTEXT = 32000;
-const MISTRAL_AI_MAX_CONTENT = 32768;
+// todo: make configurable
+const GOOGLE_AI_MAX_CONTEXT = 2048000;
+const MISTRAL_AI_MAX_CONTENT = 131072;
 
 /**
  * Assigns `req.promptTokens` and `req.outputTokens` based on the request body
@@ -37,6 +38,7 @@ export const validateContextSize: RequestPreprocessor = async (req) => {
       proxyMax = GOOGLE_AI_MAX_CONTEXT;
       break;
     case "mistral-ai":
+    case "mistral-text":
       proxyMax = MISTRAL_AI_MAX_CONTENT;
       break;
     case "openai-image":
@@ -56,6 +58,8 @@ export const validateContextSize: RequestPreprocessor = async (req) => {
     modelMax = 16384;
   } else if (model.match(/^gpt-4o/)) {
     modelMax = 128000;
+  } else if (model.match(/^chatgpt-4o/)) {
+    modelMax = 128000;
   } else if (model.match(/gpt-4-turbo(-\d{4}-\d{2}-\d{2})?$/)) {
     modelMax = 131072;
   } else if (model.match(/gpt-4-turbo(-preview)?$/)) {
@@ -64,6 +68,10 @@ export const validateContextSize: RequestPreprocessor = async (req) => {
     modelMax = 131072;
   } else if (model.match(/^gpt-4(-\d{4})?-vision(-preview)?$/)) {
     modelMax = 131072;
+  } else if (model.match(/^o1-mini(-\d{4}-\d{2}-\d{2})?$/)) {
+    modelMax = 128000;
+  } else if (model.match(/^o1(-preview)?(-\d{4}-\d{2}-\d{2})?$/)) {
+    modelMax = 128000;
   } else if (model.match(/gpt-3.5-turbo/)) {
     modelMax = 16384;
   } else if (model.match(/gpt-4-32k/)) {
@@ -80,17 +88,19 @@ export const validateContextSize: RequestPreprocessor = async (req) => {
     modelMax = 200000;
   } else if (model.match(/^claude-3/)) {
     modelMax = 200000;
-  } else if (model.match(/^gemini-\d{3}$/)) {
-    modelMax = GOOGLE_AI_MAX_CONTEXT;
-  } else if (model.match(/^mistral-(tiny|small|medium)$/)) {
-    modelMax = MISTRAL_AI_MAX_CONTENT;
+  } else if (model.match(/^gemini-/)) {
+    modelMax = 1024000;
   } else if (model.match(/^anthropic\.claude-3/)) {
     modelMax = 200000;
   } else if (model.match(/^anthropic\.claude-v2:\d/)) {
     modelMax = 200000;
   } else if (model.match(/^anthropic\.claude/)) {
-    // Not sure if AWS Claude has the same context limit as Anthropic Claude.
     modelMax = 100000;
+  } else if (model.match(/tral/)) {
+    // catches mistral, mixtral, codestral, mathstral, etc. mistral models have
+    // no name convention and wildly different context windows so this is a
+    // catch-all
+    modelMax = MISTRAL_AI_MAX_CONTENT;
   } else {
     req.log.warn({ model }, "Unknown model, using 200k token limit.");
     modelMax = 200000;

@@ -8,12 +8,13 @@ import { LLMService, MODEL_FAMILY_SERVICE, ModelFamily } from "../models";
 import { Key, KeyProvider } from "./index";
 import { AnthropicKeyProvider, AnthropicKeyUpdate } from "./anthropic/provider";
 import { OpenAIKeyProvider, OpenAIKeyUpdate } from "./openai/provider";
-import { GoogleAIKeyProvider } from "./google-ai/provider";
+import { GoogleAIKeyProvider  } from "./google-ai/provider";
 import { AwsBedrockKeyProvider } from "./aws/provider";
+import { GcpKeyProvider, GcpKey } from "./gcp/provider";
 import { AzureOpenAIKeyProvider } from "./azure/provider";
 import { MistralAIKeyProvider } from "./mistral-ai/provider";
 
-type AllowedPartial = OpenAIKeyUpdate | AnthropicKeyUpdate;
+type AllowedPartial = OpenAIKeyUpdate | AnthropicKeyUpdate | Partial<GcpKey>;
 
 export class KeyPool {
   private keyProviders: KeyProvider[] = [];
@@ -27,6 +28,7 @@ export class KeyPool {
     this.keyProviders.push(new GoogleAIKeyProvider());
     this.keyProviders.push(new MistralAIKeyProvider());
     this.keyProviders.push(new AwsBedrockKeyProvider());
+    this.keyProviders.push(new GcpKeyProvider());
     this.keyProviders.push(new AzureOpenAIKeyProvider());
   }
 
@@ -73,6 +75,14 @@ export class KeyPool {
     }
   }
 
+  /**
+   * Updates a key in the keypool with the given properties.
+   *
+   * Be aware that the `key` argument may not be the same object instance as the
+   * one in the keypool (such as if it is a clone received via `KeyPool.get` in
+   * which case you are responsible for updating your clone with the new
+   * properties.
+   */
   public update(key: Key, props: AllowedPartial): void {
     const service = this.getKeyProvider(key.service);
     service.update(key.hash, props);
@@ -128,7 +138,11 @@ export class KeyPool {
       return "openai";
     } else if (model.startsWith("claude-")) {
       // https://console.anthropic.com/docs/api/reference#parameters
-      return "anthropic";
+      if (!model.includes('@')) {
+        return "anthropic";
+      } else {
+        return "gcp";
+      }
     } else if (model.includes("gemini")) {
       // https://developers.generativeai.google.com/models/language
       return "google-ai";
@@ -164,8 +178,9 @@ export class KeyPool {
 
     const job = schedule.scheduleJob(crontab, () => {
       const next = job.nextInvocation();
-      logger.info({ next }, "Performing periodic recheck of OpenAI keys");
+      logger.info({ next }, "Performing periodic recheck.");
       this.recheck("openai");
+      this.recheck("google-ai");
     });
     logger.info(
       { rule: crontab, next: job.nextInvocation() },

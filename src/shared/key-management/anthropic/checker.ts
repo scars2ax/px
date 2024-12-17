@@ -1,6 +1,9 @@
-import axios, { AxiosError, AxiosResponse } from "axios";
+import { AxiosError, AxiosResponse } from "axios";
+import { getAxiosInstance } from "../../network";
 import { KeyCheckerBase } from "../key-checker-base";
 import type { AnthropicKey, AnthropicKeyProvider } from "./provider";
+
+const axios = getAxiosInstance();
 
 const MIN_CHECK_INTERVAL = 3 * 1000; // 3 seconds
 const KEY_CHECK_PERIOD = 1000 * 60 * 60 * 6; // 6 hours
@@ -122,7 +125,7 @@ export class AnthropicKeyChecker extends KeyCheckerBase<AnthropicKey> {
       { key: key.hash, error: error.message },
       "Network error while checking key; trying this key again in a minute."
     );
-    const oneMinute = 10 * 1000;
+    const oneMinute = 60 * 1000;
     const next = Date.now() - (KEY_CHECK_PERIOD - oneMinute);
     this.updateKey(key.hash, { lastChecked: next });
   }

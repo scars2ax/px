@@ -63,7 +63,12 @@ export const AnthropicV1MessagesSchema = AnthropicV1BaseSchema.merge(
       .number()
       .int()
       .transform((v) => Math.min(v, CLAUDE_OUTPUT_MAX)),
-    system: z.string().optional(),
+    system: z
+      .union([
+        z.string(),
+        z.array(z.object({ type: z.literal("text"), text: z.string() })),
+      ])
+      .optional(),
   })
 );
 export type AnthropicChatMessage = z.infer<
@@ -105,8 +110,6 @@ export const transformOpenAIToAnthropicChat: APIFormatTransformer<
     throw result.error;
   }
 
-  req.headers["anthropic-version"] = "2023-06-01";
-
   const { messages, ...rest } = result.data;
   const { messages: newMessages, system } =
     openAIMessagesToClaudeChatPrompt(messages);
@@ -140,8 +143,6 @@ export const transformOpenAIToAnthropicText: APIFormatTransformer<
     );
     throw result.error;
   }
-
-  req.headers["anthropic-version"] = "2023-06-01";
 
   const { messages, ...rest } = result.data;
   const prompt = openAIMessagesToClaudeTextPrompt(messages);
@@ -186,8 +187,6 @@ export const transformAnthropicTextToAnthropicChat: APIFormatTransformer<
     );
     throw result.error;
   }
-
-  req.headers["anthropic-version"] = "2023-06-01";
 
   const { model, max_tokens_to_sample, prompt, ...rest } = result.data;
   validateAnthropicTextPrompt(prompt);
